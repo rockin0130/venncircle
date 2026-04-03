@@ -717,6 +717,9 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                         );
                       })}
                     </div>
+                    <p className="text-[11px] text-muted-foreground mt-2 px-1">
+                      A calendar can be private or shared, not both
+                    </p>
                   </div>
 
                   {/* Delete option for non-default local calendars */}
