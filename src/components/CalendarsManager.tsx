@@ -253,14 +253,9 @@ const CalendarsManager = ({ open, onClose }: Props) => {
     if (visible) {
       if (isPrivateCtx) {
         // Turning on Private → turn off all group contexts
-        const updates: ContextVisRow[] = [];
-        const dbOps: Promise<any>[] = [];
         
         groupCtxIds.forEach(gid => {
           updates.push({ calendar_id: calId, context_id: gid, is_visible: false, visibility_mode: getVisibilityMode(calId, gid) });
-          dbOps.push(supabase.from("calendar_context_visibility").upsert({
-            user_id: user.id, calendar_id: calId, context_id: gid, is_visible: false, visibility_mode: getVisibilityMode(calId, gid),
-          } as any, { onConflict: "user_id,calendar_id,context_id" }));
         });
         
         setContextVisRows((prev) => {
@@ -270,12 +265,16 @@ const CalendarsManager = ({ open, onClose }: Props) => {
           return filtered;
         });
         
-        await Promise.all([
-          supabase.from("calendar_context_visibility").upsert({
-            user_id: user.id, calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode,
-          } as any, { onConflict: "user_id,calendar_id,context_id" }),
-          ...dbOps,
-        ]);
+        // Persist: turn on Private
+        await supabase.from("calendar_context_visibility").upsert({
+          user_id: user.id, calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode,
+        } as any, { onConflict: "user_id,calendar_id,context_id" });
+        // Persist: turn off all groups
+        for (const gid of groupCtxIds) {
+          await supabase.from("calendar_context_visibility").upsert({
+            user_id: user.id, calendar_id: calId, context_id: gid, is_visible: false, visibility_mode: getVisibilityMode(calId, gid),
+          } as any, { onConflict: "user_id,calendar_id,context_id" });
+        }
         return;
       } else {
         // Turning on a group → turn off Private
