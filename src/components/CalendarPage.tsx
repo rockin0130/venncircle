@@ -622,7 +622,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     });
 
     return filtered;
-  }, [filteredEvents, filteredTasks, googleCalendarEvents, showGoogleCalendar, visibleCalendarIds, visibleProviderCalendarIds, calendarColorMap.defaultVisible, calendarRecords.length, userFilterIds, user?.id, groups]);
+  }, [calFilteredEvents, calFilteredTasks, googleCalendarEvents, showGoogleCalendar, visibleCalendarIds, visibleProviderCalendarIds, calendarColorMap.defaultVisible, calendarRecords.length, userFilterIds, user?.id, groups]);
 
   const selectedDayItems = useMemo(
     () => getItemsForDate(selDay, selMonth, selYear),
