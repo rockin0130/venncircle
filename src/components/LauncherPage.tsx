@@ -213,6 +213,7 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
                 invite_code: g.invite_code,
                 created_by: g.created_by,
                 cover_image_url: g.cover_image_url || null,
+                category: (g.category === "interest" ? "interest" : "home") as "home" | "interest",
                 shared_pages: g.shared_pages || ["calendar","workout","nutrition","habits","sobriety","special_days","shopping"],
                 members: [],
               }))

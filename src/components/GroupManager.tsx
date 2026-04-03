@@ -62,6 +62,7 @@ const GroupManager = () => {
             invite_code: result.invite_code || "",
             created_by: "",
             shared_pages: ["calendar","workout","nutrition","habits","sobriety","special_days","shopping"],
+            category: "home",
             members: [],
           };
           setNewlyCreatedGroup(created);
