@@ -5,18 +5,23 @@ import CreateGroupModal from "@/components/CreateGroupModal";
 
 interface PageGroupSelectorProps {
   page: ShareablePage;
+  isHomePage?: boolean;
 }
 
 const PERSONAL_SENTINEL = "__personal__";
 
-const PageGroupSelector = ({ page }: PageGroupSelectorProps) => {
+const PageGroupSelector = ({ page, isHomePage }: PageGroupSelectorProps) => {
   const { groups, activeGroup, setActiveGroup } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
 
-  // Filter groups that include this page
+  // Filter groups: on Home page, only show "home" category groups
   const pageGroups = useMemo(
-    () => groups.filter((g) => g.shared_pages?.includes(page)),
-    [groups, page]
+    () => groups.filter((g) => {
+      if (!g.shared_pages?.includes(page)) return false;
+      if (isHomePage && g.category !== "home") return false;
+      return true;
+    }),
+    [groups, page, isHomePage]
   );
 
   // "Personal" is represented by activeGroup === null AND a special flag
@@ -78,13 +83,13 @@ const PageGroupSelector = ({ page }: PageGroupSelectorProps) => {
           );
         })}
 
-        {/* Add Group chip */}
+        {/* Add Group/Family chip */}
         <button
           onClick={() => setShowCreate(true)}
           className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0 border border-dashed border-primary/30 text-primary hover:bg-primary/5"
         >
           <Plus size={12} />
-          <span>Add Group</span>
+          <span>{isHomePage ? "Add Family" : "Add Group"}</span>
         </button>
       </div>
 
@@ -92,6 +97,7 @@ const PageGroupSelector = ({ page }: PageGroupSelectorProps) => {
         open={showCreate}
         onOpenChange={setShowCreate}
         defaultPage={page}
+        defaultCategory={isHomePage ? "home" : undefined}
       />
     </>
   );

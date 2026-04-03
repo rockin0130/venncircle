@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
-import { Plus, Sparkles, Clock, Check, Loader2, MoreVertical, Trash2, ChevronLeft, ChevronRight, Mic, MicOff, Volume2, Users, ArrowLeft, EyeOff, Eye, Settings, LayoutGrid, ListTodo, CalendarDays, Bell, Search } from "lucide-react";
+import { Plus, Sparkles, Clock, Check, Loader2, MoreVertical, Trash2, ChevronLeft, ChevronRight, Mic, MicOff, Volume2, Users, ArrowLeft, EyeOff, Eye, Settings, LayoutGrid, ListTodo, CalendarDays, Bell, Search, ChevronRightIcon } from "lucide-react";
 import NotificationCenter from "@/components/NotificationCenter";
 import UniversalSearch from "@/components/UniversalSearch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -27,6 +27,7 @@ import { useGroupContext } from "@/hooks/useGroupContext";
 import { cn } from "@/lib/utils";
 
 type Filter = string; // "mine" | "partner" | "household" | "member:{userId}"
+type AllViewFilter = string; // user IDs that are selected in All view
 
 interface ClarificationState {
   question: string;
@@ -35,8 +36,8 @@ interface ClarificationState {
   conversationHistory: { role: string; content: string }[];
 }
 
-const HomePage = ({ onBackToLauncher, onOpenSettings }: { onBackToLauncher?: () => void; onOpenSettings?: () => void }) => {
-  const { profile, partner, groups, activeGroup, setActiveGroup } = useAuth();
+const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLauncher?: () => void; onOpenSettings?: () => void; onNavigate?: (page: string) => void }) => {
+  const { profile, partner, groups, activeGroup, setActiveGroup, user } = useAuth();
   const [filter, setFilter] = useState<Filter>("mine");
   const [input, setInput] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -389,6 +390,57 @@ const HomePage = ({ onBackToLauncher, onOpenSettings }: { onBackToLauncher?: () 
   const { filters: groupFilters, otherName, hasOther, showGoogleCalendar } = useGroupContext();
   const partnerName = otherName;
 
+  // Determine if "Personal" sentinel is active
+  const isPersonalActive = (activeGroup as any)?._personal === true;
+  const isAllActive = activeGroup === null && !isPersonalActive;
+
+  // Build "All view" member filter pills from all home/family groups
+  const allViewMembers = useMemo(() => {
+    if (!isAllActive || !user) return [];
+    const homeGroups = groups.filter((g) => g.category === "home" && g.shared_pages?.includes("calendar"));
+    const memberMap = new Map<string, string>();
+    for (const g of homeGroups) {
+      for (const m of g.members) {
+        if (m.user_id !== user.id && m.status === "active" && !memberMap.has(m.user_id)) {
+          memberMap.set(m.user_id, m.display_name || "Member");
+        }
+      }
+    }
+    return Array.from(memberMap.entries()).map(([uid, name]) => ({ id: uid, label: name }));
+  }, [isAllActive, user, groups]);
+
+  const [allViewSelectedIds, setAllViewSelectedIds] = useState<Set<string>>(() => new Set(["everyone"]));
+
+  // Reset all-view pills when switching away from All
+  useEffect(() => {
+    if (isAllActive) {
+      setAllViewSelectedIds(new Set(["everyone"]));
+    }
+  }, [isAllActive]);
+
+  const toggleAllViewPill = (id: string) => {
+    setAllViewSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (id === "everyone") {
+        // Toggle everyone = select all or deselect all
+        if (next.has("everyone")) {
+          next.clear();
+          next.add("mine");
+        } else {
+          next.clear();
+          next.add("everyone");
+        }
+        return next;
+      }
+      next.delete("everyone");
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      // If all individual pills selected, switch to everyone
+      if (next.size === 0) next.add("everyone");
+      return next;
+    });
+  };
+
   // Helper: check if current filter is a specific member filter
   const isSpecificMemberFilter = filter.startsWith("member:");
   const selectedMemberUserId = isSpecificMemberFilter ? filter.replace("member:", "") : null;
@@ -695,9 +747,49 @@ const HomePage = ({ onBackToLauncher, onOpenSettings }: { onBackToLauncher?: () 
         )}
       </header>
 
-      <PageGroupSelector page="calendar" />
+      <PageGroupSelector page="calendar" isHomePage />
 
-      {groupFilters.length > 1 && (
+      {/* All view: member filter pills */}
+      {isAllActive && allViewMembers.length > 0 && (
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide py-1 mb-4">
+          <button
+            onClick={() => toggleAllViewPill("everyone")}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+              allViewSelectedIds.has("everyone")
+                ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                : "border-border bg-card text-muted-foreground hover:border-primary/30"
+            }`}
+          >
+            Everyone
+          </button>
+          <button
+            onClick={() => toggleAllViewPill("mine")}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+              allViewSelectedIds.has("mine")
+                ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                : "border-border bg-card text-muted-foreground hover:border-primary/30"
+            }`}
+          >
+            Mine
+          </button>
+          {allViewMembers.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => toggleAllViewPill(m.id)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                allViewSelectedIds.has(m.id)
+                  ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                  : "border-border bg-card text-muted-foreground hover:border-primary/30"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Group view: member filter tabs */}
+      {!isAllActive && !isPersonalActive && groupFilters.length > 1 && (
         <div className="flex gap-1 bg-secondary rounded-xl p-1 mb-5 overflow-x-auto scrollbar-hide">
           {groupFilters.map((f) => (
             <button
@@ -837,8 +929,10 @@ const HomePage = ({ onBackToLauncher, onOpenSettings }: { onBackToLauncher?: () 
         <>
           {sectionOrder.filter((id) => {
             if (!sectionVisible.has(id)) return false;
-            // If a group is selected, only show sections for pages the group shares
-            if (activeGroup?.shared_pages) {
+            // Personal view: show all sections (no shared_pages filter)
+            if (isPersonalActive) return true;
+            // If a real group is selected, only show sections for pages the group shares
+            if (activeGroup?.shared_pages && !isPersonalActive) {
               const sp = activeGroup.shared_pages;
               if (id === "scheduled" || id === "todo") return sp.includes("calendar");
               if (id === "habits") return sp.includes("habits");
@@ -893,10 +987,14 @@ const HomePage = ({ onBackToLauncher, onOpenSettings }: { onBackToLauncher?: () 
               case "scheduled":
                 return (
                   <section key={sectionId} className="mb-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Clock size={18} className="text-muted-foreground" />
+                    <button
+                      onClick={() => onNavigate?.("calendar")}
+                      className="flex items-center gap-2 mb-3 group cursor-pointer hover:opacity-80 transition-opacity"
+                    >
+                      <CalendarDays size={18} className="text-primary" />
                       <h2 className="text-lg font-semibold tracking-display">Scheduled</h2>
-                    </div>
+                      <ChevronRightIcon size={16} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+                    </button>
                     {(allDayItems.length > 0 || allTimedItems.length > 0) ? (
                       <div className="space-y-3">
                         {allDayItems.map((item) => {
