@@ -181,7 +181,18 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
   } = useAppContext();
   const { user, activeGroup, groups } = useAuth();
   const { showGoogleCalendar } = useGroupContext();
+  const isPrivateMode = !!(activeGroup as any)?._personal;
 
+  // In "Private" mode on Calendar, show personal items (no group) + group items marked hidden_from_partner
+  const calFilteredEvents = useMemo(() => {
+    if (!isPrivateMode) return filteredEvents;
+    return events.filter((e) => !e.groupId || e.hiddenFromPartner);
+  }, [isPrivateMode, filteredEvents, events]);
+
+  const calFilteredTasks = useMemo(() => {
+    if (!isPrivateMode) return filteredTasks;
+    return tasks.filter((t) => !t.groupId || t.hiddenFromPartner);
+  }, [isPrivateMode, filteredTasks, tasks]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("month");
@@ -331,7 +342,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     const items: CalItem[] = [];
 
     const hasCalendarData = calendarRecords.length > 0;
-    filteredEvents.forEach((e) => {
+    calFilteredEvents.forEach((e) => {
       // Calendar visibility filter for local events (only apply when calendar data is loaded)
       if (hasCalendarData) {
         if (e.calendarId) {
@@ -415,7 +426,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
       });
     });
 
-    filteredTasks
+    calFilteredTasks
       .filter((t) => t.scheduledDay === d && t.scheduledMonth === m && t.scheduledYear === y)
       .forEach((t) => {
         const taskIsAllDay = !t.time || t.time === "All day";
@@ -441,7 +452,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
       });
 
     const dateKey = dateToKey(d, m, y);
-    filteredTasks
+    calFilteredTasks
       .filter((t) => {
         if (!t.dueDate) return false;
         if (t.dueDate !== dateKey) return false;
@@ -611,7 +622,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     });
 
     return filtered;
-  }, [filteredEvents, filteredTasks, googleCalendarEvents, showGoogleCalendar, visibleCalendarIds, visibleProviderCalendarIds, calendarColorMap.defaultVisible, calendarRecords.length, userFilterIds, user?.id, groups]);
+  }, [calFilteredEvents, calFilteredTasks, googleCalendarEvents, showGoogleCalendar, visibleCalendarIds, visibleProviderCalendarIds, calendarColorMap.defaultVisible, calendarRecords.length, userFilterIds, user?.id, groups]);
 
   const selectedDayItems = useMemo(
     () => getItemsForDate(selDay, selMonth, selYear),
@@ -984,7 +995,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
         </div>
       </header>
 
-      <PageGroupSelector page="calendar" />
+      <PageGroupSelector page="calendar" personalLabel="Private" personalEmoji="🔒" />
       <CalendarUserFilter
         selectedUserIds={userFilterIds}
         onSelectionChange={setUserFilterIds}

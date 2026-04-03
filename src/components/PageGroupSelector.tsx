@@ -6,11 +6,13 @@ import CreateGroupModal from "@/components/CreateGroupModal";
 interface PageGroupSelectorProps {
   page: ShareablePage;
   isHomePage?: boolean;
+  personalLabel?: string;
+  personalEmoji?: string;
 }
 
 const PERSONAL_SENTINEL = "__personal__";
 
-const PageGroupSelector = ({ page, isHomePage }: PageGroupSelectorProps) => {
+const PageGroupSelector = ({ page, isHomePage, personalLabel = "Personal", personalEmoji = "👤" }: PageGroupSelectorProps) => {
   const { groups, activeGroup, setActiveGroup } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
 
@@ -60,8 +62,8 @@ const PageGroupSelector = ({ page, isHomePage }: PageGroupSelectorProps) => {
               : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
           }`}
         >
-          <span className="text-sm leading-none">👤</span>
-          <span>Personal</span>
+          <span className="text-sm leading-none">{personalEmoji}</span>
+          <span>{personalLabel}</span>
         </button>
 
         {/* Group chips filtered for this page */}
