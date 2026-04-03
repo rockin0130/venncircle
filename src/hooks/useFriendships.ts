@@ -94,8 +94,9 @@ export function useFriendships() {
 
   useEffect(() => {
     if (!user) return;
+    const channelName = `friendships-realtime-${Math.random().toString(36).slice(2)}`;
     const channel = supabase
-      .channel("friendships-realtime")
+      .channel(channelName)
       .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, () => {
         fetchFriendships();
       })
