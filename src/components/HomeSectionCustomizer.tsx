@@ -325,7 +325,8 @@ const HomeSectionCustomizer = ({
       let sobrietyQuery = supabase.from("sobriety_categories").select("id, label, icon").eq("user_id", user.id);
       let specialDaysQuery = supabase.from("special_days").select("id, title, icon").order("event_date", { ascending: true });
 
-      if (activeGroup) {
+      const isPersonal = (activeGroup as any)?._personal === true;
+      if (activeGroup && !isPersonal) {
         sobrietyQuery = sobrietyQuery.eq("group_id", activeGroup.id);
         // Show events shared with this group + private events in this context for this user
         specialDaysQuery = specialDaysQuery.or(
@@ -333,7 +334,10 @@ const HomeSectionCustomizer = ({
         );
       } else {
         sobrietyQuery = sobrietyQuery.is("group_id", null);
-        // "All" view: RLS handles access control
+        // Personal/All view: show user's personal sobriety and special days
+        if (isPersonal) {
+          specialDaysQuery = specialDaysQuery.eq("user_id", user.id).filter("shared_group_ids", "eq", "{}");
+        }
       }
       const [{ data: sobrietyData }, { data: specialDaysData }] = await Promise.all([sobrietyQuery, specialDaysQuery]);
       if (sobrietyData) setSobrietyOptions(sobrietyData as SobrietyOption[]);
