@@ -285,14 +285,12 @@ const CalendarsManager = ({ open, onClose }: Props) => {
           return filtered;
         });
         
-        await Promise.all([
-          supabase.from("calendar_context_visibility").upsert({
-            user_id: user.id, calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode,
-          } as any, { onConflict: "user_id,calendar_id,context_id" }),
-          supabase.from("calendar_context_visibility").upsert({
-            user_id: user.id, calendar_id: calId, context_id: "__personal__", is_visible: false, visibility_mode: getVisibilityMode(calId, "__personal__"),
-          } as any, { onConflict: "user_id,calendar_id,context_id" }),
-        ]);
+        await supabase.from("calendar_context_visibility").upsert({
+          user_id: user.id, calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode,
+        } as any, { onConflict: "user_id,calendar_id,context_id" });
+        await supabase.from("calendar_context_visibility").upsert({
+          user_id: user.id, calendar_id: calId, context_id: "__personal__", is_visible: false, visibility_mode: getVisibilityMode(calId, "__personal__"),
+        } as any, { onConflict: "user_id,calendar_id,context_id" });
         return;
       }
     }
