@@ -5,6 +5,7 @@ import CreateGroupModal from "@/components/CreateGroupModal";
 
 interface PageGroupSelectorProps {
   page: ShareablePage;
+  isHomePage?: boolean;
 }
 
 const PERSONAL_SENTINEL = "__personal__";
