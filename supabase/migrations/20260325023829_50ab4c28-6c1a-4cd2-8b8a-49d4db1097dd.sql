@@ -1,0 +1,1 @@
+ALTER TABLE public.meal_logs ADD COLUMN consumed boolean NOT NULL DEFAULT false;

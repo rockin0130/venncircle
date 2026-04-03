@@ -1,0 +1,1 @@
+ALTER TABLE public.workouts ADD COLUMN completion_photo_url text DEFAULT NULL;

@@ -1,0 +1,1 @@
+ALTER TABLE public.special_days ADD COLUMN IF NOT EXISTS inclusive_count boolean NOT NULL DEFAULT false;

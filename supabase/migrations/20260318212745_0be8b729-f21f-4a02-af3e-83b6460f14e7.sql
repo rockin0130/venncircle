@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS calendar_token text UNIQUE DEFAULT upper(substr(md5(random()::text || clock_timestamp()::text), 1, 32));

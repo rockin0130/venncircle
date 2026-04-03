@@ -1,0 +1,10 @@
+
+ALTER TABLE public.workouts
+  ADD COLUMN IF NOT EXISTS heart_rate_avg integer DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS pace_avg text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS speed_avg numeric DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS elevation_gain numeric DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS cadence_avg integer DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS source_app text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS source_device text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS route_data jsonb DEFAULT NULL;

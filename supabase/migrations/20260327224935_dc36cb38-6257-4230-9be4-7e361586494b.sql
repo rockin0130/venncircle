@@ -1,0 +1,1 @@
+ALTER TABLE public.events ADD COLUMN calendar_id uuid REFERENCES public.calendars(id) ON DELETE SET NULL DEFAULT NULL;
