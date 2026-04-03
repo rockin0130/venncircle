@@ -355,6 +355,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       invite_code: g.invite_code, created_by: g.created_by,
       cover_image_url: g.cover_image_url || null,
       shared_pages: g.shared_pages || SHAREABLE_PAGES.slice(),
+      category: (g.category === "interest" ? "interest" : "home") as "home" | "interest",
       members: (allMembers || [])
         .filter((m: any) => m.group_id === g.id)
         .map((m: any) => {
