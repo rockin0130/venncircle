@@ -929,8 +929,10 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
         <>
           {sectionOrder.filter((id) => {
             if (!sectionVisible.has(id)) return false;
-            // If a group is selected, only show sections for pages the group shares
-            if (activeGroup?.shared_pages) {
+            // Personal view: show all sections (no shared_pages filter)
+            if (isPersonalActive) return true;
+            // If a real group is selected, only show sections for pages the group shares
+            if (activeGroup?.shared_pages && !isPersonalActive) {
               const sp = activeGroup.shared_pages;
               if (id === "scheduled" || id === "todo") return sp.includes("calendar");
               if (id === "habits") return sp.includes("habits");
