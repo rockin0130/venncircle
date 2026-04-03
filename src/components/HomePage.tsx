@@ -27,6 +27,7 @@ import { useGroupContext } from "@/hooks/useGroupContext";
 import { cn } from "@/lib/utils";
 
 type Filter = string; // "mine" | "partner" | "household" | "member:{userId}"
+type AllViewFilter = string; // user IDs that are selected in All view
 
 interface ClarificationState {
   question: string;
