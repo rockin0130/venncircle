@@ -97,6 +97,7 @@ const PageGroupSelector = ({ page, isHomePage }: PageGroupSelectorProps) => {
         open={showCreate}
         onOpenChange={setShowCreate}
         defaultPage={page}
+        defaultCategory={isHomePage ? "home" : undefined}
       />
     </>
   );
