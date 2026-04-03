@@ -14,10 +14,14 @@ const PageGroupSelector = ({ page, isHomePage }: PageGroupSelectorProps) => {
   const { groups, activeGroup, setActiveGroup } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
 
-  // Filter groups that include this page
+  // Filter groups: on Home page, only show "home" category groups
   const pageGroups = useMemo(
-    () => groups.filter((g) => g.shared_pages?.includes(page)),
-    [groups, page]
+    () => groups.filter((g) => {
+      if (!g.shared_pages?.includes(page)) return false;
+      if (isHomePage && g.category !== "home") return false;
+      return true;
+    }),
+    [groups, page, isHomePage]
   );
 
   // "Personal" is represented by activeGroup === null AND a special flag
