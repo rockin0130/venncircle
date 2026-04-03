@@ -342,7 +342,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     const items: CalItem[] = [];
 
     const hasCalendarData = calendarRecords.length > 0;
-    filteredEvents.forEach((e) => {
+    calFilteredEvents.forEach((e) => {
       // Calendar visibility filter for local events (only apply when calendar data is loaded)
       if (hasCalendarData) {
         if (e.calendarId) {
