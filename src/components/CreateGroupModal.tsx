@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Check, Loader2, UserPlus, X, Users } from "lucide-react";
+import { Plus, Check, Loader2, UserPlus, X, Users, Home, Compass } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth, ShareablePage, SHAREABLE_PAGES, PAGE_LABELS, PAGE_ICONS } from "@/context/AuthContext";
 import { useFriendships, FriendProfile } from "@/hooks/useFriendships";
@@ -11,15 +11,17 @@ interface CreateGroupModalProps {
   onOpenChange: (open: boolean) => void;
   defaultPage?: ShareablePage;
   onGroupCreated?: (groupId: string) => void;
+  defaultCategory?: "home" | "interest";
 }
 
-type Step = "friends" | "pages" | "name";
+type Step = "category" | "friends" | "pages" | "name";
 
-const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: CreateGroupModalProps) => {
+const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, defaultCategory }: CreateGroupModalProps) => {
   const { createGroup, inviteToGroup } = useAuth();
   const { activeFriends } = useFriendships();
 
-  const [step, setStep] = useState<Step>("friends");
+  const [step, setStep] = useState<Step>(defaultCategory ? "friends" : "category");
+  const [category, setCategory] = useState<"home" | "interest">(defaultCategory || "home");
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
   const [selectedPages, setSelectedPages] = useState<Set<ShareablePage>>(
     new Set(defaultPage ? [defaultPage] : [])
@@ -29,7 +31,8 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
   const [addFriendOpen, setAddFriendOpen] = useState(false);
 
   const resetState = () => {
-    setStep("friends");
+    setStep(defaultCategory ? "friends" : "category");
+    setCategory(defaultCategory || "home");
     setSelectedFriends(new Set());
     setSelectedPages(new Set(defaultPage ? [defaultPage] : []));
     setGroupName("");
@@ -50,7 +53,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
   };
 
   const togglePage = (page: ShareablePage) => {
-    if (page === defaultPage) return; // Can't uncheck the originating page
+    if (page === defaultPage) return;
     setSelectedPages((prev) => {
       const next = new Set(prev);
       next.has(page) ? next.delete(page) : next.add(page);
@@ -65,8 +68,9 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
     const result = await createGroup(
       groupName.trim(),
       "custom",
-      "👥",
-      Array.from(selectedPages)
+      category === "home" ? "🏠" : "👥",
+      Array.from(selectedPages),
+      category
     );
 
     if (result.error) {
@@ -77,7 +81,6 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
 
     const groupId = result.id;
 
-    // Invite selected friends to the group
     if (groupId) {
       const friendUserIds = Array.from(selectedFriends);
       for (const friendId of friendUserIds) {
@@ -89,7 +92,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
     }
 
     toast.success(`Group "${groupName}" created!`, {
-      description: `Sharing: ${Array.from(selectedPages).map(p => PAGE_LABELS[p]).join(", ")}`,
+      description: `${category === "home" ? "Home" : "Shared Interest"} · ${Array.from(selectedPages).map(p => PAGE_LABELS[p]).join(", ")}`,
     });
 
     handleOpenChange(false);
@@ -101,6 +104,9 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
   const canProceedFromFriends = selectedFriends.size > 0;
   const canProceedFromPages = selectedPages.size > 0;
 
+  const allSteps: Step[] = defaultCategory ? ["friends", "pages", "name"] : ["category", "friends", "pages", "name"];
+  const stepIdx = allSteps.indexOf(step);
+
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -108,27 +114,66 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users size={18} className="text-primary" />
-              {step === "friends" ? "Choose People" : step === "pages" ? "Choose Pages" : "Name Your Group"}
+              {step === "category" ? "Group Type" :
+               step === "friends" ? "Choose People" :
+               step === "pages" ? "Choose Pages" : "Name Your Group"}
             </DialogTitle>
           </DialogHeader>
 
           {/* Step indicator */}
           <div className="flex items-center gap-2 mb-2">
-            {(["friends", "pages", "name"] as Step[]).map((s, i) => (
+            {allSteps.map((s, i) => (
               <div key={s} className="flex items-center gap-1.5 flex-1">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
                   step === s ? "bg-primary text-primary-foreground" :
-                  (["friends", "pages", "name"].indexOf(step) > i) ? "bg-primary/20 text-primary" :
+                  stepIdx > i ? "bg-primary/20 text-primary" :
                   "bg-muted text-muted-foreground"
                 }`}>
                   {i + 1}
                 </div>
-                {i < 2 && <div className="flex-1 h-px bg-border" />}
+                {i < allSteps.length - 1 && <div className="flex-1 h-px bg-border" />}
               </div>
             ))}
           </div>
 
-          {/* Step 1: Choose friends */}
+          {/* Step: Category */}
+          {step === "category" && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">What kind of group is this?</p>
+              <div className="space-y-2">
+                <button
+                  onClick={() => { setCategory("home"); setStep("friends"); }}
+                  className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all text-left ${
+                    category === "home" ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-secondary/50"
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Home size={20} className="text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">Home Group</p>
+                    <p className="text-xs text-muted-foreground">Close family & friends — your inner circle</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setCategory("interest"); setStep("friends"); }}
+                  className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all text-left ${
+                    category === "interest" ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-secondary/50"
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Compass size={20} className="text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">Shared Interest</p>
+                    <p className="text-xs text-muted-foreground">Topic-based group — workout, nutrition, etc.</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step: Choose friends */}
           {step === "friends" && (
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">Select friends to include in this group.</p>
@@ -187,17 +232,27 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
                 </div>
               )}
 
-              <button
-                onClick={() => setStep("pages")}
-                disabled={!canProceedFromFriends}
-                className="w-full py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 transition-all"
-              >
-                Continue
-              </button>
+              <div className="flex gap-2">
+                {!defaultCategory && (
+                  <button
+                    onClick={() => setStep("category")}
+                    className="flex-1 py-3 rounded-xl border border-border text-sm font-medium hover:bg-secondary transition-all"
+                  >
+                    Back
+                  </button>
+                )}
+                <button
+                  onClick={() => setStep("pages")}
+                  disabled={!canProceedFromFriends}
+                  className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 transition-all"
+                >
+                  Continue
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Step 2: Choose pages */}
+          {/* Step: Choose pages */}
           {step === "pages" && (
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">
@@ -256,7 +311,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
             </div>
           )}
 
-          {/* Step 3: Name group */}
+          {/* Step: Name group */}
           {step === "name" && (
             <div className="space-y-4">
               <p className="text-xs text-muted-foreground">Give your group a name.</p>
@@ -271,6 +326,10 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
 
               {/* Summary */}
               <div className="p-3 rounded-xl bg-secondary/50 border border-border space-y-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {category === "home" ? <Home size={12} /> : <Compass size={12} />}
+                  <span>{category === "home" ? "Home Group" : "Shared Interest"}</span>
+                </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Users size={12} />
                   <span>{selectedFriends.size} friend{selectedFriends.size !== 1 ? "s" : ""} selected</span>
