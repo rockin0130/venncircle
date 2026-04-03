@@ -181,7 +181,18 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
   } = useAppContext();
   const { user, activeGroup, groups } = useAuth();
   const { showGoogleCalendar } = useGroupContext();
+  const isPrivateMode = !!(activeGroup as any)?._personal;
 
+  // In "Private" mode on Calendar, show personal items (no group) + group items marked hidden_from_partner
+  const calFilteredEvents = useMemo(() => {
+    if (!isPrivateMode) return filteredEvents;
+    return events.filter((e) => !e.groupId || e.hiddenFromPartner);
+  }, [isPrivateMode, filteredEvents, events]);
+
+  const calFilteredTasks = useMemo(() => {
+    if (!isPrivateMode) return filteredTasks;
+    return tasks.filter((t) => !t.groupId || t.hiddenFromPartner);
+  }, [isPrivateMode, filteredTasks, tasks]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("month");
