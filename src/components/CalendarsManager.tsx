@@ -253,15 +253,14 @@ const CalendarsManager = ({ open, onClose }: Props) => {
     if (visible) {
       if (isPrivateCtx) {
         // Turning on Private → turn off all group contexts
-        
-        groupCtxIds.forEach(gid => {
-          updates.push({ calendar_id: calId, context_id: gid, is_visible: false, visibility_mode: getVisibilityMode(calId, gid) });
-        });
+        const groupOffRows: ContextVisRow[] = groupCtxIds.map(gid => ({
+          calendar_id: calId, context_id: gid, is_visible: false, visibility_mode: getVisibilityMode(calId, gid),
+        }));
         
         setContextVisRows((prev) => {
           let filtered = prev.filter(r => !(r.calendar_id === calId && (r.context_id === ctxId || groupCtxIds.includes(r.context_id))));
           filtered.push({ calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode });
-          filtered.push(...updates);
+          filtered.push(...groupOffRows);
           return filtered;
         });
         
