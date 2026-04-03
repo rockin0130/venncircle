@@ -987,10 +987,14 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
               case "scheduled":
                 return (
                   <section key={sectionId} className="mb-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Clock size={18} className="text-muted-foreground" />
+                    <button
+                      onClick={() => onNavigate?.("calendar")}
+                      className="flex items-center gap-2 mb-3 group cursor-pointer hover:opacity-80 transition-opacity"
+                    >
+                      <CalendarDays size={18} className="text-primary" />
                       <h2 className="text-lg font-semibold tracking-display">Scheduled</h2>
-                    </div>
+                      <ChevronRightIcon size={16} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+                    </button>
                     {(allDayItems.length > 0 || allTimedItems.length > 0) ? (
                       <div className="space-y-3">
                         {allDayItems.map((item) => {
