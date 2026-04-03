@@ -17,9 +17,12 @@ import ShoppingListPage from "@/components/ShoppingListPage";
 import LauncherPage from "@/components/LauncherPage";
 import AuthPage from "@/components/AuthPage";
 import ProfileSetupPage from "@/components/ProfileSetupPage";
+import SharedInterestsPage from "@/components/SharedInterestsPage";
+import ProfilePage from "@/components/ProfilePage";
 import AppDrawer from "@/components/AppDrawer";
 import DrawerMenuButton from "@/components/DrawerMenuButton";
 import FloatingAiBar from "@/components/FloatingAiBar";
+import CreateGroupModal from "@/components/CreateGroupModal";
 import { AppProvider } from "@/context/AppContext";
 import { useAuth, Group } from "@/context/AuthContext";
 import { useNavStyle } from "@/hooks/useNavStyle";
@@ -33,14 +36,15 @@ const SWIPE_THRESHOLD = 80;
 const Index = () => {
   const { user, loading, profile, groups, activeGroup, setActiveGroup, refreshProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<FullTab>("launcher");
-  const [navPages, setNavPages] = useState<Tab[]>(() => loadNavPages());
+  const [navPages] = useState<Tab[]>(() => loadNavPages());
   const [chatGroup, setChatGroup] = useState<Group | null>(null);
   const [chatMode, setChatMode] = useState<"list" | "chat">("list");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [createGroupCategory, setCreateGroupCategory] = useState<"home" | "interest" | undefined>(undefined);
   const { navStyle, setNavStyle } = useNavStyle();
   const { weekStart, setWeekStart } = useWeekStart();
 
-  // Swipe tracking for Home → Launcher transition
   const swipeX = useMotionValue(0);
 
   const resetHomeSwipeState = useCallback(() => {
@@ -66,7 +70,6 @@ const Index = () => {
     return <AuthPage />;
   }
 
-  // Profile setup gate: require name + username
   const needsProfileSetup = profile && !(profile as any).username;
   if (needsProfileSetup) {
     return (
@@ -80,14 +83,12 @@ const Index = () => {
 
   const handleEnterGroup = (groupId: string | null) => {
     resetHomeSwipeState();
-
     if (groupId) {
       const group = groups.find((g) => g.id === groupId);
       if (group) setActiveGroup(group);
     } else {
       setActiveGroup(null);
     }
-
     setActiveTab("home");
     requestAnimationFrame(resetHomeSwipeState);
   };
@@ -107,27 +108,6 @@ const Index = () => {
       setChatMode("list");
     }
     setActiveTab(tab);
-  };
-
-  const handleAddToNav = (pageId: Tab) => {
-    if (navPages.includes(pageId) || navPages.length >= MAX_NAV_SLOTS) return;
-    const updated = [...navPages, pageId];
-    setNavPages(updated);
-    saveNavPages(updated);
-  };
-
-  const handleRemoveFromNav = (pageId: Tab) => {
-    if (FIXED_NAV_PAGES.includes(pageId)) return;
-    const updated = navPages.filter(p => p !== pageId);
-    setNavPages(updated);
-    saveNavPages(updated);
-  };
-
-  const handleReplaceInNav = (oldPageId: Tab, newPageId: Tab) => {
-    if (FIXED_NAV_PAGES.includes(oldPageId)) return;
-    const updated = navPages.map(p => p === oldPageId ? newPageId : p);
-    setNavPages(updated);
-    saveNavPages(updated);
   };
 
   const handleOpenChat = (group: Group) => {
@@ -159,19 +139,48 @@ const Index = () => {
     setActiveTab("ai");
   };
 
-  // Swipe handlers for Home → Launcher (right swipe)
+  const handleNavigateToFeature = (feature: string, groupId?: string) => {
+    if (groupId) {
+      const group = groups.find((g) => g.id === groupId);
+      if (group) setActiveGroup(group);
+    }
+    const tabMap: Record<string, Tab> = {
+      workout: "workout",
+      nutrition: "nutrition",
+      habits: "habits",
+      sobriety: "sobriety",
+      special_days: "specialdays",
+      specialdays: "specialdays",
+      calendar: "calendar",
+      shopping: "shopping",
+    };
+    const tab = tabMap[feature];
+    if (tab) setActiveTab(tab);
+  };
+
+  const handleCreateInterestGroup = () => {
+    setCreateGroupCategory("interest");
+    setCreateGroupOpen(true);
+  };
+
   const handleDragEnd = (_: any, info: PanInfo) => {
     if (activeTab === "home" && (info.offset.x > SWIPE_THRESHOLD || info.velocity.x > 200)) {
       handleBackToLauncher();
       return;
     }
-
     resetHomeSwipeState();
   };
 
   const pages: Record<string, React.ReactNode> = {
     launcher: <LauncherPage onEnterGroup={handleEnterGroup} onOpenSettings={handleOpenSettings} />,
     home: <HomePage onOpenSettings={handleOpenSettings} />,
+    "shared-interests": (
+      <SharedInterestsPage
+        onNavigateToFeature={handleNavigateToFeature}
+        onCreateGroup={handleCreateInterestGroup}
+      />
+    ),
+    profile: <ProfilePage onNavigate={(tab) => setActiveTab(tab as FullTab)} />,
     workout: <WorkoutsPage />,
     nutrition: <NutritionPage />,
     habits: <HabitsPage />,
@@ -186,9 +195,9 @@ const Index = () => {
       <MorePage
         navPages={navPages}
         onNavigate={handleTabChange}
-        onAddToNav={handleAddToNav}
-        onRemoveFromNav={handleRemoveFromNav}
-        onReplaceInNav={handleReplaceInNav}
+        onAddToNav={() => {}}
+        onRemoveFromNav={() => {}}
+        onReplaceInNav={() => {}}
         onOpenSettings={handleOpenSettings}
         navStyle={navStyle}
         onNavStyleChange={setNavStyle}
@@ -202,13 +211,11 @@ const Index = () => {
   const isInnerPage = activeTab !== "launcher";
   const showBottomNav = isInnerPage && navStyle === "bottom";
   const showDrawerButton = isInnerPage && navStyle === "drawer";
-  const showFloatingMoreButton = isInnerPage && navStyle === "bottom" && activeTab !== "more";
+  const showFloatingMoreButton = isInnerPage && navStyle === "bottom" && !["more", "home", "shared-interests", "ai", "chat", "profile"].includes(activeTab);
 
   return (
     <AppProvider>
       <div className="flex flex-col w-full max-w-md mx-auto bg-background h-svh relative overflow-hidden">
-
-        {/* Main page area */}
         <AnimatePresence mode="wait">
           {activeTab === "launcher" ? (
             <motion.div
@@ -240,20 +247,13 @@ const Index = () => {
           )}
         </AnimatePresence>
 
-        {/* Bottom Navigation */}
         {showBottomNav && (
           <BottomNav
             activeTab={activeTab as Tab}
             onTabChange={handleTabChange}
-            navPages={navPages}
-            onReorder={(newPages) => {
-              setNavPages(newPages);
-              saveNavPages(newPages);
-            }}
           />
         )}
 
-        {/* Floating More Button — top left in Bottom Bar mode */}
         {showFloatingMoreButton && (
           <button
             onClick={() => setActiveTab("more")}
@@ -264,17 +264,14 @@ const Index = () => {
           </button>
         )}
 
-        {/* Drawer Menu Button */}
         {showDrawerButton && (
           <DrawerMenuButton onClick={() => setDrawerOpen(true)} />
         )}
 
-        {/* Floating AI Bar — always visible in drawer mode */}
         {showDrawerButton && (
           <FloatingAiBar onSubmit={handleAiSubmit} />
         )}
 
-        {/* Side Drawer */}
         <AppDrawer
           open={drawerOpen}
           onOpenChange={setDrawerOpen}
@@ -283,6 +280,12 @@ const Index = () => {
           navStyle={navStyle}
           onNavStyleChange={setNavStyle}
           onAiSubmit={handleAiSubmit}
+        />
+
+        <CreateGroupModal
+          open={createGroupOpen}
+          onOpenChange={setCreateGroupOpen}
+          defaultCategory={createGroupCategory}
         />
       </div>
     </AppProvider>
