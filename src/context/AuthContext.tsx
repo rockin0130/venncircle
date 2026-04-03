@@ -93,7 +93,7 @@ interface AuthContextType {
   refreshGroups: () => Promise<void>;
   connectPartner: (code: string) => Promise<{ success?: boolean; error?: string; partner_name?: string }>;
   disconnectPartner: () => Promise<{ success?: boolean; error?: string }>;
-  createGroup: (name: string, type: string, emoji: string, sharedPages?: ShareablePage[]) => Promise<{ id?: string; invite_code?: string; error?: string }>;
+  createGroup: (name: string, type: string, emoji: string, sharedPages?: ShareablePage[], category?: "home" | "interest") => Promise<{ id?: string; invite_code?: string; error?: string }>;
   updateGroupSharedPages: (groupId: string, sharedPages: ShareablePage[]) => Promise<{ success?: boolean; error?: string }>;
   joinGroup: (code: string) => Promise<{ success?: boolean; group_name?: string; error?: string }>;
   leaveGroup: (groupId: string) => Promise<{ success?: boolean; error?: string }>;
