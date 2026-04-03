@@ -983,6 +983,8 @@ const HomePage = ({ onBackToLauncher, onOpenSettings }: { onBackToLauncher?: () 
         onSave={handleSaveSections}
       />
       <AddItemModal open={showAddModal} onClose={() => setShowAddModal(false)} />
+      <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
+      <UniversalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 };
