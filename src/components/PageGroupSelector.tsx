@@ -10,7 +10,7 @@ interface PageGroupSelectorProps {
 
 const PERSONAL_SENTINEL = "__personal__";
 
-const PageGroupSelector = ({ page }: PageGroupSelectorProps) => {
+const PageGroupSelector = ({ page, isHomePage }: PageGroupSelectorProps) => {
   const { groups, activeGroup, setActiveGroup } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
 
