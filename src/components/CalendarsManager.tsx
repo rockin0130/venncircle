@@ -419,11 +419,11 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                   {myCalendars.map((item) => {
                     const cal = item.cal;
                     const label = item.type === "personal"
-                      ? "Personal"
+                      ? "Private"
                       : item.groupName || "Group";
-                    const emoji = item.type === "personal" ? "👤" : item.groupEmoji || "📅";
+                    const emoji = item.type === "personal" ? "🔒" : item.groupEmoji || "📅";
                     const color = cal?.color || CALENDAR_COLORS[0].value;
-                    const subtitle = item.type === "personal" ? "Your personal calendar" : "Shared group calendar";
+                    const subtitle = item.type === "personal" ? "Your private calendar" : "Shared group calendar";
 
                     return (
                       <button
