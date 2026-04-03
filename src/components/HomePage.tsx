@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
-import { Plus, Sparkles, Clock, Check, Loader2, MoreVertical, Trash2, ChevronLeft, ChevronRight, Mic, MicOff, Volume2, Users, ArrowLeft, EyeOff, Eye, Settings, LayoutGrid, ListTodo, CalendarDays } from "lucide-react";
+import { Plus, Sparkles, Clock, Check, Loader2, MoreVertical, Trash2, ChevronLeft, ChevronRight, Mic, MicOff, Volume2, Users, ArrowLeft, EyeOff, Eye, Settings, LayoutGrid, ListTodo, CalendarDays, Bell, Search } from "lucide-react";
+import NotificationCenter from "@/components/NotificationCenter";
+import UniversalSearch from "@/components/UniversalSearch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import GroupBadge from "@/components/GroupBadge";
@@ -592,16 +594,27 @@ const HomePage = ({ onBackToLauncher, onOpenSettings }: { onBackToLauncher?: () 
   };
 
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Determine if we can toggle items (only own items)
   const isViewingPartner = filter === "partner" || isSpecificMemberFilter;
 
+  // Notification badge count (simple: incomplete habits after 6pm + upcoming events)
+  const notificationCount = useMemo(() => {
+    const now = new Date();
+    let count = 0;
+    if (now.getHours() >= 18) {
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      count += habits.filter((h) => !h.completionDates.includes(todayStr)).length > 0 ? 1 : 0;
+    }
+    return count;
+  }, [habits]);
+
   const dateHeaderLabel = (() => {
-    const weekday = sd.toLocaleDateString("en-US", { weekday: "short" });
-    const monthDay = sd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    if (isToday) return `Today · ${weekday}, ${monthDay}`;
-    const yearStr = selYear !== new Date().getFullYear() ? `, ${selYear}` : "";
-    return `${weekday}, ${monthDay}${yearStr}`;
+    const weekday = sd.toLocaleDateString("en-US", { weekday: "long" });
+    const monthDay = sd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    return `${weekday}, ${monthDay}`;
   })();
 
   return (
@@ -610,47 +623,76 @@ const HomePage = ({ onBackToLauncher, onOpenSettings }: { onBackToLauncher?: () 
         <CongratsPopup type={congratsType} show={true} onClose={() => setCongratsType(null)} />
       )}
 
-      <header className="pt-12 pb-4">
+      <header className="pt-10 pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <button onClick={() => shiftDate(-1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-secondary active:scale-95 transition-all">
-                <ChevronLeft size={18} />
-              </button>
-              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-                <PopoverTrigger asChild>
-                  <button className={`px-2 py-1 rounded-lg text-lg font-bold tracking-display transition-colors ${isToday ? "text-primary" : "text-foreground"} hover:bg-secondary`}>
-                    {dateHeaderLabel}
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={sd}
-                    onSelect={(date) => {
-                      if (date) {
-                        setSelectedDate(date);
-                        setDatePickerOpen(false);
-                      }
-                    }}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-              <button onClick={() => shiftDate(1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-secondary active:scale-95 transition-all">
-                <ChevronRight size={18} />
-              </button>
-            </div>
+          <div className="flex items-center gap-0.5 flex-1 min-w-0">
+            <button onClick={() => shiftDate(-1)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary/60 active:scale-95 transition-all" style={{ color: "hsl(25, 30%, 45%)" }}>
+              <ChevronLeft size={20} />
+            </button>
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  className="px-2 py-1 rounded-xl text-base font-bold tracking-tight transition-colors hover:bg-secondary/50 truncate"
+                  style={{ fontFamily: "'Georgia', serif", color: "hsl(25, 30%, 25%)" }}
+                >
+                  {dateHeaderLabel}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={sd}
+                  onSelect={(date) => {
+                    if (date) {
+                      setSelectedDate(date);
+                      setDatePickerOpen(false);
+                    }
+                  }}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+            <button onClick={() => shiftDate(1)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary/60 active:scale-95 transition-all" style={{ color: "hsl(25, 30%, 45%)" }}>
+              <ChevronRight size={20} />
+            </button>
           </div>
-          <button
+
+          <div className="flex items-center gap-1">
+            <button
               onClick={() => setShowCustomizer(true)}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary/60 transition-colors"
+              style={{ color: "hsl(25, 25%, 45%)" }}
               aria-label="Customize layout"
             >
-              <LayoutGrid size={16} />
+              <LayoutGrid size={17} />
             </button>
+            <button
+              onClick={() => setNotificationsOpen(true)}
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary/60 transition-colors relative"
+              style={{ color: "hsl(25, 25%, 45%)" }}
+              aria-label="Notifications"
+            >
+              <Bell size={17} />
+              {notificationCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-destructive" />
+              )}
+            </button>
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary/60 transition-colors"
+              style={{ color: "hsl(25, 25%, 45%)" }}
+              aria-label="Search"
+            >
+              <Search size={17} />
+            </button>
+          </div>
         </div>
+        {isToday && (
+          <p className="text-xs font-semibold mt-1 ml-9" style={{ color: "hsl(25, 50%, 55%)" }}>
+            Today
+          </p>
+        )}
       </header>
 
       <PageGroupSelector page="calendar" />
@@ -941,6 +983,8 @@ const HomePage = ({ onBackToLauncher, onOpenSettings }: { onBackToLauncher?: () 
         onSave={handleSaveSections}
       />
       <AddItemModal open={showAddModal} onClose={() => setShowAddModal(false)} />
+      <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
+      <UniversalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 };

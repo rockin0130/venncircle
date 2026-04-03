@@ -49,6 +49,13 @@
     --nav-active: 210 100% 50%;
     --nav-inactive: 215 10% 60%;
 
+    /* Warm home tokens */
+    --warm-heading: 25 30% 25%;
+    --warm-subheading: 25 25% 45%;
+    --warm-accent: 25 50% 55%;
+    --warm-card-bg: 30 20% 97%;
+    --warm-card-border: 30 15% 90%;
+
     --shadow-card: 0 1px 2px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03);
 
     --sidebar-background: 0 0% 98%;
