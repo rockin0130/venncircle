@@ -529,13 +529,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { success: true };
   };
 
-  const createGroup = async (name: string, type: string, emoji: string, sharedPages?: ShareablePage[]) => {
+  const createGroup = async (name: string, type: string, emoji: string, sharedPages?: ShareablePage[], category?: "home" | "interest") => {
     const { data, error } = await supabase.rpc("create_group", {
       _name: name,
       _type: type,
       _emoji: emoji,
       _shared_pages: sharedPages || SHAREABLE_PAGES.slice(),
-    });
+      _category: category || "home",
+    } as any);
     if (error) return { error: error.message };
     const result = data as any;
     if (result?.error) return { error: result.error };
