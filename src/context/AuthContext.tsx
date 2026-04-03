@@ -54,6 +54,7 @@ export interface Group {
   cover_image_url?: string | null;
   shared_pages: ShareablePage[];
   members: GroupMember[];
+  category: "home" | "interest";
 }
 
 export interface GroupMember {
@@ -92,7 +93,7 @@ interface AuthContextType {
   refreshGroups: () => Promise<void>;
   connectPartner: (code: string) => Promise<{ success?: boolean; error?: string; partner_name?: string }>;
   disconnectPartner: () => Promise<{ success?: boolean; error?: string }>;
-  createGroup: (name: string, type: string, emoji: string, sharedPages?: ShareablePage[]) => Promise<{ id?: string; invite_code?: string; error?: string }>;
+  createGroup: (name: string, type: string, emoji: string, sharedPages?: ShareablePage[], category?: "home" | "interest") => Promise<{ id?: string; invite_code?: string; error?: string }>;
   updateGroupSharedPages: (groupId: string, sharedPages: ShareablePage[]) => Promise<{ success?: boolean; error?: string }>;
   joinGroup: (code: string) => Promise<{ success?: boolean; group_name?: string; error?: string }>;
   leaveGroup: (groupId: string) => Promise<{ success?: boolean; error?: string }>;
@@ -265,6 +266,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             created_by: g.created_by,
             cover_image_url: g.cover_image_url || null,
             shared_pages: g.shared_pages || SHAREABLE_PAGES.slice(),
+            category: (g.category === "interest" ? "interest" : "home") as "home" | "interest",
             members: [],
           }));
           setGroups(fallbackEnriched);
@@ -322,6 +324,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           invite_code: g.invite_code, created_by: g.created_by,
           cover_image_url: g.cover_image_url || null,
           shared_pages: g.shared_pages || SHAREABLE_PAGES.slice(),
+          category: (g.category === "interest" ? "interest" : "home") as "home" | "interest",
           members: [],
         }));
       setGroups(fallbackEnriched);
@@ -354,6 +357,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       invite_code: g.invite_code, created_by: g.created_by,
       cover_image_url: g.cover_image_url || null,
       shared_pages: g.shared_pages || SHAREABLE_PAGES.slice(),
+      category: (g.category === "interest" ? "interest" : "home") as "home" | "interest",
       members: (allMembers || [])
         .filter((m: any) => m.group_id === g.id)
         .map((m: any) => {
@@ -527,13 +531,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { success: true };
   };
 
-  const createGroup = async (name: string, type: string, emoji: string, sharedPages?: ShareablePage[]) => {
+  const createGroup = async (name: string, type: string, emoji: string, sharedPages?: ShareablePage[], category?: "home" | "interest") => {
     const { data, error } = await supabase.rpc("create_group", {
       _name: name,
       _type: type,
       _emoji: emoji,
       _shared_pages: sharedPages || SHAREABLE_PAGES.slice(),
-    });
+      _category: category || "home",
+    } as any);
     if (error) return { error: error.message };
     const result = data as any;
     if (result?.error) return { error: result.error };

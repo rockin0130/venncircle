@@ -615,6 +615,7 @@ export type Database = {
       }
       groups: {
         Row: {
+          category: string
           cover_image_url: string | null
           created_at: string
           created_by: string
@@ -626,6 +627,7 @@ export type Database = {
           type: string
         }
         Insert: {
+          category?: string
           cover_image_url?: string | null
           created_at?: string
           created_by: string
@@ -637,6 +639,7 @@ export type Database = {
           type?: string
         }
         Update: {
+          category?: string
           cover_image_url?: string | null
           created_at?: string
           created_by?: string
@@ -1525,6 +1528,16 @@ export type Database = {
           }
         | {
             Args: {
+              _emoji?: string
+              _name: string
+              _shared_pages?: string[]
+              _type?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _category?: string
               _emoji?: string
               _name: string
               _shared_pages?: string[]

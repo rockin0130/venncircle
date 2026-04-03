@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { MessageCircle, Settings } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { MessageCircle, Settings, Home, Compass, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, Group } from "@/context/AuthContext";
 
@@ -38,7 +38,6 @@ const ChatListPage = ({
       setLoading(true);
       const groupIds = groups.map((g) => g.id);
 
-      // Fetch the last message per group
       const { data: allMessages } = await supabase
         .from("messages")
         .select("*")
@@ -65,7 +64,6 @@ const ChatListPage = ({
         unreadCount: 0,
       }));
 
-      // Sort: groups with recent messages first, then by group name
       results.sort((a, b) => {
         if (a.lastMessage && b.lastMessage) {
           return new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime();
@@ -81,7 +79,6 @@ const ChatListPage = ({
 
     loadPreviews();
 
-    // Subscribe to new messages to update previews live
     const channel = supabase
       .channel("chat-list-updates")
       .on(
@@ -117,6 +114,11 @@ const ChatListPage = ({
     };
   }, [user, groups]);
 
+  const homeChats = useMemo(() => previews.filter((p) => (p.group as any).category === "home"), [previews]);
+  const interestChats = useMemo(() => previews.filter((p) => (p.group as any).category === "interest"), [previews]);
+  // DMs: groups with exactly 2 members and no category distinction — heuristic
+  const dmChats = useMemo(() => previews.filter((p) => p.group.members.length === 2 && !(p.group as any).category), [previews]);
+
   const formatTime = (iso: string) => {
     const d = new Date(iso);
     const now = new Date();
@@ -140,21 +142,113 @@ const ChatListPage = ({
   };
 
   const getInitials = (name: string) =>
-    name
-      .split(" ")
-      .map((w) => w[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+    name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 
   const getMemberAvatars = (group: Group) => {
     const others = group.members.filter((m) => m.user_id !== user?.id);
     return others.slice(0, 3);
   };
 
+  const renderChatItem = (preview: ChatPreview) => {
+    const avatars = getMemberAvatars(preview.group);
+    const senderName = getSenderName(preview);
+
+    return (
+      <button
+        key={preview.group.id}
+        onClick={() => onOpenChat(preview.group)}
+        className="w-full flex items-center gap-3 px-1 py-3.5 border-b border-border/50 text-left hover:bg-secondary/40 active:scale-[0.98] transition-all"
+      >
+        <div className="w-12 h-12 relative flex-shrink-0">
+          {avatars.length === 0 ? (
+            <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-lg">
+              {preview.group.emoji}
+            </div>
+          ) : avatars.length === 1 ? (
+            <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+              {avatars[0].avatar_url ? (
+                <img src={avatars[0].avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-sm font-bold text-foreground">
+                  {getInitials(avatars[0].display_name || "?")}
+                </span>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="absolute top-0 left-0 w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden ring-2 ring-background z-10">
+                {avatars[0].avatar_url ? (
+                  <img src={avatars[0].avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[10px] font-bold text-foreground">
+                    {getInitials(avatars[0].display_name || "?")}
+                  </span>
+                )}
+              </div>
+              <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden ring-2 ring-background">
+                {avatars[1].avatar_url ? (
+                  <img src={avatars[1].avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[10px] font-bold text-foreground">
+                    {getInitials(avatars[1].display_name || "?")}
+                  </span>
+                )}
+              </div>
+              {avatars.length > 2 && (
+                <div className="absolute bottom-0 left-4 w-6 h-6 rounded-full bg-muted flex items-center justify-center ring-2 ring-background z-20">
+                  <span className="text-[8px] font-bold text-muted-foreground">+{avatars.length - 2}</span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between gap-2">
+            <h3 className="text-sm font-semibold truncate text-foreground">{preview.group.name}</h3>
+            {preview.lastMessage && (
+              <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                {formatTime(preview.lastMessage.created_at)}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <p className="text-xs text-muted-foreground truncate">
+              {preview.lastMessage
+                ? `${senderName}: ${
+                    preview.lastMessage.metadata?.type === "voice" ? "🎤 Voice memo" :
+                    preview.lastMessage.metadata?.type === "image" ? "📷 Photo" :
+                    preview.lastMessage.metadata?.type === "video" ? "🎥 Video" :
+                    preview.lastMessage.content
+                  }`
+                : `${preview.group.members.length} member${preview.group.members.length !== 1 ? "s" : ""} · No messages yet`}
+            </p>
+            {preview.unreadCount > 0 && (
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                {preview.unreadCount}
+              </span>
+            )}
+          </div>
+        </div>
+      </button>
+    );
+  };
+
+  const renderSection = (title: string, icon: React.ReactNode, items: ChatPreview[]) => {
+    if (items.length === 0) return null;
+    return (
+      <div className="mb-4">
+        <div className="flex items-center gap-2 px-1 pt-3 pb-2">
+          {icon}
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{title}</p>
+        </div>
+        {items.map(renderChatItem)}
+      </div>
+    );
+  };
+
   return (
     <div className="px-5 flex flex-col h-[calc(100svh-5rem)]">
-      {/* Header */}
       <header className="pt-12 pb-4 flex items-center justify-between flex-shrink-0">
         <h1 className="text-[1.75rem] font-bold tracking-tight">Chats</h1>
         {onOpenSettings && (
@@ -168,7 +262,6 @@ const ChatListPage = ({
         )}
       </header>
 
-      {/* Chat list */}
       <div className="flex-1 overflow-y-auto -webkit-overflow-scrolling-touch">
         {loading && (
           <div className="flex justify-center py-12">
@@ -184,101 +277,20 @@ const ChatListPage = ({
           </div>
         )}
 
+        {!loading && (
+          <>
+            {renderSection("Home Groups", <Home size={12} className="text-muted-foreground" />, homeChats)}
+            {renderSection("Shared Interests", <Compass size={12} className="text-muted-foreground" />, interestChats)}
+            {renderSection("Direct Messages", <User size={12} className="text-muted-foreground" />, dmChats)}
 
-        {/* Group chats */}
-        {!loading && previews.length > 0 && (
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1 pt-3 pb-2">
-            Group Chats
-          </p>
+            {/* Show uncategorized groups that don't fit the above sections */}
+            {previews.filter(p => !homeChats.includes(p) && !interestChats.includes(p) && !dmChats.includes(p)).length > 0 && (
+              renderSection("Other", <MessageCircle size={12} className="text-muted-foreground" />,
+                previews.filter(p => !homeChats.includes(p) && !interestChats.includes(p) && !dmChats.includes(p))
+              )
+            )}
+          </>
         )}
-
-        {!loading &&
-          previews.map((preview) => {
-            const avatars = getMemberAvatars(preview.group);
-            const senderName = getSenderName(preview);
-
-            return (
-              <button
-                key={preview.group.id}
-                onClick={() => onOpenChat(preview.group)}
-                className="w-full flex items-center gap-3 px-1 py-3.5 border-b border-border/50 text-left hover:bg-secondary/40 active:scale-[0.98] transition-all"
-              >
-                {/* Avatar cluster */}
-                <div className="w-12 h-12 relative flex-shrink-0">
-                  {avatars.length === 0 ? (
-                    <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-lg">
-                      {preview.group.emoji}
-                    </div>
-                  ) : avatars.length === 1 ? (
-                    <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
-                      {avatars[0].avatar_url ? (
-                        <img src={avatars[0].avatar_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-sm font-bold text-foreground">
-                          {getInitials(avatars[0].display_name || "?")}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <div className="absolute top-0 left-0 w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden ring-2 ring-background z-10">
-                        {avatars[0].avatar_url ? (
-                          <img src={avatars[0].avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-[10px] font-bold text-foreground">
-                            {getInitials(avatars[0].display_name || "?")}
-                          </span>
-                        )}
-                      </div>
-                      <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden ring-2 ring-background">
-                        {avatars[1].avatar_url ? (
-                          <img src={avatars[1].avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-[10px] font-bold text-foreground">
-                            {getInitials(avatars[1].display_name || "?")}
-                          </span>
-                        )}
-                      </div>
-                      {avatars.length > 2 && (
-                        <div className="absolute bottom-0 left-4 w-6 h-6 rounded-full bg-muted flex items-center justify-center ring-2 ring-background z-20">
-                          <span className="text-[8px] font-bold text-muted-foreground">+{avatars.length - 2}</span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {/* Text content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <h3 className="text-sm font-semibold truncate text-foreground">{preview.group.name}</h3>
-                    {preview.lastMessage && (
-                      <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                        {formatTime(preview.lastMessage.created_at)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between gap-2 mt-0.5">
-                    <p className="text-xs text-muted-foreground truncate">
-                      {preview.lastMessage
-                        ? `${senderName}: ${
-                            preview.lastMessage.metadata?.type === "voice" ? "🎤 Voice memo" :
-                            preview.lastMessage.metadata?.type === "image" ? "📷 Photo" :
-                            preview.lastMessage.metadata?.type === "video" ? "🎥 Video" :
-                            preview.lastMessage.content
-                          }`
-                        : `${preview.group.members.length} member${preview.group.members.length !== 1 ? "s" : ""} · No messages yet`}
-                    </p>
-                    {preview.unreadCount > 0 && (
-                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
-                        {preview.unreadCount}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
       </div>
     </div>
   );
