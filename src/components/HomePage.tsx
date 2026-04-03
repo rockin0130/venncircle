@@ -594,16 +594,27 @@ const HomePage = ({ onBackToLauncher, onOpenSettings }: { onBackToLauncher?: () 
   };
 
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Determine if we can toggle items (only own items)
   const isViewingPartner = filter === "partner" || isSpecificMemberFilter;
 
+  // Notification badge count (simple: incomplete habits after 6pm + upcoming events)
+  const notificationCount = useMemo(() => {
+    const now = new Date();
+    let count = 0;
+    if (now.getHours() >= 18) {
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      count += habits.filter((h) => !h.completionDates.includes(todayStr)).length > 0 ? 1 : 0;
+    }
+    return count;
+  }, [habits]);
+
   const dateHeaderLabel = (() => {
-    const weekday = sd.toLocaleDateString("en-US", { weekday: "short" });
-    const monthDay = sd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    if (isToday) return `Today · ${weekday}, ${monthDay}`;
-    const yearStr = selYear !== new Date().getFullYear() ? `, ${selYear}` : "";
-    return `${weekday}, ${monthDay}${yearStr}`;
+    const weekday = sd.toLocaleDateString("en-US", { weekday: "long" });
+    const monthDay = sd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    return `${weekday}, ${monthDay}`;
   })();
 
   return (
