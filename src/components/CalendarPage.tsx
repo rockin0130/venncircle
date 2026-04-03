@@ -452,7 +452,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
       });
 
     const dateKey = dateToKey(d, m, y);
-    filteredTasks
+    calFilteredTasks
       .filter((t) => {
         if (!t.dueDate) return false;
         if (t.dueDate !== dateKey) return false;
