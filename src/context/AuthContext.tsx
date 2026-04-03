@@ -54,6 +54,7 @@ export interface Group {
   cover_image_url?: string | null;
   shared_pages: ShareablePage[];
   members: GroupMember[];
+  category: "home" | "interest";
 }
 
 export interface GroupMember {
