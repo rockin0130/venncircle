@@ -426,7 +426,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
       });
     });
 
-    filteredTasks
+    calFilteredTasks
       .filter((t) => t.scheduledDay === d && t.scheduledMonth === m && t.scheduledYear === y)
       .forEach((t) => {
         const taskIsAllDay = !t.time || t.time === "All day";
