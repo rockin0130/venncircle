@@ -73,10 +73,10 @@ const CalendarsManager = ({ open, onClose }: Props) => {
     [groups]
   );
 
-  // All context options: Personal + each calendar-sharing group
+  // All context options: Private + each calendar-sharing group
   const contextOptions = useMemo(() => {
     const opts: { id: string; label: string; emoji: string }[] = [
-      { id: "__personal__", label: "Personal", emoji: "👤" },
+      { id: "__personal__", label: "Private", emoji: "🔒" },
     ];
     calendarGroups.forEach((g) =>
       opts.push({ id: g.id, label: g.name, emoji: g.emoji })
@@ -174,7 +174,7 @@ const CalendarsManager = ({ open, onClose }: Props) => {
     if (!user) return;
     await supabase.from("calendars").insert({
       user_id: user.id,
-      name: "Personal",
+      name: "Private",
       color: CALENDAR_COLORS[0].value,
       provider: "local",
       is_visible: true,
@@ -245,6 +245,56 @@ const CalendarsManager = ({ open, onClose }: Props) => {
   ) => {
     if (!user) return;
     const currentMode = mode || getVisibilityMode(calId, ctxId);
+    
+    // Mutual exclusivity: Private vs Group toggles
+    const isPrivateCtx = ctxId === "__personal__";
+    const groupCtxIds = contextOptions.filter(c => c.id !== "__personal__").map(c => c.id);
+    
+    if (visible) {
+      if (isPrivateCtx) {
+        // Turning on Private → turn off all group contexts
+        const groupOffRows: ContextVisRow[] = groupCtxIds.map(gid => ({
+          calendar_id: calId, context_id: gid, is_visible: false, visibility_mode: getVisibilityMode(calId, gid),
+        }));
+        
+        setContextVisRows((prev) => {
+          let filtered = prev.filter(r => !(r.calendar_id === calId && (r.context_id === ctxId || groupCtxIds.includes(r.context_id))));
+          filtered.push({ calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode });
+          filtered.push(...groupOffRows);
+          return filtered;
+        });
+        
+        // Persist: turn on Private
+        await supabase.from("calendar_context_visibility").upsert({
+          user_id: user.id, calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode,
+        } as any, { onConflict: "user_id,calendar_id,context_id" });
+        // Persist: turn off all groups
+        for (const gid of groupCtxIds) {
+          await supabase.from("calendar_context_visibility").upsert({
+            user_id: user.id, calendar_id: calId, context_id: gid, is_visible: false, visibility_mode: getVisibilityMode(calId, gid),
+          } as any, { onConflict: "user_id,calendar_id,context_id" });
+        }
+        return;
+      } else {
+        // Turning on a group → turn off Private
+        setContextVisRows((prev) => {
+          let filtered = prev.filter(r => !(r.calendar_id === calId && (r.context_id === ctxId || r.context_id === "__personal__")));
+          filtered.push({ calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode });
+          filtered.push({ calendar_id: calId, context_id: "__personal__", is_visible: false, visibility_mode: getVisibilityMode(calId, "__personal__") });
+          return filtered;
+        });
+        
+        await supabase.from("calendar_context_visibility").upsert({
+          user_id: user.id, calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode,
+        } as any, { onConflict: "user_id,calendar_id,context_id" });
+        await supabase.from("calendar_context_visibility").upsert({
+          user_id: user.id, calendar_id: calId, context_id: "__personal__", is_visible: false, visibility_mode: getVisibilityMode(calId, "__personal__"),
+        } as any, { onConflict: "user_id,calendar_id,context_id" });
+        return;
+      }
+    }
+    
+    // Simple toggle off
     setContextVisRows((prev) => {
       const filtered = prev.filter(
         (r) => !(r.calendar_id === calId && r.context_id === ctxId)
@@ -419,11 +469,11 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                   {myCalendars.map((item) => {
                     const cal = item.cal;
                     const label = item.type === "personal"
-                      ? "Personal"
+                      ? "Private"
                       : item.groupName || "Group";
-                    const emoji = item.type === "personal" ? "👤" : item.groupEmoji || "📅";
+                    const emoji = item.type === "personal" ? "🔒" : item.groupEmoji || "📅";
                     const color = cal?.color || CALENDAR_COLORS[0].value;
-                    const subtitle = item.type === "personal" ? "Your personal calendar" : "Shared group calendar";
+                    const subtitle = item.type === "personal" ? "Your private calendar" : "Shared group calendar";
 
                     return (
                       <button
@@ -667,6 +717,9 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                         );
                       })}
                     </div>
+                    <p className="text-[11px] text-muted-foreground mt-2 px-1">
+                      A calendar can be private or shared, not both
+                    </p>
                   </div>
 
                   {/* Delete option for non-default local calendars */}
