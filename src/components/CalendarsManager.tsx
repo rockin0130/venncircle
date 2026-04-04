@@ -174,7 +174,7 @@ const CalendarsManager = ({ open, onClose }: Props) => {
     if (!user) return;
     await supabase.from("calendars").insert({
       user_id: user.id,
-      name: "Private",
+      name: "Mine",
       color: CALENDAR_COLORS[0].value,
       provider: "local",
       is_visible: true,
