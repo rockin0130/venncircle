@@ -64,15 +64,15 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   const aiRequestInFlightRef = useRef(false);
   useEffect(() => { voiceModeRef.current = voiceMode; }, [voiceMode]);
 
-  // Load section preferences
+  // Load section preferences — always use null (aggregate/personal view)
   useEffect(() => {
-    const prefs = loadSectionPrefs(activeGroup?.id ?? null);
+    const prefs = loadSectionPrefs(null);
     setSectionOrder(prefs.order);
     setSectionVisible(prefs.visible);
     setSelectedSobrietyIds(prefs.selectedSobrietyIds);
     setSelectedSpecialDayIds(prefs.selectedSpecialDayIds);
     setSelectedHabitSubIds(prefs.selectedHabitSubIds);
-  }, [activeGroup?.id]);
+  }, []);
 
   const handleSaveSections = (
     order: string[],
