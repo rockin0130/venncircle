@@ -56,6 +56,26 @@
     --warm-card-bg: 30 20% 97%;
     --warm-card-border: 30 15% 90%;
 
+    --calendar-member-a-bg: 210 74% 83%;
+    --calendar-member-a-text: 210 82% 27%;
+    --calendar-member-a-card-bg: 210 74% 94%;
+    --calendar-member-a-card-border: 210 74% 83%;
+
+    --calendar-member-b-bg: 85 51% 73%;
+    --calendar-member-b-text: 95 78% 18%;
+    --calendar-member-b-card-bg: 85 43% 92%;
+    --calendar-member-b-card-border: 85 51% 73%;
+
+    --calendar-member-c-bg: 340 70% 85%;
+    --calendar-member-c-text: 340 52% 29%;
+    --calendar-member-c-card-bg: 340 67% 95%;
+    --calendar-member-c-card-border: 340 70% 85%;
+
+    --calendar-shared-bg: 244 70% 88%;
+    --calendar-shared-text: 248 39% 50%;
+    --calendar-shared-card-bg: 244 89% 96%;
+    --calendar-shared-card-border: 244 70% 88%;
+
     --shadow-card: 0 1px 2px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03);
 
     --sidebar-background: 0 0% 98%;
