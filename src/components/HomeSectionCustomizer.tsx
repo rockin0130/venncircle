@@ -517,23 +517,22 @@ const HomeSectionCustomizer = ({
                 const section = ALL_SECTIONS.find((s) => s.id === id);
                 if (!section) return null;
                 const isVisible = localVisible.has(id);
-                const isLocked = section.locked;
-                const isHabits = id === "habits";
+                const isScheduled = id === "scheduled";
                 const isSobriety = id === "sobriety";
                 const isSpecialDays = id === "special-days";
 
                 const hasExpandable =
-                  (isHabits && habitSubItems.length > 0) ||
+                  (isScheduled && habitSubItems.length > 0) ||
                   (isSobriety && sobrietyOptions.length > 0) ||
                   (isSpecialDays && specialDayOptions.length > 0);
 
                 const isExpanded =
-                  (isHabits && habitsExpanded) ||
+                  (isScheduled && habitsExpanded) ||
                   (isSobriety && sobrietyExpanded) ||
                   (isSpecialDays && specialDaysExpanded);
 
                 const toggleExpand = () => {
-                  if (isHabits) setHabitsExpanded(!habitsExpanded);
+                  if (isScheduled) setHabitsExpanded(!habitsExpanded);
                   if (isSobriety) setSobrietyExpanded(!sobrietyExpanded);
                   if (isSpecialDays) setSpecialDaysExpanded(!specialDaysExpanded);
                 };
@@ -574,7 +573,7 @@ const HomeSectionCustomizer = ({
                           )}
                         </div>
 
-                        {isHabits && isVisible && habitsExpanded && habitSubItems.length > 0 &&
+                        {isScheduled && isVisible && habitsExpanded && habitSubItems.length > 0 &&
                           renderSubItems(habitSubItems, localHabitSubIds, toggleHabitSub, reorderHabitSubs)}
 
                         {isSobriety && isVisible && sobrietyExpanded && sobrietyOptions.length > 0 &&
