@@ -1578,6 +1578,27 @@ const EventList = ({
   const allDayItems = items.filter((i) => i.allDay && !i.isDueDateTask);
   const timedItems = items.filter((i) => !i.allDay);
 
+  // Resolve person color for left border
+  const getPersonColor = (item: CalItem): string => {
+    if (!filterUsers || filterUsers.length === 0) return resolveItemColor(item, groups, colorMap);
+    const raw = item.raw as any;
+    const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+    if (item.assignee === "both") {
+      // Shared event → use shared purple color
+      return "#8B5CF6";
+    }
+    const targetId = item.assignee === "partner" ? undefined : ownerId;
+    if (item.type === "gcal") {
+      const fu = filterUsers.find(u => u.id === currentUserId);
+      return fu ? MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot : resolveItemColor(item, groups, colorMap);
+    }
+    if (targetId) {
+      const fu = filterUsers.find(u => u.id === targetId);
+      if (fu) return MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot;
+    }
+    return resolveItemColor(item, groups, colorMap);
+  };
+
   return (
     <div className={compact ? "space-y-0.5" : "divide-y divide-border"}>
       {todoItems.length > 0 && (
