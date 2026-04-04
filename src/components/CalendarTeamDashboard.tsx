@@ -308,21 +308,32 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
               </span>
             </div>
             {columns.map((_, colIdx) => {
-              const colItems = row.items.filter(item => {
+              // Single-column items for this column
+              const singleItems = row.items.filter(item => {
                 const cols = itemColumnMap.get(item.id);
-                if (!cols) return false;
-                if (cols.size > 1) {
-                  // Shared: only render in first column
-                  return Math.min(...cols) === colIdx;
-                }
-                return cols.has(colIdx);
+                return cols && cols.size === 1 && cols.has(colIdx);
+              });
+
+              // Shared items: render only at leftmost assigned column, spanning across
+              const sharedItems = row.items.filter(item => {
+                const cols = itemColumnMap.get(item.id);
+                if (!cols || cols.size <= 1) return false;
+                return Math.min(...cols) === colIdx;
               });
 
               return (
                 <div key={colIdx} className="space-y-0.5 min-h-[28px]">
-                  {colItems.map(item => {
-                    const cols = itemColumnMap.get(item.id) || new Set([colIdx]);
-                    return renderCard(item, cols);
+                  {singleItems.map(item => renderCard(item, itemColumnMap.get(item.id) || new Set([colIdx])))}
+                  {sharedItems.map(item => {
+                    const cols = itemColumnMap.get(item.id)!;
+                    const minCol = Math.min(...cols);
+                    const maxCol = Math.max(...cols);
+                    const span = maxCol - minCol + 1;
+                    return (
+                      <div key={item.id} style={{ gridColumn: `${colIdx + 2} / span ${span}` }}>
+                        {renderCard(item, cols)}
+                      </div>
+                    );
                   })}
                 </div>
               );
