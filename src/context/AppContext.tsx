@@ -1139,6 +1139,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         end_time: event.endTime ?? (isAllDay ? "" : (event.time || "")),
         all_day: isAllDay,
         assignee: event.user,
+        assignee_user_ids: event.assigneeUserIds || null,
         done: false,
         completed_at: null,
         completed_by: null,
