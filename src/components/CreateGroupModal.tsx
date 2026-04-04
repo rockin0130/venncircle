@@ -20,7 +20,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
   const { createGroup, inviteToGroup } = useAuth();
   const { activeFriends } = useFriendships();
 
-  const [step, setStep] = useState<Step>(defaultCategory ? "friends" : "category");
+  const [step, setStep] = useState<Step>(defaultCategory ? "pages" : "category");
   const [category, setCategory] = useState<"home" | "interest">(defaultCategory || "home");
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
   const [selectedPages, setSelectedPages] = useState<Set<ShareablePage>>(
