@@ -304,32 +304,33 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
     return (
       <button
         onClick={() => onItemTap?.(item as CalItem)}
-        className="w-full text-left rounded-lg border transition-all hover:brightness-95 active:brightness-90 overflow-hidden max-w-full"
+        className="w-full text-left rounded-lg border transition-all hover:brightness-95 active:brightness-90 max-w-full box-border"
         style={{
           backgroundColor: colors.cardBg,
           borderColor: colors.cardBorder,
           minHeight: `${minHeight}px`,
+          overflow: "hidden",
         }}
       >
-        <div className="px-2 py-1.5">
-          <p className={`text-[12px] font-semibold leading-tight truncate ${item.done ? "line-through opacity-40" : ""}`}
-            style={{ color: colors.cardBorder }}>
+        <div className="px-2 py-1.5 overflow-hidden">
+          <p className={`text-[12px] font-semibold leading-tight ${item.done ? "line-through opacity-40" : ""}`}
+            style={{ color: colors.cardBorder, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {item.title}
           </p>
           {!isAllDay && (
-            <p className="text-[10px] mt-0.5 opacity-70" style={{ color: colors.cardBorder }}>
+            <p className="text-[10px] mt-0.5 opacity-70 truncate" style={{ color: colors.cardBorder }}>
               {displayTime}{displayEndTime && displayEndTime !== displayTime ? ` – ${displayEndTime}` : ""}
             </p>
           )}
           {isShared && (
-            <div className="flex -space-x-1 mt-1">
+            <div className="flex -space-x-1 mt-1 flex-nowrap overflow-hidden">
               {assignedColIndices.map(colIdx => {
                 const col = columns[colIdx];
                 if (!col) return null;
                 return (
                   <div
                     key={col.id}
-                    className={`w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white ring-1 ring-white/50 ${MEMBER_COLORS[col.colorIndex % MEMBER_COLORS.length].avatarBg}`}
+                    className={`w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white ring-1 ring-white/50 flex-shrink-0 ${MEMBER_COLORS[col.colorIndex % MEMBER_COLORS.length].avatarBg}`}
                   >
                     {col.initial}
                   </div>
