@@ -43,6 +43,7 @@ const Index = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [createGroupCategory, setCreateGroupCategory] = useState<"home" | "interest" | undefined>(undefined);
+  const [hubGroup, setHubGroup] = useState<Group | null>(null);
   const { navStyle, setNavStyle } = useNavStyle();
   const { weekStart, setWeekStart } = useWeekStart();
 
