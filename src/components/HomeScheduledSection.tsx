@@ -197,7 +197,23 @@ const HomeScheduledSection = ({
     return map;
   }, [unifiedItems]);
 
-  const activePeriods = (["morning", "afternoon", "evening", "flexible"] as Period[]).filter(p => periodMap[p].length > 0);
+  // Get habits grouped by period for enabled categories
+  const habitsByPeriod = useMemo(() => {
+    const map: Record<Period, typeof filteredHabits> = { morning: [], afternoon: [], evening: [], flexible: [] };
+    for (const cat of enabledHabitCategories) {
+      const period = CATEGORY_TO_PERIOD[cat] || "flexible";
+      const catHabits = filteredHabits.filter((h) => {
+        const hCat = (h.category || "other").toLowerCase();
+        return hCat === cat || hCat === `${cat}-habits`;
+      });
+      map[period].push(...catHabits);
+    }
+    return map;
+  }, [filteredHabits, enabledHabitCategories]);
+
+  const activePeriods = (["morning", "afternoon", "evening", "flexible"] as Period[]).filter(
+    p => periodMap[p].length > 0 || habitsByPeriod[p].length > 0
+  );
 
   // Progress
   const totalItems = unifiedItems.length;
