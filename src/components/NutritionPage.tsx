@@ -1217,7 +1217,13 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
                         if (meals.length === 0) {
                           return (
                             <div key={u.id} className="rounded-xl border-2 border-dashed border-border/50 p-2 flex items-center justify-center min-h-[60px]">
-                              <span className="text-[9px] text-muted-foreground">None</span>
+                              {!isOwn ? (
+                                <button onClick={() => sendNudge(u.id)} className="flex items-center gap-1 text-[9px] text-primary font-semibold hover:underline">
+                                  <Bell size={10} /> Nudge {u.name}
+                                </button>
+                              ) : (
+                                <span className="text-[9px] text-muted-foreground">None</span>
+                              )}
                             </div>
                           );
                         }
