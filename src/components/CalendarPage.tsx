@@ -1143,7 +1143,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
                       {items.length === 0 ? (
                         <p className="text-xs text-muted-foreground py-1">No events</p>
                       ) : (
-                        <EventList items={items} groups={groups} getColorClasses={getColorClasses} onItemTap={setSelectedItem} compact colorMap={calendarColorMap} />
+                        <EventList items={items} groups={groups} getColorClasses={getColorClasses} onItemTap={handleItemTap} compact colorMap={calendarColorMap} />
                       )}
                     </div>
                   </div>
