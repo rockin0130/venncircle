@@ -369,66 +369,8 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   const { filters: groupFilters, otherName, hasOther, showGoogleCalendar } = useGroupContext();
   const partnerName = otherName;
 
-  // Home page is always aggregate — no group/personal sentinel logic needed
-  const isPersonalActive = false;
-  const isAllActive = true;
-
-  // Build "All view" member filter pills from all home/family groups
-  const allViewMembers = useMemo(() => {
-    if (!isAllActive || !user) return [];
-    const homeGroups = groups.filter((g) => g.category === "home" && g.shared_pages?.includes("calendar"));
-    const memberMap = new Map<string, string>();
-    for (const g of homeGroups) {
-      for (const m of g.members) {
-        if (m.user_id !== user.id && m.status === "active" && !memberMap.has(m.user_id)) {
-          memberMap.set(m.user_id, m.display_name || "Member");
-        }
-      }
-    }
-    return Array.from(memberMap.entries()).map(([uid, name]) => ({ id: uid, label: name }));
-  }, [isAllActive, user, groups]);
-
-  const [allViewSelectedIds, setAllViewSelectedIds] = useState<Set<string>>(() => new Set(["everyone"]));
-
-  // Reset all-view pills when switching away from All
-  useEffect(() => {
-    if (isAllActive) {
-      setAllViewSelectedIds(new Set(["everyone"]));
-    }
-  }, [isAllActive]);
-
-  const toggleAllViewPill = (id: string) => {
-    setAllViewSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (id === "everyone") {
-        // Toggle everyone = select all or deselect all
-        if (next.has("everyone")) {
-          next.clear();
-          next.add("mine");
-        } else {
-          next.clear();
-          next.add("everyone");
-        }
-        return next;
-      }
-      next.delete("everyone");
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      // If all individual pills selected, switch to everyone
-      if (next.size === 0) next.add("everyone");
-      return next;
-    });
-  };
-
-  // Helper: check if current filter is a specific member filter
-  const isSpecificMemberFilter = filter.startsWith("member:");
-  const selectedMemberUserId = isSpecificMemberFilter ? filter.replace("member:", "") : null;
-  // Find the display name for the selected member
-  const selectedMemberName = useMemo(() => {
-    if (!selectedMemberUserId) return partnerName;
-    const f = groupFilters.find((gf) => gf.id === filter);
-    return f?.label || partnerName;
-  }, [selectedMemberUserId, groupFilters, filter, partnerName]);
+  // Home page is always the aggregate "mine" view — no group/member filtering
+  const isViewingPartner = false;
 
   // Morning habits: show own when "mine", partner's when "partner" — use first habit section
   const myMorningHabits = habits.filter((h) => h.category === "morning");
