@@ -638,10 +638,10 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
             <button
               onClick={() => toggleAssignee("me")}
               className={cn(
-                "px-3 py-1.5 text-[13px] font-medium rounded-full border transition-all whitespace-nowrap",
+                "px-3 py-1.5 text-[13px] font-semibold rounded-full border-2 transition-all whitespace-nowrap",
                 selectedAssignees.includes("me")
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground"
+                  ? "border-primary bg-primary/20 text-primary shadow-sm"
+                  : "border-border/60 bg-secondary/30 text-muted-foreground/70"
               )}
             >
               Mine
@@ -652,10 +652,10 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
                 key={m.user_id}
                 onClick={() => toggleAssignee(m.user_id)}
                 className={cn(
-                  "px-3 py-1.5 text-[13px] font-medium rounded-full border transition-all whitespace-nowrap",
+                  "px-3 py-1.5 text-[13px] font-semibold rounded-full border-2 transition-all whitespace-nowrap",
                   selectedAssignees.includes(m.user_id)
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground"
+                    ? "border-primary bg-primary/20 text-primary shadow-sm"
+                    : "border-border/60 bg-secondary/30 text-muted-foreground/70"
                 )}
               >
                 {m.display_name || "Member"}
