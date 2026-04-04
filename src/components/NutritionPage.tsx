@@ -1195,12 +1195,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
             </div>
             {/* Meal cards in columns by type */}
             {MEAL_TYPES.map(mt => {
-              const hasMeals = selectedUsersOrdered.some(u => {
-                const isOwn = u.id === user?.id;
-                const meals = isOwn ? myMealsForView.filter(m => m.user_id === user?.id) : otherUserMeals.filter(m => m.user_id === u.id);
-                return meals.some(m => m.meal_date === dateStr && m.meal_type === mt.key);
-              });
-              if (!hasMeals) return null;
+              // Always show all meal types in multi-user view so nudge buttons appear in empty cells
 
               return (
                 <div key={mt.key} className="mb-3">
