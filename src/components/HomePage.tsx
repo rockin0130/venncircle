@@ -774,7 +774,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                     onNavigate={onNavigate}
                     enabledHabitCategories={effectiveHabitSubIds.filter(id => id.startsWith("habit:")).map(id => id.replace("habit:", ""))}
                     selectedDate={selectedDate}
-                    isViewingMemberName={isViewingPartner ? selectedMemberName : undefined}
+                    isViewingMemberName={undefined}
                   />
                 );
 
