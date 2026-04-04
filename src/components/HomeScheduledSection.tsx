@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+import { motion } from "framer-motion";
 import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
@@ -326,47 +326,42 @@ const HomeScheduledSection = ({
                 <div className="flex-1 h-px bg-border ml-1" />
               </div>
 
-              {/* Habits at top of period */}
+              {/* Habits card at top of period */}
               {periodHabits.length > 0 && (
-                <div className="mb-2">
-                  <LayoutGroup id={`scheduled-habits-${period}`}>
-                    <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-                      <AnimatePresence mode="popLayout">
-                        {(() => {
-                          const incomplete = periodHabits.filter((h) => !h.completionDates.includes(dateStr));
-                          const complete = periodHabits.filter((h) => h.completionDates.includes(dateStr));
-                          return [...incomplete, ...complete].map((habit) => {
-                            const doneForDate = habit.completionDates.includes(dateStr);
-                            return (
-                              <motion.button
-                                key={habit.id}
-                                layout
-                                transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                                onClick={() => isTodayForHabits && !isViewingPartner && toggleHabit(habit.id)}
-                                disabled={!isTodayForHabits || isViewingPartner}
-                                className={cn(
-                                  "flex items-center gap-2 px-4 py-2.5 rounded-full border whitespace-nowrap text-sm font-medium transition-colors active:scale-[0.97]",
-                                  doneForDate
-                                    ? "border-habit-green bg-habit-green/10 text-habit-green"
-                                    : "border-border bg-card text-foreground",
-                                  (!isTodayForHabits || isViewingPartner) && "opacity-80"
-                                )}
-                              >
-                                {doneForDate ? (
-                                  <span className="w-5 h-5 rounded-full bg-habit-green flex items-center justify-center">
-                                    <Check size={12} className="text-primary-foreground" />
-                                  </span>
-                                ) : (
-                                  <span className="w-5 h-5 rounded-full border-2 border-muted" />
-                                )}
-                                {habit.label}
-                              </motion.button>
-                            );
-                          });
-                        })()}
-                      </AnimatePresence>
-                    </div>
-                  </LayoutGroup>
+                <div className="rounded-xl border border-border bg-card p-3 mb-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2 block">Habits</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(() => {
+                      const incomplete = periodHabits.filter((h) => !h.completionDates.includes(dateStr));
+                      const complete = periodHabits.filter((h) => h.completionDates.includes(dateStr));
+                      return [...incomplete, ...complete].map((habit) => {
+                        const doneForDate = habit.completionDates.includes(dateStr);
+                        return (
+                          <button
+                            key={habit.id}
+                            onClick={() => isTodayForHabits && !isViewingPartner && toggleHabit(habit.id)}
+                            disabled={!isTodayForHabits || isViewingPartner}
+                            className={cn(
+                              "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors active:scale-[0.97]",
+                              doneForDate
+                                ? "border-border bg-secondary/50 opacity-45"
+                                : "border-border bg-secondary/30 text-foreground",
+                              (!isTodayForHabits || isViewingPartner) && "opacity-80"
+                            )}
+                          >
+                            {doneForDate ? (
+                              <span className="w-3.5 h-3.5 rounded-full bg-habit-green flex items-center justify-center flex-shrink-0">
+                                <Check size={9} className="text-primary-foreground" />
+                              </span>
+                            ) : (
+                              <span className="w-3.5 h-3.5 rounded-full border-[1.5px] border-muted flex-shrink-0" />
+                            )}
+                            <span className={cn(doneForDate && "line-through")}>{habit.label}</span>
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
               )}
 
