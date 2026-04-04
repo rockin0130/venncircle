@@ -451,14 +451,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     return !meal.group_id || meal.group_id !== groupId;
   }, [isGroupView, groupId]);
 
-  const getMemberInfo = useCallback((userId: string) => {
-    if (userId === user?.id) return { name: "Mine", displayName: profile?.display_name || "Me", avatarUrl: profile?.avatar_url };
-    for (const g of groups) {
-      const member = g.members.find((m: GroupMember) => m.user_id === userId);
-      if (member) return { name: member.display_name?.split(" ")[0] || "Member", displayName: member.display_name || "Member", avatarUrl: member.avatar_url };
-    }
-    return { name: "Member", displayName: "Member", avatarUrl: null };
-  }, [user, profile, groups]);
 
   const getTrackerTotals = useCallback((mealsForUser: MealLog[]): Record<TrackerKey, number> => {
     const consumed = mealsForUser.filter(m => m.consumed && m.meal_date === dateStr);
