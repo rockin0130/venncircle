@@ -400,11 +400,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPendingGroupInvites(pendingInvites);
 
     setActiveGroup((prev) => {
+      if ((prev as any)?._personal) return prev; // Keep "Mine" if already selected
       if (prev) {
         const still = enrichedGroups.find((g) => g.id === prev.id);
-        return still ?? enrichedGroups[0] ?? null;
+        return still ?? prev;
       }
-      return enrichedGroups.length > 0 ? enrichedGroups[0] : null;
+      return prev;
     });
   }, [user, session?.access_token]);
 
