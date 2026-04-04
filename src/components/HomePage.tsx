@@ -86,7 +86,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
     setSelectedSobrietyIds(sobrietyIds);
     setSelectedSpecialDayIds(specialDayIds);
     setSelectedHabitSubIds(habitSubIds);
-    saveSectionPrefs(activeGroup?.id ?? null, order, visible, sobrietyIds, specialDayIds, habitSubIds);
+    saveSectionPrefs(null, order, visible, sobrietyIds, specialDayIds, habitSubIds);
   };
 
   const { listening, start: startListening, stop: stopListening, isSupported: speechSupported } = useSpeechToText({
