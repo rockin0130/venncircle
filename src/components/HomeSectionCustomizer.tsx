@@ -517,6 +517,7 @@ const HomeSectionCustomizer = ({
                 const section = ALL_SECTIONS.find((s) => s.id === id);
                 if (!section) return null;
                 const isVisible = localVisible.has(id);
+                const isLocked = section.locked;
                 const isScheduled = id === "scheduled";
                 const isSobriety = id === "sobriety";
                 const isSpecialDays = id === "special-days";
