@@ -190,8 +190,16 @@ const Index = () => {
       <SharedInterestsPage
         onNavigateToFeature={handleNavigateToFeature}
         onCreateGroup={handleCreateInterestGroup}
+        onOpenGroupHub={handleOpenGroupHub}
       />
     ),
+    "group-hub": hubGroup ? (
+      <GroupHubPage
+        group={hubGroup}
+        onBack={handleBackFromHub}
+        onNavigateToFeature={handleNavigateToFeature}
+      />
+    ) : null,
     profile: <ProfilePage onNavigate={(tab) => setActiveTab(tab as FullTab)} />,
     workout: <WorkoutsPage />,
     nutrition: <NutritionPage />,
