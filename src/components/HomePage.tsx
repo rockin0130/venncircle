@@ -769,7 +769,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                     readOnly={isViewingPartner}
                     addTask={addTask}
                     selectedDate={selectedDate}
-                    memberFilters={groupFilters}
+                    memberFilters={[]}
                   />
                 );
 
