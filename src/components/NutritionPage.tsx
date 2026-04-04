@@ -1258,16 +1258,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
               );
             })}
 
-            {/* Nudge buttons for users who haven't logged */}
-            {selectedOtherIds.map(otherId => {
-              if (otherUserHasLoggedToday(otherId)) return null;
-              const info = getMemberInfo(otherId);
-              return (
-                <button key={otherId} onClick={() => sendNudge(otherId)} className="flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline mb-1">
-                  <Bell size={12} /> Nudge {info.name}
-                </button>
-              );
-            })}
+            {/* Standalone nudge rows removed — nudge is now inside empty column cells */}
           </>
         )}
 
