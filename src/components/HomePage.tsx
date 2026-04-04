@@ -918,7 +918,6 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
 };
 
 const TaskCard = ({ task, onToggle, onCongrats, readOnly }: { task: Task; onToggle?: (id: string) => void; onCongrats: () => void; readOnly?: boolean }) => {
-  const { activeGroup } = useAuth();
   const handleToggle = () => {
     if (readOnly || !onToggle) return;
     if (!task.done) {
