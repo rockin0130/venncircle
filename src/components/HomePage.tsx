@@ -979,6 +979,13 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                   />
                 );
 
+              case "water":
+                return (
+                  <section key={sectionId} className="mb-6">
+                    <HomeWaterWidget selectedDate={selectedDate} />
+                  </section>
+                );
+
               case "nutrition":
                 return (
                   <section key={sectionId} className="mb-6">
