@@ -980,6 +980,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
       {/* ── Header ──────────────────────────────────────── */}
       <header className="pt-10 pb-2">
         <div className="flex items-center justify-between">
+          {/* Left: Month Year */}
           {viewMode === "list" ? (
             <button onClick={goToday} className="flex items-center gap-2 hover:bg-secondary rounded-lg px-2 py-1 transition-colors">
               <h1 className="text-xl font-bold text-foreground">{listVisibleMonth}</h1>
@@ -988,7 +989,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
             <Popover>
               <PopoverTrigger asChild>
                 <button className="flex items-center gap-2 hover:bg-secondary rounded-lg px-2 py-1 transition-colors">
-                  <h1 className="text-xl font-bold text-foreground">
+                  <h1 className="text-xl font-semibold text-foreground">
                     {selectedDate.toLocaleString("default", { month: "long" })}
                   </h1>
                   <span className="text-xl font-light text-muted-foreground">{selYear}</span>
@@ -1013,9 +1014,9 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
           ) : (
             <Popover>
               <PopoverTrigger asChild>
-                <button className="flex items-center gap-2 hover:bg-secondary rounded-lg px-2 py-1 transition-colors">
-                  <h1 className="text-xl font-bold text-foreground">{monthName}</h1>
-                  <span className="text-xl font-light text-muted-foreground">{year}</span>
+                <button className="flex items-center gap-1.5 hover:bg-secondary rounded-lg px-2 py-1 transition-colors">
+                  <h1 className="text-xl font-semibold text-foreground">{monthName}</h1>
+                  <span className="text-lg font-light text-muted-foreground">{year}</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -1035,46 +1036,39 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
               </PopoverContent>
             </Popover>
           )}
-          <div className="flex items-center gap-0.5">
-            
-            <button onClick={goToday} className="h-7 px-2 text-[11px] font-semibold text-primary hover:bg-primary/10 rounded-full transition-colors">
-              Today
-            </button>
-            <button onClick={() => setShowSearch(true)} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-secondary text-muted-foreground">
-              <Search size={16} />
-            </button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="h-7 px-2 flex items-center gap-0.5 text-[11px] font-medium text-primary hover:bg-primary/10 rounded-full">
-                  <CalendarIcon size={13} />
-                  <span>{VIEW_LABELS[viewMode]}</span>
+          {/* Right: D/W/M segmented control + search + add */}
+          <div className="flex items-center gap-1.5">
+            {/* D / W / M pill toggle */}
+            <div className="flex bg-secondary rounded-full p-0.5">
+              {(["day", "3day", "month"] as ViewMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={cn(
+                    "px-2 py-0.5 text-[10px] font-semibold rounded-full transition-all",
+                    viewMode === mode
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {mode === "day" ? "D" : mode === "3day" ? "W" : "M"}
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[120px]">
-                {(["month", "list", "day", "3day"] as ViewMode[]).map((mode) => (
-                  <DropdownMenuItem
-                    key={mode}
-                    onClick={() => setViewMode(mode)}
-                    className={viewMode === mode ? "bg-accent font-semibold" : ""}
-                  >
-                    {VIEW_LABELS[mode]}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              ))}
+            </div>
+
+            <button onClick={() => setShowSearch(true)} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-secondary text-muted-foreground">
+              <Search size={15} />
+            </button>
 
             <button onClick={openAddForm} className="w-7 h-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground">
               <Plus size={14} />
             </button>
 
             {onOpenSettings && (
-              <>
-                <div className="w-px h-4 bg-border mx-0.5" />
-                <button onClick={onOpenSettings} className="w-7 h-7 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                  <Settings size={16} />
-                </button>
-              </>
+              <button onClick={onOpenSettings} className="w-7 h-7 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                <Settings size={15} />
+              </button>
             )}
           </div>
         </div>
