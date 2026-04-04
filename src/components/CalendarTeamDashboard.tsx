@@ -373,42 +373,71 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
       }
     });
 
+    // If there are spanning items, they need their own row to avoid overlapping single-column items
+    const hasSingleItems = singleByCol.size > 0;
+
     return (
-      <div key={timeLabel ?? "allday"} className="grid gap-1 items-start" style={{ gridTemplateColumns: `40px repeat(${columns.length}, 1fr)` }}>
-        <div className="flex items-start justify-end pr-1 pt-1">
-          <span className="text-[9px] text-muted-foreground font-medium tabular-nums">
-            {timeLabel ?? "All day"}
-          </span>
-        </div>
-
-        {/* Render single-column items in their respective columns */}
-        {columns.map((_, colIdx) => {
-          const singles = singleByCol.get(colIdx) || [];
-          if (singles.length === 0) {
-            return <div key={colIdx} className="min-h-[28px]" />;
-          }
-          return (
-            <div key={colIdx} className="space-y-0.5 min-h-[28px]">
-              {singles.map((instr, i) => (
-                <div key={`${instr.item.id}-${i}`}>{renderCard(instr, isAllDay)}</div>
-              ))}
+      <div key={timeLabel ?? "allday"} className="space-y-0.5">
+        {/* Single-column items row */}
+        {hasSingleItems && (
+          <div className="grid gap-1 items-start" style={{ gridTemplateColumns: `48px repeat(${columns.length}, minmax(0, 1fr))` }}>
+            <div className="flex items-start justify-end pr-1 pt-1 flex-shrink-0 w-[48px]">
+              <span className="text-[9px] text-muted-foreground font-medium tabular-nums whitespace-nowrap">
+                {timeLabel ?? "All day"}
+              </span>
             </div>
-          );
-        })}
+            {columns.map((_, colIdx) => {
+              const singles = singleByCol.get(colIdx) || [];
+              if (singles.length === 0) {
+                return <div key={colIdx} className="min-h-[28px] min-w-0" />;
+              }
+              return (
+                <div key={colIdx} className="space-y-0.5 min-h-[28px] min-w-0 overflow-hidden">
+                  {singles.map((instr, i) => (
+                    <div key={`${instr.item.id}-${i}`} className="min-w-0 overflow-hidden">{renderCard(instr, isAllDay)}</div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-        {/* Render spanning items overlaid on top using absolute positioning within the grid */}
+        {/* Spanning items — each in its own grid row */}
         {spanItems.map((instr, i) => (
           <div
             key={`span-${instr.item.id}-${i}`}
-            style={{
-              gridColumn: `${instr.startColIdx + 2} / span ${instr.spanCount}`,
-              gridRow: 1,
-            }}
-            className="min-h-[28px]"
+            className="grid gap-1 items-start"
+            style={{ gridTemplateColumns: `48px repeat(${columns.length}, minmax(0, 1fr))` }}
           >
-            {renderCard(instr, isAllDay)}
+            {/* Time label for first span item only if no singles rendered above */}
+            <div className="flex items-start justify-end pr-1 pt-1 flex-shrink-0 w-[48px]">
+              {!hasSingleItems && i === 0 && (
+                <span className="text-[9px] text-muted-foreground font-medium tabular-nums whitespace-nowrap">
+                  {timeLabel ?? "All day"}
+                </span>
+              )}
+            </div>
+            <div
+              className="min-h-[28px] min-w-0 overflow-hidden"
+              style={{
+                gridColumn: `${instr.startColIdx + 2} / span ${instr.spanCount}`,
+              }}
+            >
+              {renderCard(instr, isAllDay)}
+            </div>
           </div>
         ))}
+
+        {/* If no items at all, still show the time label */}
+        {!hasSingleItems && spanItems.length === 0 && (
+          <div className="grid gap-1 items-start" style={{ gridTemplateColumns: `48px repeat(${columns.length}, minmax(0, 1fr))` }}>
+            <div className="flex items-start justify-end pr-1 pt-1 flex-shrink-0 w-[48px]">
+              <span className="text-[9px] text-muted-foreground font-medium tabular-nums whitespace-nowrap">
+                {timeLabel ?? "All day"}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
