@@ -477,9 +477,12 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
   // Convert selectedAssignees to the legacy assignee format
   const computeAssignee = (): "me" | "partner" | "both" => {
     if (isPersonalContext) return "me";
-    if (selectedAssignees.length > 1) return "both";
-    if (selectedAssignees[0] === "me") return "me";
-    return "partner";
+    const hasMe = selectedAssignees.includes("me");
+    const hasOthers = selectedAssignees.some(a => a !== "me");
+    if (hasMe && hasOthers) return "both";
+    if (hasMe) return "me";
+    if (hasOthers) return "partner";
+    return "me";
   };
 
   // ── Save handlers ──
