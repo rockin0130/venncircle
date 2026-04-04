@@ -29,8 +29,8 @@ export function buildAllSections(): HomeSection[] {
   return [...FIXED_SECTIONS];
 }
 
-export const DEFAULT_ORDER = ["habits", "scheduled", "todo"];
-export const DEFAULT_VISIBLE = new Set(["habits", "scheduled", "todo"]);
+export const DEFAULT_ORDER = ["scheduled", "todo", "water"];
+export const DEFAULT_VISIBLE = new Set(["scheduled", "todo", "water"]);
 
 function getStorageKey(groupId: string | null) {
   return `homeSections_${groupId || "personal"}`;
