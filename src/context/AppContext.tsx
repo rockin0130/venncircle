@@ -1645,8 +1645,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const filterByGroup = useCallback(<T extends { groupId?: string | null }>(items: T[]): T[] => {
     if (!activeGroup) return items; // "All" mode — show everything
     if ((activeGroup as any)?._personal) {
-      // Personal mode — only items with no group
-      return items.filter((item) => !item.groupId);
+      // "Mine" mode — show ALL of the logged-in user's own items across all contexts (aggregate)
+      return items;
     }
     return items.filter((item) => item.groupId === activeGroup.id);
   }, [activeGroup]);

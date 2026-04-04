@@ -652,7 +652,7 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
         )}
       </header>
 
-      <PageGroupSelector page="workout" />
+      <PageGroupSelector page="workout" personalLabel="Mine" hideAllPill />
 
       {/* User filter pills — shown in All and Group views, not Personal */}
       {!isPersonalView && (

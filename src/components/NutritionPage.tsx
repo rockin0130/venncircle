@@ -1091,7 +1091,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
         )}
       </div>
 
-      <PageGroupSelector page="nutrition" />
+      <PageGroupSelector page="nutrition" personalLabel="Mine" hideAllPill />
 
       {/* User filter pills — not shown on Personal */}
       <NutritionUserFilter selectedUserIds={selectedUserIds} onSelectionChange={handlePillChange} />

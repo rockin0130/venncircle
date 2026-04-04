@@ -823,7 +823,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
         </button>
       </div>
 
-      <PageGroupSelector page="sobriety" />
+      <PageGroupSelector page="sobriety" personalLabel="Mine" hideAllPill />
 
       {/* Pill User Filter */}
       <SobrietyUserFilter

@@ -117,7 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [partner, setPartner] = useState<PartnerProfile | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [pendingGroupInvites, setPendingGroupInvites] = useState<PendingGroupInvite[]>([]);
-  const [activeGroup, setActiveGroup] = useState<Group | null>(null);
+  const [activeGroup, setActiveGroup] = useState<Group | null>({ _personal: true, id: "__personal__", name: "Mine", type: "personal", emoji: "👤", invite_code: "", created_by: "", shared_pages: [], members: [] } as any);
   const [loading, setLoading] = useState(true);
 
   const getGroupsCacheKey = (userId: string) => `groups_cache_${userId}`;
@@ -160,10 +160,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setGroups(cachedGroups);
     setActiveGroup((prev) => {
+      if ((prev as any)?._personal) return prev; // Keep "Mine" if already selected
       if (prev) {
-        return cachedGroups.find((g) => g.id === prev.id) ?? cachedGroups[0] ?? null;
+        return cachedGroups.find((g) => g.id === prev.id) ?? prev;
       }
-      return cachedGroups[0] ?? null;
+      return prev;
     });
     return true;
   };
@@ -271,8 +272,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }));
           setGroups(fallbackEnriched);
           setActiveGroup((prev) => {
-            if (!prev) return fallbackEnriched[0] ?? null;
-            return fallbackEnriched.find((g) => g.id === prev.id) ?? fallbackEnriched[0] ?? null;
+            if ((prev as any)?._personal) return prev;
+            if (!prev) return prev;
+            return fallbackEnriched.find((g) => g.id === prev.id) ?? prev;
           });
           saveCachedGroups(user.id, fallbackEnriched);
           return;
@@ -398,11 +400,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPendingGroupInvites(pendingInvites);
 
     setActiveGroup((prev) => {
+      if ((prev as any)?._personal) return prev; // Keep "Mine" if already selected
       if (prev) {
         const still = enrichedGroups.find((g) => g.id === prev.id);
-        return still ?? enrichedGroups[0] ?? null;
+        return still ?? prev;
       }
-      return enrichedGroups.length > 0 ? enrichedGroups[0] : null;
+      return prev;
     });
   }, [user, session?.access_token]);
 
@@ -572,7 +575,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (result?.error) return { error: result.error };
     // Immediately clear activeGroup if it was the one we just left
     if (activeGroup?.id === groupId) {
-      setActiveGroup(null);
+      setActiveGroup({ _personal: true, id: "__personal__", name: "Mine", type: "personal", emoji: "👤", invite_code: "", created_by: "", shared_pages: [], members: [] } as any);
     }
     await fetchGroups();
     return { success: true };
