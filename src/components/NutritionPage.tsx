@@ -887,13 +887,17 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   const caloriesPct = calorieGoal > 0 ? Math.min((caloriesConsumed / calorieGoal) * 100, 100) : 0;
   const caloriesRemaining = Math.max(0, calorieGoal - caloriesConsumed);
 
-  // Macro bars for single-user view (P, C, F)
+  // Macro bars for single-user view — only show enabled trackers
   const macroBarData = useMemo(() => {
-    const p = { key: "protein" as TrackerKey, label: "Protein", val: myTotals.protein, goal: goals.protein_goal || 150, color: "hsl(var(--primary))" };
-    const c = { key: "carbs" as TrackerKey, label: "Carbs", val: myTotals.carbs, goal: goals.carbs_goal || 220, color: "hsl(45 93% 47%)" };
-    const f = { key: "fat" as TrackerKey, label: "Fat", val: myTotals.fat, goal: goals.fat_goal || 70, color: "hsl(340 60% 55%)" };
-    return [p, c, f];
-  }, [myTotals, goals]);
+    const allBars = [
+      { key: "protein" as TrackerKey, label: "Protein", val: myTotals.protein, goal: goals.protein_goal || 150, color: "hsl(var(--primary))" },
+      { key: "calories" as TrackerKey, label: "Calories", val: myTotals.calories, goal: goals.calorie_goal || 2000, color: "hsl(25 95% 53%)" },
+      { key: "carbs" as TrackerKey, label: "Carbs", val: myTotals.carbs, goal: goals.carbs_goal || 220, color: "hsl(45 93% 47%)" },
+      { key: "fat" as TrackerKey, label: "Fat", val: myTotals.fat, goal: goals.fat_goal || 70, color: "hsl(340 60% 55%)" },
+      { key: "fiber" as TrackerKey, label: "Fiber", val: myTotals.fiber, goal: goals.fiber_goal || 30, color: "hsl(142 71% 45%)" },
+    ];
+    return allBars.filter(b => enabledTrackers.includes(b.key));
+  }, [myTotals, goals, enabledTrackers]);
 
   // If showing log page, render it instead
   if (showLogPage) {
