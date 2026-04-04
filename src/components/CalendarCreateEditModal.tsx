@@ -762,10 +762,10 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
                   className="w-full flex items-center justify-between"
                 >
                   <span className="text-[15px] text-foreground">Calendar</span>
-                  <div className="flex items-center gap-2">
+                   <div className="flex items-center gap-2">
                     <div
                       className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: calendarColor }}
+                      style={{ backgroundColor: selectedContextOption.color }}
                     />
                     <span className="text-[15px] text-muted-foreground">{selectedContextOption.label}</span>
                     <ChevronDown
