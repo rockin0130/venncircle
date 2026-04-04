@@ -310,16 +310,62 @@ const HomeScheduledSection = ({
       <div className="space-y-4">
         {activePeriods.map(period => {
           const items = periodMap[period];
+          const periodHabits = habitsByPeriod[period];
           const config = PERIOD_CONFIG[period];
+          const totalCount = items.length + periodHabits.length;
           return (
             <div key={period}>
               {/* Period separator */}
               <div className="flex items-center gap-2 mb-2">
                 {config.icon}
                 <span className="text-xs font-semibold text-muted-foreground">{config.label}</span>
-                <span className="text-[10px] text-muted-foreground/60">({items.length})</span>
+                <span className="text-[10px] text-muted-foreground/60">({totalCount})</span>
                 <div className="flex-1 h-px bg-border ml-1" />
               </div>
+
+              {/* Habits at top of period */}
+              {periodHabits.length > 0 && (
+                <div className="mb-2">
+                  <LayoutGroup id={`scheduled-habits-${period}`}>
+                    <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+                      <AnimatePresence mode="popLayout">
+                        {(() => {
+                          const incomplete = periodHabits.filter((h) => !h.completionDates.includes(dateStr));
+                          const complete = periodHabits.filter((h) => h.completionDates.includes(dateStr));
+                          return [...incomplete, ...complete].map((habit) => {
+                            const doneForDate = habit.completionDates.includes(dateStr);
+                            return (
+                              <motion.button
+                                key={habit.id}
+                                layout
+                                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                                onClick={() => isTodayForHabits && !isViewingPartner && toggleHabit(habit.id)}
+                                disabled={!isTodayForHabits || isViewingPartner}
+                                className={cn(
+                                  "flex items-center gap-2 px-4 py-2.5 rounded-full border whitespace-nowrap text-sm font-medium transition-colors active:scale-[0.97]",
+                                  doneForDate
+                                    ? "border-habit-green bg-habit-green/10 text-habit-green"
+                                    : "border-border bg-card text-foreground",
+                                  (!isTodayForHabits || isViewingPartner) && "opacity-80"
+                                )}
+                              >
+                                {doneForDate ? (
+                                  <span className="w-5 h-5 rounded-full bg-habit-green flex items-center justify-center">
+                                    <Check size={12} className="text-primary-foreground" />
+                                  </span>
+                                ) : (
+                                  <span className="w-5 h-5 rounded-full border-2 border-muted" />
+                                )}
+                                {habit.label}
+                              </motion.button>
+                            );
+                          });
+                        })()}
+                      </AnimatePresence>
+                    </div>
+                  </LayoutGroup>
+                </div>
+              )}
 
               {/* Cards */}
               <div className="space-y-2">
