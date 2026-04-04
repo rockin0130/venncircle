@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
-import { Plus, ChevronRight } from "lucide-react";
-import { useAuth, Group, ShareablePage, PAGE_LABELS, PAGE_ICONS } from "@/context/AuthContext";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { Plus, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
+import { useAuth, Group, ShareablePage, PAGE_LABELS } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
 interface FeedItem {
@@ -87,18 +87,22 @@ const MemberDots = ({ members }: { members: { display_name: string | null; user_
   );
 };
 
+type SplitMode = "equal" | "groups-expanded" | "feed-expanded";
+
 const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHub }: SharedInterestsPageProps) => {
   const { groups, user } = useAuth();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
+  const [splitMode, setSplitMode] = useState<SplitMode>("equal");
+  const [splitRatio, setSplitRatio] = useState(50);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
 
-  // Show all groups except the personal sentinel
   const allGroups = useMemo(
     () => groups.filter((g: any) => !g._personal && g.id !== "__personal__"),
     [groups]
   );
 
-  // Load activity feed from all groups
   useEffect(() => {
     if (!user || allGroups.length === 0) {
       setFeedItems([]);
@@ -152,7 +156,6 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
   }, [user, allGroups]);
 
   const handleGroupTap = (group: Group) => {
-    // If group has only one interest, go directly to that page
     if (group.shared_pages.length === 1) {
       const page = group.shared_pages[0];
       const tab = page === "special_days" ? "specialdays" : page;
@@ -162,10 +165,54 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
     }
   };
 
+  const toggleExpand = (section: "groups" | "feed") => {
+    if (section === "groups") {
+      setSplitMode((m) => (m === "groups-expanded" ? "equal" : "groups-expanded"));
+      setSplitRatio((r) => (splitMode === "groups-expanded" ? 50 : 75));
+    } else {
+      setSplitMode((m) => (m === "feed-expanded" ? "equal" : "feed-expanded"));
+      setSplitRatio((r) => (splitMode === "feed-expanded" ? 50 : 25));
+    }
+  };
+
+  const onDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    isDragging.current = true;
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    const onMove = (clientY: number) => {
+      if (!isDragging.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const pct = ((clientY - rect.top) / rect.height) * 100;
+      const clamped = Math.max(20, Math.min(80, pct));
+      setSplitRatio(clamped);
+      setSplitMode("equal");
+    };
+    const handleMouseMove = (e: MouseEvent) => onMove(e.clientY);
+    const handleTouchMove = (e: TouchEvent) => onMove(e.touches[0].clientY);
+    const handleEnd = () => { isDragging.current = false; };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("touchmove", handleTouchMove);
+    window.addEventListener("mouseup", handleEnd);
+    window.addEventListener("touchend", handleEnd);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("mouseup", handleEnd);
+      window.removeEventListener("touchend", handleEnd);
+    };
+  }, []);
+
+  const topPct = splitMode === "groups-expanded" ? 75 : splitMode === "feed-expanded" ? 25 : splitRatio;
+  const isGroupsCompact = splitMode === "feed-expanded";
+  const isFeedCompact = splitMode === "groups-expanded";
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="px-5 pt-12 pb-4 flex-shrink-0 flex items-center justify-between">
+      <header className="px-5 pt-12 pb-3 flex-shrink-0 flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight text-foreground">Explore</h1>
         <button
           onClick={onCreateGroup}
@@ -176,98 +223,164 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-5">
-        {/* Group Cards */}
-        {allGroups.length > 0 ? (
-          <section className="space-y-2.5">
+      {/* Split container */}
+      <div ref={containerRef} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* Top: My Groups */}
+        <div style={{ height: `${topPct}%` }} className="flex flex-col min-h-0">
+          <div className="px-5 py-1.5 flex items-center justify-between flex-shrink-0">
             <h2 className="text-sm font-semibold text-foreground">My Groups</h2>
-            {allGroups.map((group, gi) => {
-              const activeMembers = group.members.filter((m) => m.status === "active");
-              return (
-                <button
-                  key={group.id}
-                  onClick={() => handleGroupTap(group)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary/20 transition-all active:scale-[0.99] text-left"
-                >
-                  {/* Group avatar */}
-                  <div className={`w-9 h-9 rounded-lg ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex items-center justify-center shrink-0`}>
-                    <span className="text-xs font-bold text-foreground/80">{getInitials(group.name)}</span>
-                  </div>
-
-                  {/* Name + member dots */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{group.name}</p>
-                    <MemberDots members={activeMembers} />
-                  </div>
-
-                  {/* Interest pills */}
-                  <div className="flex flex-wrap gap-1 max-w-[160px] justify-end shrink-0">
-                    {(group.shared_pages || []).slice(0, 4).map((page) => (
-                      <span
-                        key={page}
-                        className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
-                      >
-                        {PAGE_LABELS[page as ShareablePage] || page}
-                      </span>
-                    ))}
-                    {(group.shared_pages || []).length > 4 && (
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                        +{group.shared_pages.length - 4}
-                      </span>
-                    )}
-                  </div>
-
-                  <ChevronRight size={16} className="text-muted-foreground shrink-0" />
-                </button>
-              );
-            })}
-          </section>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-              <span className="text-2xl">👥</span>
-            </div>
-            <p className="text-sm font-medium text-foreground mb-1">No groups yet</p>
-            <p className="text-xs text-muted-foreground max-w-[240px]">
-              Create one or ask a friend to invite you.
-            </p>
+            <button
+              onClick={() => toggleExpand("groups")}
+              className="p-1 rounded-md hover:bg-muted transition-colors"
+              title={splitMode === "groups-expanded" ? "Collapse" : "Expand groups"}
+            >
+              {splitMode === "groups-expanded" ? <Minimize2 size={14} className="text-muted-foreground" /> : <Maximize2 size={14} className="text-muted-foreground" />}
+            </button>
           </div>
-        )}
 
-        {/* Recent Activity */}
-        {feedItems.length > 0 && (
-          <section className="space-y-2.5">
+          <div className="flex-1 overflow-y-auto px-5 pb-1">
+            {allGroups.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-3">
+                  <span className="text-xl">👥</span>
+                </div>
+                <p className="text-sm font-medium text-foreground mb-0.5">No groups yet</p>
+                <p className="text-xs text-muted-foreground max-w-[220px]">Create one or ask a friend to invite you.</p>
+              </div>
+            ) : isGroupsCompact ? (
+              /* Compact horizontal strip */
+              <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+                {allGroups.map((group, gi) => (
+                  <button
+                    key={group.id}
+                    onClick={() => handleGroupTap(group)}
+                    className="flex flex-col items-center gap-1 shrink-0 active:scale-95 transition-transform"
+                  >
+                    <div className={`w-10 h-10 rounded-lg ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex items-center justify-center`}>
+                      <span className="text-[10px] font-bold text-foreground/80">{getInitials(group.name)}</span>
+                    </div>
+                    <span className="text-[9px] text-muted-foreground font-medium max-w-[52px] truncate">{group.name}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              /* Full group cards */
+              <div className="space-y-2">
+                {allGroups.map((group, gi) => {
+                  const activeMembers = group.members.filter((m) => m.status === "active");
+                  return (
+                    <button
+                      key={group.id}
+                      onClick={() => handleGroupTap(group)}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary/20 transition-all active:scale-[0.99] text-left"
+                    >
+                      <div className={`w-9 h-9 rounded-lg ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex items-center justify-center shrink-0`}>
+                        <span className="text-xs font-bold text-foreground/80">{getInitials(group.name)}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{group.name}</p>
+                        <MemberDots members={activeMembers} />
+                      </div>
+                      <div className="flex flex-wrap gap-1 max-w-[160px] justify-end shrink-0">
+                        {(group.shared_pages || []).slice(0, 4).map((page) => (
+                          <span
+                            key={page}
+                            className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
+                          >
+                            {PAGE_LABELS[page as ShareablePage] || page}
+                          </span>
+                        ))}
+                        {(group.shared_pages || []).length > 4 && (
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                            +{group.shared_pages.length - 4}
+                          </span>
+                        )}
+                      </div>
+                      <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Draggable divider */}
+        <div
+          onMouseDown={onDragStart}
+          onTouchStart={onDragStart}
+          className="flex-shrink-0 h-3 flex items-center justify-center cursor-row-resize group hover:bg-muted/40 transition-colors select-none touch-none"
+        >
+          <div className="w-10 h-1 rounded-full bg-border group-hover:bg-primary/30 transition-colors" />
+        </div>
+
+        {/* Bottom: Recent Activity */}
+        <div style={{ height: `calc(${100 - topPct}% - 12px)` }} className="flex flex-col min-h-0">
+          <div className="px-5 py-1.5 flex items-center justify-between flex-shrink-0">
             <h2 className="text-sm font-semibold text-foreground">Recent Activity</h2>
+            <button
+              onClick={() => toggleExpand("feed")}
+              className="p-1 rounded-md hover:bg-muted transition-colors"
+              title={splitMode === "feed-expanded" ? "Collapse" : "Expand feed"}
+            >
+              {splitMode === "feed-expanded" ? <Minimize2 size={14} className="text-muted-foreground" /> : <Maximize2 size={14} className="text-muted-foreground" />}
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-5 pb-4">
             {feedLoading ? (
               <p className="text-xs text-muted-foreground text-center py-4">Loading activity...</p>
-            ) : (
-              feedItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => onNavigateToFeature?.(item.type, item.groupId)}
-                  className="w-full flex items-start gap-3 p-3 rounded-xl bg-card border border-border text-left hover:border-primary/20 transition-colors"
-                >
-                  <div className="w-[26px] h-[26px] rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
-                    {getInitials(item.userName)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs leading-snug">
-                      <span className="font-semibold">{item.userName}</span>{" "}
-                      <span className="text-muted-foreground">{item.description} in </span>
-                      <span className="font-medium">{item.groupName}</span>
-                    </p>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-[10px] text-muted-foreground">{getTimeAgo(item.timestamp)}</span>
-                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${item.categoryColor}`}>
-                        {item.categoryLabel}
-                      </span>
+            ) : feedItems.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-6">No recent activity yet</p>
+            ) : isFeedCompact ? (
+              /* Compact feed */
+              <div className="space-y-1">
+                {feedItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => onNavigateToFeature?.(item.type, item.groupId)}
+                    className="w-full flex items-center gap-2 py-1.5 text-left hover:bg-muted/30 rounded-lg px-1 transition-colors"
+                  >
+                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary shrink-0">
+                      {getInitials(item.userName)}
                     </div>
-                  </div>
-                </button>
-              ))
+                    <p className="text-[11px] text-muted-foreground truncate flex-1">
+                      <span className="font-medium text-foreground">{item.userName}</span> {item.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              /* Full feed items */
+              <div className="space-y-2">
+                {feedItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => onNavigateToFeature?.(item.type, item.groupId)}
+                    className="w-full flex items-start gap-3 p-3 rounded-xl bg-card border border-border text-left hover:border-primary/20 transition-colors"
+                  >
+                    <div className="w-[26px] h-[26px] rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
+                      {getInitials(item.userName)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs leading-snug">
+                        <span className="font-semibold">{item.userName}</span>{" "}
+                        <span className="text-muted-foreground">{item.description} in </span>
+                        <span className="font-medium">{item.groupName}</span>
+                      </p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-[10px] text-muted-foreground">{getTimeAgo(item.timestamp)}</span>
+                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${item.categoryColor}`}>
+                          {item.categoryLabel}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             )}
-          </section>
-        )}
+          </div>
+        </div>
       </div>
     </div>
   );
