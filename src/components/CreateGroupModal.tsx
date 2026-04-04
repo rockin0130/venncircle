@@ -142,7 +142,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
               <p className="text-xs text-muted-foreground">What kind of group is this?</p>
               <div className="space-y-2">
                 <button
-                  onClick={() => { setCategory("home"); setStep("friends"); }}
+                  onClick={() => { setCategory("home"); setSelectedFriends(new Set()); setStep("pages"); }}
                   className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all text-left ${
                     category === "home" ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-secondary/50"
                   }`}
@@ -151,12 +151,12 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
                     <Home size={20} className="text-primary" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold">Home Group</p>
-                    <p className="text-xs text-muted-foreground">Close family & friends — your inner circle</p>
+                    <p className="text-sm font-semibold">Create Alone</p>
+                    <p className="text-xs text-muted-foreground">Start a personal group — invite friends later</p>
                   </div>
                 </button>
                 <button
-                  onClick={() => { setCategory("interest"); setStep("friends"); }}
+                  onClick={() => { setCategory("interest"); setSelectedFriends(new Set()); setStep("pages"); }}
                   className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all text-left ${
                     category === "interest" ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-secondary/50"
                   }`}
