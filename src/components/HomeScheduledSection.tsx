@@ -101,7 +101,20 @@ interface Props {
   onToggleGcal: (id: string) => void;
   onCongrats: () => void;
   onNavigate?: (page: string) => void;
+  enabledHabitCategories?: string[];
+  selectedDate?: Date;
+  isViewingMemberName?: string;
 }
+
+const CATEGORY_TO_PERIOD: Record<string, Period> = {
+  morning: "morning",
+  afternoon: "afternoon",
+  evening: "evening",
+  other: "flexible",
+};
+
+const fmtDateStr = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const HomeScheduledSection = ({
   allDayItems,
@@ -113,6 +126,9 @@ const HomeScheduledSection = ({
   onToggleGcal,
   onCongrats,
   onNavigate,
+  enabledHabitCategories = [],
+  selectedDate,
+  isViewingMemberName,
 }: Props) => {
   const { groups, activeGroup, user } = useAuth();
   const [nowMinutes, setNowMinutes] = useState(() => {
