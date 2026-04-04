@@ -131,6 +131,9 @@ const HomeScheduledSection = ({
   isViewingMemberName,
 }: Props) => {
   const { groups, activeGroup, user } = useAuth();
+  const { filteredHabits, toggleHabit, getHabitStreak } = useAppContext();
+  const dateStr = selectedDate ? fmtDateStr(selectedDate) : fmtDateStr(new Date());
+  const isTodayForHabits = dateStr === fmtDateStr(new Date());
   const [nowMinutes, setNowMinutes] = useState(() => {
     const n = new Date();
     return n.getHours() * 60 + n.getMinutes();
