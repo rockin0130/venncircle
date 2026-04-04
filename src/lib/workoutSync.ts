@@ -56,23 +56,16 @@ const NORMALIZED_TYPE_MAP: Record<string, string> = {
   "EXERCISE_SESSION_TYPE_YOGA": "Yoga",
   "EXERCISE_SESSION_TYPE_BOXING": "Boxing",
   "EXERCISE_SESSION_TYPE_GOLF": "Golf",
-  // Generic fallbacks from title keywords
+  // Generic fallbacks from title keywords (non-duplicate keys only)
   "run": "Run",
-  "running": "Run",
   "walk": "Walk",
-  "walking": "Walk",
   "cycle": "Cycle",
-  "cycling": "Cycle",
   "bike": "Cycle",
   "biking": "Cycle",
   "swim": "Swim",
-  "swimming": "Swim",
   "strength": "Strength",
   "weight": "Strength",
   "hiit": "HIIT",
-  "yoga": "Yoga",
-  "boxing": "Boxing",
-  "golf": "Golf",
 };
 
 const NORMALIZED_TYPE_EMOJI: Record<string, string> = {
