@@ -38,8 +38,9 @@ interface ClarificationState {
 }
 
 const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLauncher?: () => void; onOpenSettings?: () => void; onNavigate?: (page: string) => void }) => {
-  const { profile, partner, groups, activeGroup, setActiveGroup, user } = useAuth();
-  const [filter, setFilter] = useState<Filter>("mine");
+  const { profile, partner, groups, user } = useAuth();
+  // Home page is ALWAYS the logged-in user's aggregate view — never influenced by global group selection
+  const filter: Filter = "mine";
   const [input, setInput] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
