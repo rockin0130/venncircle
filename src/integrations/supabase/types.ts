@@ -190,6 +190,33 @@ export type Database = {
           },
         ]
       }
+      calendar_team_dashboard_preferences: {
+        Row: {
+          column_user_ids: string[]
+          context_key: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          column_user_ids?: string[]
+          context_key: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          column_user_ids?: string[]
+          context_key?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       calendars: {
         Row: {
           color: string
@@ -516,23 +543,53 @@ export type Database = {
       gcal_event_designations: {
         Row: {
           assignee: string
+          assignee_user_ids: string[]
           created_at: string
           gcal_event_id: string
           id: string
+          is_deleted: boolean
+          override_all_day: boolean | null
+          override_description: string | null
+          override_end: string | null
+          override_location: string | null
+          override_start: string | null
+          override_timezone: string | null
+          override_title: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
           assignee?: string
+          assignee_user_ids?: string[]
           created_at?: string
           gcal_event_id: string
           id?: string
+          is_deleted?: boolean
+          override_all_day?: boolean | null
+          override_description?: string | null
+          override_end?: string | null
+          override_location?: string | null
+          override_start?: string | null
+          override_timezone?: string | null
+          override_title?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
           assignee?: string
+          assignee_user_ids?: string[]
           created_at?: string
           gcal_event_id?: string
           id?: string
+          is_deleted?: boolean
+          override_all_day?: boolean | null
+          override_description?: string | null
+          override_end?: string | null
+          override_location?: string | null
+          override_start?: string | null
+          override_timezone?: string | null
+          override_title?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
