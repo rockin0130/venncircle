@@ -751,6 +751,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               hiddenFromPartner: e.hidden_from_partner || false,
               groupId: e.group_id || null,
               ownerUserId: otherUserId,
+              assigneeUserIds: e.assignee_user_ids || null,
             })));
           }
 
