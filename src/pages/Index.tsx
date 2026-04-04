@@ -247,16 +247,16 @@ const Index = () => {
           )}
         </AnimatePresence>
 
-        {activeTab === "home" && (
+        {activeTab === "home" && showBottomNav && (
           <button
             onClick={() => handleNavigateToFeature("specialdays")}
-            className="fixed bottom-28 left-4 z-50 w-11 h-11 rounded-full bg-card/90 backdrop-blur-sm border border-border shadow-md flex items-center justify-center hover:bg-secondary/80 active:scale-95 transition-all"
+            className="fixed left-4 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[60] w-11 h-11 rounded-full border border-border bg-card/95 backdrop-blur-sm shadow-md flex items-center justify-center text-primary hover:bg-secondary/80 active:scale-95 transition-all"
             aria-label="Special Days"
             title="Special Days"
           >
-            <svg width="22" height="18" viewBox="0 0 22 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary">
-              <circle cx="8" cy="9" r="7" stroke="currentColor" strokeWidth="1.8" fill="none" opacity="0.7" />
-              <circle cx="14" cy="9" r="7" stroke="currentColor" strokeWidth="1.8" fill="none" opacity="0.7" />
+            <svg width="22" height="18" viewBox="0 0 22 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="8" cy="9" r="7" stroke="currentColor" strokeWidth="1.8" fill="none" opacity="0.78" />
+              <circle cx="14" cy="9" r="7" stroke="currentColor" strokeWidth="1.8" fill="none" opacity="0.78" />
             </svg>
           </button>
         )}
