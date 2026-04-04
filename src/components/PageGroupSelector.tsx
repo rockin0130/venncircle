@@ -41,18 +41,20 @@ const PageGroupSelector = ({ page, isHomePage, personalLabel = "Personal", perso
   return (
     <>
       <div className="flex gap-1.5 overflow-x-auto scrollbar-hide scroll-smooth-touch py-1 -mx-1 px-1" style={{ WebkitOverflowScrolling: "touch" }}>
-        {/* All chip */}
-        <button
-          onClick={handleSelectAll}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0 border ${
-            isAllActive
-              ? "border-primary bg-primary text-primary-foreground shadow-sm"
-              : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
-          }`}
-        >
-          <span className="text-sm leading-none">🌐</span>
-          <span>All</span>
-        </button>
+        {/* All chip — hidden when hideAllPill is true */}
+        {!hideAllPill && (
+          <button
+            onClick={handleSelectAll}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0 border ${
+              isAllActive
+                ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
+            }`}
+          >
+            <span className="text-sm leading-none">🌐</span>
+            <span>All</span>
+          </button>
+        )}
 
         {/* Personal chip */}
         <button
