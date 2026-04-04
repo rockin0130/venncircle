@@ -112,11 +112,6 @@ function dateWithMinutes(baseDate: Date, minutes: number) {
   return dt;
 }
 
-function getGroupColorIndex(groupId: string | null | undefined, groups: Group[]): number {
-  if (!groupId) return 0;
-  const idx = groups.findIndex((g) => g.id === groupId);
-  return idx >= 0 ? idx % GROUP_COLOR_CLASSES.length : 0;
-}
 
 function dateToKey(d: number, m: number, y: number) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
