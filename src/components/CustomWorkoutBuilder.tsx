@@ -1,36 +1,15 @@
 import { useState, useEffect, useMemo } from "react";
 import { X, Plus, Trash2, Search, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, MapPin, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import type { WorkoutType } from "@capgo/capacitor-health";
 import { Workout } from "@/context/AppContext";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { canonicalExerciseName } from "@/lib/exerciseLibrary";
+import { getAllHealthKitWorkoutOptions } from "@/lib/healthKitWorkoutTypes";
 import ExerciseLibrarySheet from "@/components/ExerciseLibrarySheet";
 import WorkoutContextSelector, { PERSONAL_ID } from "@/components/WorkoutContextSelector";
-
-const COMMON_ACTIVITIES = [
-  { name: "Running", emoji: "🏃" },
-  { name: "Walking", emoji: "🚶" },
-  { name: "Cycling", emoji: "🚴" },
-  { name: "Swimming", emoji: "🏊" },
-  { name: "Hiking", emoji: "🥾" },
-  { name: "Yoga", emoji: "🧘" },
-  { name: "Pilates", emoji: "🤸" },
-  { name: "Golf", emoji: "⛳" },
-  { name: "Pickleball", emoji: "🏓" },
-  { name: "Tennis", emoji: "🎾" },
-  { name: "Basketball", emoji: "🏀" },
-  { name: "Soccer", emoji: "⚽" },
-  { name: "Dance", emoji: "💃" },
-  { name: "Boxing", emoji: "🥊" },
-  { name: "Rowing", emoji: "🚣" },
-  { name: "Jump Rope", emoji: "🪢" },
-  { name: "Elliptical", emoji: "🏋️" },
-  { name: "Stair Climber", emoji: "🪜" },
-  { name: "Stretching", emoji: "🙆" },
-  { name: "Martial Arts", emoji: "🥋" },
-];
 
 interface ExerciseEntry {
   name: string;
@@ -69,6 +48,9 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWork
   const [activityDistanceUnit, setActivityDistanceUnit] = useState<"mi" | "km">("mi");
   const [activityEmoji, setActivityEmoji] = useState("🏃");
   const [activitySearch, setActivitySearch] = useState("");
+  const [activityHealthKitType, setActivityHealthKitType] = useState<WorkoutType | null>(null);
+
+  const healthKitActivityOptions = useMemo(() => getAllHealthKitWorkoutOptions(), []);
 
   // Context selector state — Personal always included
   const isPersonalActive = (activeGroup as any)?._personal === true;
@@ -106,8 +88,8 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWork
     })();
   }, [open, user]);
 
-  const filteredActivities = COMMON_ACTIVITIES.filter(
-    (a) => a.name.toLowerCase().includes(activitySearch.toLowerCase())
+  const filteredActivities = healthKitActivityOptions.filter((a) =>
+    a.label.toLowerCase().includes(activitySearch.toLowerCase())
   );
 
   const addExercise = (name: string) => {
@@ -181,6 +163,7 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWork
       distanceUnit: activityDistanceUnit,
       groupId: ctx === PERSONAL_ID ? null : ctx,
       linkedWorkoutId: linkedId,
+      normalizedType: activityHealthKitType ?? undefined,
     }));
 
     onAdd(newWorkouts);
@@ -202,13 +185,15 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWork
     setActivityDistanceUnit("mi");
     setActivityEmoji("🏃");
     setActivitySearch("");
+    setActivityHealthKitType(null);
   };
 
   const handleClose = () => { reset(); onClose(); };
 
-  const selectActivity = (name: string, emoji: string) => {
-    setTitle(name);
+  const selectActivity = (label: string, emoji: string, hkType: WorkoutType) => {
+    setTitle(label);
     setActivityEmoji(emoji);
+    setActivityHealthKitType(hkType);
     setActivitySearch("");
     setStep("activity-details");
   };
@@ -332,23 +317,26 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWork
                         className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto">
+                    <div className="grid grid-cols-3 gap-1.5 max-h-56 overflow-y-auto">
                       {filteredActivities.map((a) => (
                         <button
-                          key={a.name}
-                          onClick={() => selectActivity(a.name, a.emoji)}
+                          key={a.value}
+                          type="button"
+                          onClick={() => selectActivity(a.label, a.emoji, a.value)}
                           className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg hover:bg-secondary transition-colors text-center"
                         >
                           <span className="text-lg">{a.emoji}</span>
-                          <span className="text-[11px] font-medium truncate w-full">{a.name}</span>
+                          <span className="text-[10px] font-medium leading-tight line-clamp-2 w-full">{a.label}</span>
                         </button>
                       ))}
                     </div>
                     {/* Or go custom */}
                     <button
+                      type="button"
                       onClick={() => {
                         if (!title.trim()) { toast.error("Enter an activity name"); return; }
                         setActivityEmoji("🏃");
+                        setActivityHealthKitType(null);
                         setStep("activity-details");
                       }}
                       className="w-full py-3 bg-primary text-primary-foreground rounded-xl text-sm font-bold"

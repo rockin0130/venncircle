@@ -18,6 +18,33 @@ const NORMALIZED_TYPE_MAP: Record<string, string> = {
   "HKWorkoutActivityTypeYoga": "Yoga",
   "HKWorkoutActivityTypeBoxing": "Boxing",
   "HKWorkoutActivityTypeGolf": "Golf",
+  // @capgo/capacitor-health WorkoutType keys (used when picking activities in-app)
+  running: "Run",
+  walking: "Walk",
+  cycling: "Cycle",
+  swimming: "Swim",
+  swimmingPool: "Swim",
+  swimmingOpenWater: "Swim",
+  hiking: "Run",
+  yoga: "Yoga",
+  pilates: "Yoga",
+  golf: "Golf",
+  pickleball: "Other",
+  tennis: "Other",
+  basketball: "Other",
+  soccer: "Other",
+  dance: "Other",
+  boxing: "Boxing",
+  rowing: "Other",
+  elliptical: "Other",
+  stairClimbing: "Other",
+  traditionalStrengthTraining: "Strength",
+  strengthTraining: "Strength",
+  functionalStrengthTraining: "Strength",
+  highIntensityIntervalTraining: "HIIT",
+  crossTraining: "HIIT",
+  mixedCardio: "Other",
+  other: "Other",
   // Health Connect workout types
   "EXERCISE_SESSION_TYPE_RUNNING": "Run",
   "EXERCISE_SESSION_TYPE_WALKING": "Walk",
@@ -144,7 +171,7 @@ interface ExistingWorkout {
 /**
  * Parse duration string to minutes for comparison.
  */
-function parseDurationToMinutes(dur: string): number {
+export function parseWorkoutDurationToMinutes(dur: string): number {
   if (!dur) return 0;
   let total = 0;
   const hrMatch = dur.match(/(\d+)\s*hr/i);
@@ -217,7 +244,7 @@ export function matchImportedWorkout(
     }
 
     // 4. Duration similarity bonus
-    const candidateDur = parseDurationToMinutes(candidate.duration);
+    const candidateDur = parseWorkoutDurationToMinutes(candidate.duration);
     if (candidateDur > 0 && imported.durationMinutes > 0) {
       const ratio = Math.min(candidateDur, imported.durationMinutes) /
         Math.max(candidateDur, imported.durationMinutes);
@@ -288,7 +315,7 @@ export function isDuplicateImport(
     }
 
     // Check duration similarity
-    const wDur = parseDurationToMinutes(w.duration);
+    const wDur = parseWorkoutDurationToMinutes(w.duration);
     if (wDur > 0 && imported.durationMinutes > 0) {
       const ratio = Math.min(wDur, imported.durationMinutes) /
         Math.max(wDur, imported.durationMinutes);

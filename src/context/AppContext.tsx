@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useCallback, useEffect, useMemo } from "react";
+import { createContext, useContext, useState, ReactNode, useCallback, useEffect, useMemo, type Dispatch, type SetStateAction } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -9,6 +9,7 @@ import {
   renameSectionInDB,
   deleteSectionFromDB,
 } from "@/lib/habitSections";
+import { parseWorkoutDurationToMinutes } from "@/lib/workoutSync";
 
 export interface Habit {
   id: string;
@@ -169,7 +170,39 @@ export interface GoogleCalendarEvent {
   completedBy?: string | null;
   calendarId?: string;
   calendarColor?: string | null;
+  isApple?: boolean;
 }
+
+export interface AppleCalendarEvent {
+  id: string;
+  title: string;
+  startDate: number;
+  endDate: number;
+  allDay: boolean;
+  location?: string | null;
+  calendarId?: string;
+  calendarTitle?: string;
+  calendarColor?: string;
+}
+
+const mapAppleCalendarToGoogle = (ae: AppleCalendarEvent, ownerUserId: string): GoogleCalendarEvent => ({
+  id: `apple-${ae.id}`,
+  title: ae.title,
+  description: null,
+  start: new Date(ae.startDate).toISOString(),
+  end: new Date(ae.endDate).toISOString(),
+  allDay: ae.allDay,
+  location: ae.location ?? null,
+  htmlLink: "",
+  ownerUserId,
+  assignee: "me",
+  done: false,
+  completedAt: null,
+  completedBy: null,
+  calendarId: ae.calendarId,
+  calendarColor: ae.calendarColor ?? null,
+  isApple: true,
+});
 
 interface AppContextType {
   habits: Habit[];
@@ -222,6 +255,10 @@ interface AppContextType {
   getHabitsForDate: (date: string) => Habit[];
   getWorkoutsForDate: (date: string) => Workout[];
   googleCalendarEvents: GoogleCalendarEvent[];
+  appleCalendarEvents: AppleCalendarEvent[];
+  setAppleCalendarEvents: Dispatch<SetStateAction<AppleCalendarEvent[]>>;
+  appleFitnessSyncEnabled: boolean;
+  setAppleFitnessSyncEnabled: (enabled: boolean) => void;
   hideGcalEvent: (eventId: string) => Promise<void>;
   toggleGcalCompletion: (eventId: string) => Promise<void>;
   toggleEventVisibility: (eventId: string) => Promise<void>;
@@ -244,6 +281,16 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+const APPLE_FITNESS_SYNC_STORAGE_KEY = "venncircle_apple_fitness_sync";
+
+function readAppleFitnessSyncFromStorage(): boolean {
+  try {
+    return typeof localStorage !== "undefined" && localStorage.getItem(APPLE_FITNESS_SYNC_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 const fmtDateCtx = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -288,9 +335,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [partnerTasks, setPartnerTasks] = useState<Task[]>([]);
   const [partnerWorkouts, setPartnerWorkouts] = useState<Workout[]>([]);
   const [googleCalendarEvents, setGoogleCalendarEvents] = useState<GoogleCalendarEvent[]>([]);
+  const [appleCalendarEvents, setAppleCalendarEvents] = useState<AppleCalendarEvent[]>([]);
+  const [appleFitnessSyncEnabled, setAppleFitnessSyncEnabledState] = useState(readAppleFitnessSyncFromStorage);
   const [habitSectionsState, setHabitSectionsState] = useState<HabitSectionMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshCounter, setRefreshCounter] = useState(0);
+
+  const setAppleFitnessSyncEnabled = useCallback((enabled: boolean) => {
+    setAppleFitnessSyncEnabledState(enabled);
+    try {
+      if (enabled) localStorage.setItem(APPLE_FITNESS_SYNC_STORAGE_KEY, "1");
+      else localStorage.removeItem(APPLE_FITNESS_SYNC_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Get ALL other user IDs in the active context (supports 3+ member groups)
   const contextOtherUserIds = useMemo(() => {
@@ -533,6 +592,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!user) {
       setGoogleCalendarEvents([]);
+      setAppleCalendarEvents([]);
       return;
     }
 
@@ -626,7 +686,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         });
 
         if (cancelled) return;
-        setGoogleCalendarEvents(enriched);
+        setGoogleCalendarEvents((prev) => {
+          const preserved = prev.filter((e) => e.id.startsWith("apple-"));
+          return [...enriched, ...preserved];
+        });
       } catch (err) {
         console.error("Error loading Google Calendar events:", err);
       }
@@ -638,6 +701,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       cancelled = true;
     };
   }, [user?.id, activeGroup?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+    setGoogleCalendarEvents((prev) => {
+      const withoutApple = prev.filter((e) => !e.id.startsWith("apple-"));
+      const mapped = appleCalendarEvents.map((ae) => mapAppleCalendarToGoogle(ae, user.id));
+      return [...withoutApple, ...mapped];
+    });
+  }, [appleCalendarEvents, user?.id]);
 
   // Load "other member" data for the active context (group member if selected, otherwise linked partner)
   useEffect(() => {
@@ -1364,6 +1436,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const newDone = !workout.done;
     const effectiveDate = workout.scheduledDate || todayStr();
 
+    const durationMin = parseWorkoutDurationToMinutes(workout.duration) || 30;
+    const endIso = new Date().toISOString();
+    const startIso = new Date(Date.now() - durationMin * 60000).toISOString();
+
     // Find all linked workouts to sync completion
     const linkedIds = new Set<string>([id]);
     if (workout.linkedWorkoutId) {
@@ -1377,7 +1453,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setWorkoutsState((w) =>
       w.map((item) =>
         linkedIds.has(item.id)
-          ? { ...item, done: newDone, completedDate: newDone ? (item.scheduledDate || effectiveDate) : undefined }
+          ? {
+              ...item,
+              done: newDone,
+              completedDate: newDone ? (item.scheduledDate || effectiveDate) : undefined,
+              startTime: newDone ? startIso : null,
+              endTime: newDone ? endIso : null,
+            }
           : item
       )
     );
@@ -1389,7 +1471,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       await supabase.from("workouts").update({
         done: newDone,
         completed_date: newDone ? linkedDate : null,
+        start_time: newDone ? startIso : null,
+        end_time: newDone ? endIso : null,
       }).eq("id", wid);
+    }
+
+    if (newDone && appleFitnessSyncEnabled) {
+      const merged: Workout = {
+        ...workout,
+        done: true,
+        startTime: startIso,
+        endTime: endIso,
+        completedDate: workout.scheduledDate || effectiveDate,
+      };
+      void import("@/integrations/appleHealth").then(({ syncCompletedWorkoutFromHealthKit }) =>
+        syncCompletedWorkoutFromHealthKit(merged, updateWorkout, Array.from(linkedIds))
+      );
     }
   };
 
@@ -1451,6 +1548,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (updates.sourceApp !== undefined) dbUpdates.source_app = updates.sourceApp;
     if (updates.sourceDevice !== undefined) dbUpdates.source_device = updates.sourceDevice;
     if (updates.completionPhotoUrl !== undefined) dbUpdates.completion_photo_url = updates.completionPhotoUrl;
+    if (updates.normalizedType !== undefined) dbUpdates.normalized_type = updates.normalizedType;
+    if (updates.externalId !== undefined) dbUpdates.external_id = updates.externalId;
+    if (updates.startTime !== undefined) dbUpdates.start_time = updates.startTime;
+    if (updates.endTime !== undefined) dbUpdates.end_time = updates.endTime;
     if (Object.keys(dbUpdates).length > 0) {
       await supabase.from("workouts").update(dbUpdates).eq("id", id);
     }
@@ -1498,6 +1599,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       source_device: w.sourceDevice ?? null,
       route_data: w.routeData ?? null,
       linked_workout_id: w.linkedWorkoutId ?? null,
+      normalized_type: w.normalizedType ?? null,
+      start_time: w.startTime ?? null,
+      end_time: w.endTime ?? null,
     }));
 
     const { data, error } = await supabase
@@ -1725,6 +1829,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
     // Remove from local state immediately
     setGoogleCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
+    if (eventId.startsWith("apple-")) return;
     await supabase.from("hidden_gcal_events").upsert({
       user_id: user.id,
       gcal_event_id: eventId,
@@ -1748,6 +1853,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setGoogleCalendarEvents((prev) =>
       prev.map((e) => e.id === eventId ? { ...e, assignee } : e)
     );
+    if (eventId.startsWith("apple-")) return;
     await supabase.from("gcal_event_designations").upsert({
       user_id: user.id,
       gcal_event_id: eventId,
@@ -1771,21 +1877,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       } : e)
     );
 
-    const { error } = await supabase.from("gcal_event_completions" as any).upsert({
-      user_id: user.id,
-      gcal_event_id: eventId,
-      group_id: resolvedGroupId,
-      done: newDone,
-      completed_at: newDone ? new Date().toISOString() : null,
-      completed_by: newDone ? user.id : null,
-    }, { onConflict: "user_id,gcal_event_id" });
+    if (!eventId.startsWith("apple-")) {
+      const { error } = await supabase.from("gcal_event_completions" as any).upsert({
+        user_id: user.id,
+        gcal_event_id: eventId,
+        group_id: resolvedGroupId,
+        done: newDone,
+        completed_at: newDone ? new Date().toISOString() : null,
+        completed_by: newDone ? user.id : null,
+      }, { onConflict: "user_id,gcal_event_id" });
 
-    if (error) {
-      console.error("Failed to toggle gcal completion:", error);
-      // Rollback
-      setGoogleCalendarEvents((prev) =>
-        prev.map((e) => e.id === eventId ? { ...e, done: ge.done, completedAt: ge.completedAt, completedBy: ge.completedBy } : e)
-      );
+      if (error) {
+        console.error("Failed to toggle gcal completion:", error);
+        setGoogleCalendarEvents((prev) =>
+          prev.map((e) => e.id === eventId ? { ...e, done: ge.done, completedAt: ge.completedAt, completedBy: ge.completedBy } : e)
+        );
+      }
     }
   };
 
@@ -1799,7 +1906,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       partnerWaterIntake, partnerWaterGoal, partnerWaterMap,
       workouts, filteredWorkouts, toggleWorkout, removeWorkout, removeWorkoutsByFilter, updateWorkout, setWorkouts, addWorkouts, rescheduleWorkout, rescheduleWorkoutCascade,
       getHabitStreak, getHabitsForDate, getWorkoutsForDate,
-      googleCalendarEvents, hideGcalEvent, toggleGcalCompletion, toggleEventVisibility, designateGcalEvent,
+      googleCalendarEvents, appleCalendarEvents, setAppleCalendarEvents, appleFitnessSyncEnabled, setAppleFitnessSyncEnabled, hideGcalEvent, toggleGcalCompletion, toggleEventVisibility, designateGcalEvent,
       partnerHabits, partnerEvents, partnerTasks, partnerWorkouts,
       filteredPartnerHabits, filteredPartnerEvents, filteredPartnerTasks, filteredPartnerWorkouts,
       getPartnerWorkoutsForDate, getPartnerHabitsForDate, getPartnerHabitStreak,

@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
-import { User, Bell, Shield, Palette, HelpCircle, LogOut, ChevronRight, Link2, Copy, Check, Unlink, Loader2, Calendar, ExternalLink, Users, DoorOpen, Trash2, ShieldCheck, AlertTriangle, Pencil } from "lucide-react";
+import { User, Bell, Shield, Palette, HelpCircle, LogOut, ChevronRight, Link2, Copy, Check, Unlink, Loader2, Calendar, ExternalLink, Users, DoorOpen, Trash2, ShieldCheck, AlertTriangle, Pencil, Activity } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useAppContext } from "@/context/AppContext";
+import { requestCalendarPermission, getCalendarEvents, hasCalendarReadPermission } from "../integrations/appleCalendar";
+import { requestHealthKitReadPermission } from "../integrations/appleHealth";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,8 +18,16 @@ const settingsItems = [
   { icon: HelpCircle, label: "Help & Support", desc: "FAQ & contact" },
 ];
 
+const appleCalendarRange = () => {
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endDate = new Date(now.getFullYear(), now.getMonth() + 3, 0, 23, 59, 59, 999);
+  return { startDate, endDate };
+};
+
 const SettingsPage = () => {
   const { user, session, profile, partner, groups, activeGroup, setActiveGroup, signOut, connectPartner, disconnectPartner, leaveGroup, refreshGroups } = useAuth();
+  const { setAppleCalendarEvents, appleFitnessSyncEnabled, setAppleFitnessSyncEnabled } = useAppContext();
   const [showPartnerDialog, setShowPartnerDialog] = useState(false);
   const [inviteInput, setInviteInput] = useState("");
   const [connecting, setConnecting] = useState(false);
@@ -31,6 +42,9 @@ const SettingsPage = () => {
   const [transferring, setTransferring] = useState(false);
   const [selectedTransferMember, setSelectedTransferMember] = useState<string | null>(null);
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [appleCalendarConnected, setAppleCalendarConnected] = useState(false);
+  const [appleCalendarLoading, setAppleCalendarLoading] = useState(false);
+  const [appleFitnessLoading, setAppleFitnessLoading] = useState(false);
 
   // Keep activeGroup in sync with groups list
   useEffect(() => {
@@ -68,6 +82,73 @@ const SettingsPage = () => {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const ok = await hasCalendarReadPermission();
+        if (cancelled || !ok) return;
+        const { startDate, endDate } = appleCalendarRange();
+        const events = await getCalendarEvents(startDate, endDate);
+        if (cancelled) return;
+        setAppleCalendarEvents(events);
+        setAppleCalendarConnected(true);
+      } catch {
+        /* Web or unavailable plugin */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [setAppleCalendarEvents]);
+
+  const handleConnectAppleCalendar = async () => {
+    setAppleCalendarLoading(true);
+    try {
+      const { result } = await requestCalendarPermission();
+      if (result !== "granted") {
+        toast.error("Calendar access was denied");
+        return;
+      }
+      const { startDate, endDate } = appleCalendarRange();
+      const events = await getCalendarEvents(startDate, endDate);
+      setAppleCalendarEvents(events);
+      setAppleCalendarConnected(true);
+      toast.success("Apple Calendar connected");
+    } catch {
+      toast.error("Could not connect Apple Calendar");
+    } finally {
+      setAppleCalendarLoading(false);
+    }
+  };
+
+  const handleDisconnectAppleCalendar = () => {
+    setAppleCalendarEvents([]);
+    setAppleCalendarConnected(false);
+  };
+
+  const handleConnectAppleFitness = async () => {
+    setAppleFitnessLoading(true);
+    try {
+      const granted = await requestHealthKitReadPermission();
+      if (!granted) {
+        toast.error("Health data access was denied");
+        return;
+      }
+      setAppleFitnessSyncEnabled(true);
+      toast.success("Apple Fitness sync enabled");
+    } catch {
+      toast.error("Could not enable Apple Fitness sync");
+    } finally {
+      setAppleFitnessLoading(false);
+    }
+  };
+
+  const handleDisconnectAppleFitness = () => {
+    setAppleFitnessSyncEnabled(false);
+    toast.success("Apple Fitness sync turned off");
+  };
 
   const handleCopyCode = () => {
     if (profile?.invite_code) {
@@ -359,6 +440,101 @@ const SettingsPage = () => {
         </div>
       </div>
 
+      {/* Apple Calendar (device native) */}
+      <div className="bg-card rounded-xl border border-border shadow-card mb-6 overflow-hidden">
+        <div className="p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <Calendar size={16} className="text-primary" />
+            <span className="text-sm font-semibold">Apple Calendar</span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Show events from calendars on this device (iOS / Android). Requires the native app.
+          </p>
+
+          {appleCalendarConnected ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
+                <span className="text-xl">🍎</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-primary">Connected</p>
+                  <p className="text-xs text-muted-foreground">Device calendar events are merged into your schedule</p>
+                </div>
+                <Check size={16} className="text-primary" />
+              </div>
+              <button
+                type="button"
+                onClick={handleDisconnectAppleCalendar}
+                disabled={appleCalendarLoading}
+                className="w-full py-2.5 rounded-xl border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                Disconnect Apple Calendar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleConnectAppleCalendar}
+              disabled={appleCalendarLoading}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <span className="text-xl">🍎</span>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold">Connect Apple Calendar</p>
+                <p className="text-xs opacity-80">Import device calendar events</p>
+              </div>
+              {appleCalendarLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Apple Fitness / HealthKit sync */}
+      <div className="bg-card rounded-xl border border-border shadow-card mb-6 overflow-hidden">
+        <div className="p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <Activity size={16} className="text-primary" />
+            <span className="text-sm font-semibold">Apple Fitness Sync</span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            After you complete a workout, we can pull calories, distance, and heart rate from Apple Health (HealthKit). Requires the native iOS app and Health permissions.
+          </p>
+
+          {appleFitnessSyncEnabled ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
+                <span className="text-xl">❤️</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-primary">Sync on</p>
+                  <p className="text-xs text-muted-foreground">Completed workouts will merge metrics from Health when available</p>
+                </div>
+                <Check size={16} className="text-primary" />
+              </div>
+              <button
+                type="button"
+                onClick={handleDisconnectAppleFitness}
+                disabled={appleFitnessLoading}
+                className="w-full py-2.5 rounded-xl border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                Turn off sync
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleConnectAppleFitness}
+              disabled={appleFitnessLoading}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <span className="text-xl">❤️</span>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold">Enable Apple Fitness Sync</p>
+                <p className="text-xs opacity-80">Allow reading workouts, energy, distance, and heart rate</p>
+              </div>
+              {appleFitnessLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Settings List */}
       <div className="space-y-1">
