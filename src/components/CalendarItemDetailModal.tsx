@@ -122,13 +122,11 @@ const CalendarItemDetailModal = ({ item, onClose, onEdit }: Props) => {
               {item.done ? "Mark as not done" : "Mark as done"}
             </button>
 
-            {item.type !== "gcal" && (
-              <button onClick={handleEdit}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl hover:bg-secondary transition-colors text-left">
-                <Pencil size={16} className="text-muted-foreground" />
-                Edit
-              </button>
-            )}
+            <button onClick={handleEdit}
+              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl hover:bg-secondary transition-colors text-left">
+              <Pencil size={16} className="text-muted-foreground" />
+              Edit
+            </button>
 
             {!confirmDelete ? (
               <button onClick={() => setConfirmDelete(true)}

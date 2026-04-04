@@ -165,6 +165,7 @@ export interface GoogleCalendarEvent {
   htmlLink: string;
   ownerUserId?: string;
   assignee?: "me" | "partner" | "both";
+  assigneeUserIds?: string[] | null;
   done?: boolean;
   completedAt?: string | null;
   completedBy?: string | null;
@@ -262,7 +263,7 @@ interface AppContextType {
   hideGcalEvent: (eventId: string) => Promise<void>;
   toggleGcalCompletion: (eventId: string) => Promise<void>;
   toggleEventVisibility: (eventId: string) => Promise<void>;
-  designateGcalEvent: (eventId: string, assignee: "me" | "partner" | "both") => Promise<void>;
+  designateGcalEvent: (eventId: string, assignee: "me" | "partner" | "both", assigneeUserIds?: string[]) => Promise<void>;
   // Partner data (raw)
   partnerHabits: Habit[];
   partnerEvents: ScheduledEvent[];
@@ -665,20 +666,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const data = await res.json();
         const rawEvents: GoogleCalendarEvent[] = data.events || [];
 
-        // Load completion states for these gcal events
+        // Load completion states and designations for these gcal events
         const gcalIds = rawEvents.map((ge) => ge.id);
-        const { data: completions } = gcalIds.length > 0
-          ? await supabase.from("gcal_event_completions").select("*").in("gcal_event_id", gcalIds)
-          : { data: [] };
+        const [{ data: completions }, { data: designations }] = gcalIds.length > 0
+          ? await Promise.all([
+              supabase.from("gcal_event_completions").select("*").in("gcal_event_id", gcalIds),
+              supabase.from("gcal_event_designations").select("*").in("gcal_event_id", gcalIds),
+            ])
+          : [{ data: [] }, { data: [] }];
         const completionMap = new Map((completions || []).map((c: any) => [c.gcal_event_id, c]));
+        const designationMap = new Map((designations || []).map((d: any) => [d.gcal_event_id, d]));
 
         const enriched = rawEvents.map((ge) => {
           const fallbackAssignee: Assignee = ge.ownerUserId === user.id ? "me" : "partner";
-          const assignee = (ge.assignee as Assignee | undefined) ?? fallbackAssignee;
+          const designation = designationMap.get(ge.id);
+          const assignee = designation?.assignee ?? (ge.assignee as Assignee | undefined) ?? fallbackAssignee;
+          const assigneeUserIds: string[] | null = designation?.assignee_user_ids?.length > 0 ? designation.assignee_user_ids : null;
           const completion = completionMap.get(ge.id);
           return {
             ...ge,
             assignee,
+            assigneeUserIds,
             done: completion?.done ?? false,
             completedAt: completion?.completed_at ?? null,
             completedBy: completion?.completed_by ?? null,
@@ -1848,16 +1856,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await supabase.from("events").update({ hidden_from_partner: newHidden }).eq("id", eventId);
   };
 
-  const designateGcalEvent = async (eventId: string, assignee: "me" | "partner" | "both") => {
+  const designateGcalEvent = async (eventId: string, assignee: "me" | "partner" | "both", assigneeUserIds?: string[]) => {
     if (!user) return;
     setGoogleCalendarEvents((prev) =>
-      prev.map((e) => e.id === eventId ? { ...e, assignee } : e)
+      prev.map((e) => e.id === eventId ? { ...e, assignee, assigneeUserIds: assigneeUserIds || null } : e)
     );
     if (eventId.startsWith("apple-")) return;
+    // Future: sync edits back to Google Calendar via the Google Calendar API.
+    // For now edits are stored in the app's database only and do not push back to Google.
     await supabase.from("gcal_event_designations").upsert({
       user_id: user.id,
       gcal_event_id: eventId,
       assignee,
+      assignee_user_ids: assigneeUserIds || [],
     }, { onConflict: "user_id,gcal_event_id" });
   };
 

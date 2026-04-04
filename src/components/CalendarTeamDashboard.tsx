@@ -1,7 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useAuth, Group, GroupMember } from "@/context/AuthContext";
 import { formatTime } from "@/lib/formatTime";
 import { FilterUser, MEMBER_COLORS, SHARED_COLOR } from "@/components/CalendarUserFilter";
+import { GripVertical } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CalItem {
   id: string;
@@ -32,72 +34,57 @@ interface Props {
   onItemTap?: (item: CalItem) => void;
 }
 
-function resolveItemOwnerIds(item: CalItem, currentUserId: string, groups: Group[]): Set<string> {
+// ── Assignment resolution ──
+
+function resolveItemAssignedUserIds(item: CalItem, currentUserId: string, groups: Group[]): string[] {
   const raw = item.raw as any;
   const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
 
-  // Google Calendar events always default to current user only
+  // Google Calendar: use explicit assignee_user_ids from designation, else default to current user only
   if (item.type === "gcal") {
-    // Check if explicitly assigned via gcal designation
-    const gcalAssignee = raw.assignee;
-    if (gcalAssignee === "both") {
-      const ids = new Set<string>();
-      ids.add(currentUserId);
-      const groupId = item.groupId;
-      if (groupId) {
-        const grp = groups.find(g => g.id === groupId);
-        grp?.members?.filter((m: any) => m.user_id !== currentUserId && m.status === "active")
-          .forEach((m: any) => ids.add(m.user_id));
-      }
-      return ids;
+    const designationIds: string[] | null = raw.assigneeUserIds || raw.assignee_user_ids;
+    if (designationIds && designationIds.length > 0) {
+      return designationIds;
     }
-    if (gcalAssignee === "partner") {
-      const ids = new Set<string>();
-      const groupId = item.groupId;
-      if (groupId) {
-        const grp = groups.find(g => g.id === groupId);
-        grp?.members?.filter((m: any) => m.user_id !== currentUserId && m.status === "active")
-          .forEach((m: any) => ids.add(m.user_id));
-      }
-      if (ids.size === 0) ids.add(currentUserId);
-      return ids;
-    }
-    // Default: Mine only
-    return new Set([currentUserId]);
+    // No explicit assignment → Mine only
+    return [currentUserId];
   }
 
-  // For regular events/tasks: prefer assignee_user_ids array if available
-  const assigneeUserIds: string[] | null = raw.assignee_user_ids;
+  // Regular events/tasks: prefer assignee_user_ids array
+  const assigneeUserIds: string[] | null = raw.assigneeUserIds || raw.assignee_user_ids;
   if (assigneeUserIds && assigneeUserIds.length > 0) {
-    return new Set(assigneeUserIds);
+    return assigneeUserIds;
   }
 
   // Fallback to legacy assignee field
   const assignee = item.assignee;
   const groupId = item.groupId;
-  const ids = new Set<string>();
 
   if (assignee === "me") {
-    ids.add(ownerId);
-  } else if (assignee === "partner") {
-    if (groupId) {
-      const grp = groups.find(g => g.id === groupId);
-      grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
-        .forEach((m: any) => ids.add(m.user_id));
-    }
-    if (ids.size === 0) ids.add("partner");
-  } else if (assignee === "both") {
-    ids.add(ownerId);
-    if (groupId) {
-      const grp = groups.find(g => g.id === groupId);
-      grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
-        .forEach((m: any) => ids.add(m.user_id));
-    }
-  } else {
-    ids.add(ownerId);
+    return [ownerId];
   }
-  return ids;
+  if (assignee === "partner") {
+    if (groupId) {
+      const grp = groups.find(g => g.id === groupId);
+      const others = grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active").map((m: any) => m.user_id) || [];
+      return others.length > 0 ? others : [ownerId];
+    }
+    return [ownerId];
+  }
+  if (assignee === "both") {
+    const ids = [ownerId];
+    if (groupId) {
+      const grp = groups.find(g => g.id === groupId);
+      grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+        .forEach((m: any) => { if (!ids.includes(m.user_id)) ids.push(m.user_id); });
+    }
+    return ids;
+  }
+
+  return [ownerId];
 }
+
+// ── Time helpers ──
 
 function parseMinutesFromTime(time: string): number | null {
   if (!time || time === "All day") return null;
@@ -124,49 +111,160 @@ function formatMinutes(mins: number): string {
   return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
+// ── Render map types ──
+
+interface RenderInstruction {
+  type: "single" | "span";
+  startColIdx: number;
+  spanCount: number;
+  item: CalItem & { startMin?: number; endMin?: number };
+  assignedColIndices: number[];
+}
+
 const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap }: Props) => {
   const { user, groups } = useAuth();
   const currentUserId = user?.id || "";
 
-  // Only show columns for selected users
-  const columns = useMemo(() => {
+  // ── Column order (saved per user per group) ──
+  const contextKey = useMemo(() => {
+    const isEveryone = selectedUserIds.has("__everyone__");
+    if (isEveryone) return "__everyone__";
+    return [...selectedUserIds].sort().join(",");
+  }, [selectedUserIds]);
+
+  const defaultColumns = useMemo(() => {
     const isEveryone = selectedUserIds.has("__everyone__");
     return filterUsers.filter(u => isEveryone || selectedUserIds.has(u.id));
   }, [filterUsers, selectedUserIds]);
 
-  // Resolve which columns each item belongs to
-  const itemColumnMap = useMemo(() => {
-    const map = new Map<string, Set<number>>();
-    items.forEach(item => {
-      const ownerIds = resolveItemOwnerIds(item, currentUserId, groups);
-      const colIndices = new Set<number>();
-      columns.forEach((col, idx) => {
-        if (ownerIds.has(col.id)) colIndices.add(idx);
-      });
-      // For gcal events, assign to first column (current user)
-      if (item.type === "gcal" && colIndices.size === 0) {
-        const myIdx = columns.findIndex(c => c.id === currentUserId);
-        if (myIdx >= 0) colIndices.add(myIdx);
-      }
-      if (colIndices.size > 0) map.set(item.id, colIndices);
-    });
-    return map;
-  }, [items, columns, currentUserId, groups]);
+  const [columnOrder, setColumnOrder] = useState<string[]>([]);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [showReorder, setShowReorder] = useState(false);
 
-  // Split into all-day and timed
+  // Load saved column order
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from("calendar_team_dashboard_preferences")
+        .select("column_user_ids")
+        .eq("user_id", user.id)
+        .eq("context_key", contextKey)
+        .maybeSingle();
+      if (data?.column_user_ids?.length) {
+        setColumnOrder(data.column_user_ids);
+      } else {
+        setColumnOrder(defaultColumns.map(c => c.id));
+      }
+    };
+    load();
+  }, [user?.id, contextKey, defaultColumns]);
+
+  const columns = useMemo(() => {
+    if (columnOrder.length === 0) return defaultColumns;
+    // Map saved order to FilterUser objects, filtering out any that aren't in defaultColumns
+    const defaultMap = new Map(defaultColumns.map(c => [c.id, c]));
+    const ordered: FilterUser[] = [];
+    columnOrder.forEach(id => {
+      const col = defaultMap.get(id);
+      if (col) { ordered.push(col); defaultMap.delete(id); }
+    });
+    // Add any new members not in saved order
+    defaultMap.forEach(col => ordered.push(col));
+    return ordered;
+  }, [columnOrder, defaultColumns]);
+
+  const saveColumnOrder = useCallback(async (newOrder: string[]) => {
+    setColumnOrder(newOrder);
+    if (!user) return;
+    await supabase.from("calendar_team_dashboard_preferences").upsert({
+      user_id: user.id,
+      context_key: contextKey,
+      column_user_ids: newOrder,
+    }, { onConflict: "user_id,context_key" });
+  }, [user?.id, contextKey]);
+
+  const handleDragStart = (idx: number) => setDragIdx(idx);
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === idx) return;
+    const newOrder = [...columns.map(c => c.id)];
+    const [moved] = newOrder.splice(dragIdx, 1);
+    newOrder.splice(idx, 0, moved);
+    setDragIdx(idx);
+    saveColumnOrder(newOrder);
+  };
+  const handleDragEnd = () => setDragIdx(null);
+
+  // ── Build column index map ──
+  const columnIndexByUserId = useMemo(() => {
+    return new Map(columns.map((col, idx) => [col.id, idx]));
+  }, [columns]);
+
+  // ── Resolve render instructions for each item ──
+  const buildRenderInstructions = useCallback((item: CalItem & { startMin?: number; endMin?: number }): RenderInstruction[] => {
+    const assignedIds = resolveItemAssignedUserIds(item, currentUserId, groups);
+    
+    // Map to column indices
+    const assignedColIndices = assignedIds
+      .map(id => columnIndexByUserId.get(id))
+      .filter((idx): idx is number => idx !== undefined)
+      .sort((a, b) => a - b);
+
+    // Debug logging
+    console.log(`[TeamDash] "${item.title}" | type=${item.type} | assignees=[${assignedIds.join(",")}] | columns=[${assignedColIndices.join(",")}]`);
+
+    if (assignedColIndices.length === 0) {
+      // Default to current user's column
+      const myIdx = columnIndexByUserId.get(currentUserId);
+      if (myIdx !== undefined) {
+        return [{ type: "single", startColIdx: myIdx, spanCount: 1, item, assignedColIndices: [myIdx] }];
+      }
+      return [];
+    }
+
+    if (assignedColIndices.length === 1) {
+      return [{ type: "single", startColIdx: assignedColIndices[0], spanCount: 1, item, assignedColIndices }];
+    }
+
+    // Check if consecutive
+    const minCol = assignedColIndices[0];
+    const maxCol = assignedColIndices[assignedColIndices.length - 1];
+    const isConsecutive = (maxCol - minCol + 1) === assignedColIndices.length;
+
+    if (isConsecutive) {
+      // Span from min to max
+      return [{ type: "span", startColIdx: minCol, spanCount: maxCol - minCol + 1, item, assignedColIndices }];
+    }
+
+    // Non-consecutive: render individual cards in each assigned column
+    return assignedColIndices.map(colIdx => ({
+      type: "single" as const,
+      startColIdx: colIdx,
+      spanCount: 1,
+      item,
+      assignedColIndices,
+    }));
+  }, [currentUserId, groups, columnIndexByUserId]);
+
+  // ── Split items ──
   const allDayItems = useMemo(() => items.filter(i => i.allDay || i.isDueDateTask), [items]);
   const timedItems = useMemo(() => {
     return items
       .filter(i => !i.allDay && !i.isDueDateTask)
       .map(i => {
-        const startMin = i.type === "gcal" && i.time ? parseMinutesFromTime(new Date(i.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })) : parseMinutesFromTime(i.time);
-        const endMin = i.endTime ? parseMinutesFromTime(i.endTime) : (startMin != null ? startMin + 60 : null);
+        const startMin = i.type === "gcal" && i.time
+          ? parseMinutesFromTime(new Date(i.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }))
+          : parseMinutesFromTime(i.time);
+        const endMin = i.endTime
+          ? (i.type === "gcal" ? parseMinutesFromTime(new Date(i.endTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })) : parseMinutesFromTime(i.endTime))
+          : (startMin != null ? startMin + 60 : null);
         return { ...i, startMin: startMin ?? 0, endMin: endMin ?? (startMin ?? 0) + 60 };
       })
       .sort((a, b) => a.startMin - b.startMin);
   }, [items]);
 
-  // Group timed items by their start time for row layout
+  // Time rows
   const timeRows = useMemo(() => {
     const rows: { time: number; items: typeof timedItems }[] = [];
     const seen = new Set<number>();
@@ -179,30 +277,34 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
     return rows;
   }, [timedItems]);
 
-  const getItemColors = (item: CalItem, colIndices: Set<number>) => {
-    if (colIndices.size > 1) return SHARED_COLOR;
-    const colIdx = [...colIndices][0] ?? 0;
-    const user = columns[colIdx];
-    if (!user) return MEMBER_COLORS[0];
-    return MEMBER_COLORS[user.colorIndex % MEMBER_COLORS.length];
+  // ── Rendering helpers ──
+
+  const getItemColors = (assignedColIndices: number[]) => {
+    if (assignedColIndices.length > 1) return SHARED_COLOR;
+    const colIdx = assignedColIndices[0] ?? 0;
+    const colUser = columns[colIdx];
+    if (!colUser) return MEMBER_COLORS[0];
+    return MEMBER_COLORS[colUser.colorIndex % MEMBER_COLORS.length];
   };
 
-  const renderCard = (item: CalItem & { startMin?: number; endMin?: number }, colIndices: Set<number>, isAllDay?: boolean) => {
-    const colors = getItemColors(item, colIndices);
-    const isShared = colIndices.size > 1;
-    const durationMins = (item as any).endMin && (item as any).startMin != null ? (item as any).endMin - (item as any).startMin : 60;
+  const renderCard = (instruction: RenderInstruction, isAllDay?: boolean) => {
+    const { item, assignedColIndices } = instruction;
+    const colors = getItemColors(assignedColIndices);
+    const isShared = assignedColIndices.length > 1;
+    const durationMins = item.endMin && item.startMin != null ? item.endMin - item.startMin : 60;
     const minHeight = isAllDay ? 32 : Math.max(28, Math.min(durationMins * 0.6, 80));
-    
+
     const displayTime = item.type === "gcal" && item.time && !item.allDay
       ? new Date(item.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
       : formatTime(item.time);
-    const displayEndTime = item.endTime ? formatTime(item.endTime) : null;
+    const displayEndTime = item.endTime
+      ? (item.type === "gcal" ? new Date(item.endTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : formatTime(item.endTime))
+      : null;
 
     return (
       <button
-        key={item.id}
         onClick={() => onItemTap?.(item as CalItem)}
-        className="w-full text-left rounded-lg border transition-all hover:brightness-95 active:brightness-90 overflow-hidden"
+        className="w-full text-left rounded-lg border transition-all hover:brightness-95 active:brightness-90 overflow-hidden max-w-full"
         style={{
           backgroundColor: colors.cardBg,
           borderColor: colors.cardBorder,
@@ -221,14 +323,18 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
           )}
           {isShared && (
             <div className="flex -space-x-1 mt-1">
-              {columns.filter((_, idx) => colIndices.has(idx)).map(col => (
-                <div
-                  key={col.id}
-                  className={`w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white ring-1 ring-white/50 ${MEMBER_COLORS[col.colorIndex % MEMBER_COLORS.length].avatarBg}`}
-                >
-                  {col.initial}
-                </div>
-              ))}
+              {assignedColIndices.map(colIdx => {
+                const col = columns[colIdx];
+                if (!col) return null;
+                return (
+                  <div
+                    key={col.id}
+                    className={`w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white ring-1 ring-white/50 ${MEMBER_COLORS[col.colorIndex % MEMBER_COLORS.length].avatarBg}`}
+                  >
+                    {col.initial}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -236,110 +342,121 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
     );
   };
 
+  // ── Render a row of items using flat grid cells ──
+  const renderItemRow = (rowItems: (CalItem & { startMin?: number; endMin?: number })[], isAllDay: boolean, timeLabel?: string) => {
+    // Build all render instructions for this row
+    const allInstructions: RenderInstruction[] = [];
+    const processedIds = new Set<string>();
+
+    rowItems.forEach(item => {
+      if (processedIds.has(item.id)) return;
+      processedIds.add(item.id);
+      const instructions = buildRenderInstructions(item);
+      allInstructions.push(...instructions);
+    });
+
+    // Build a flat array of grid cells: [timeLabel, col0, col1, col2, ...]
+    // For spanning items, we use gridColumn CSS
+    // We need to render each cell individually but spanning items use gridColumn
+
+    // Separate single-column items per column and spanning items
+    const singleByCol = new Map<number, RenderInstruction[]>();
+    const spanItems: RenderInstruction[] = [];
+
+    allInstructions.forEach(instr => {
+      if (instr.type === "span") {
+        spanItems.push(instr);
+      } else {
+        const arr = singleByCol.get(instr.startColIdx) || [];
+        arr.push(instr);
+        singleByCol.set(instr.startColIdx, arr);
+      }
+    });
+
+    return (
+      <div key={timeLabel ?? "allday"} className="grid gap-1 items-start" style={{ gridTemplateColumns: `40px repeat(${columns.length}, 1fr)` }}>
+        <div className="flex items-start justify-end pr-1 pt-1">
+          <span className="text-[9px] text-muted-foreground font-medium tabular-nums">
+            {timeLabel ?? "All day"}
+          </span>
+        </div>
+
+        {/* Render single-column items in their respective columns */}
+        {columns.map((_, colIdx) => {
+          const singles = singleByCol.get(colIdx) || [];
+          if (singles.length === 0) {
+            return <div key={colIdx} className="min-h-[28px]" />;
+          }
+          return (
+            <div key={colIdx} className="space-y-0.5 min-h-[28px]">
+              {singles.map((instr, i) => (
+                <div key={`${instr.item.id}-${i}`}>{renderCard(instr, isAllDay)}</div>
+              ))}
+            </div>
+          );
+        })}
+
+        {/* Render spanning items overlaid on top using absolute positioning within the grid */}
+        {spanItems.map((instr, i) => (
+          <div
+            key={`span-${instr.item.id}-${i}`}
+            style={{
+              gridColumn: `${instr.startColIdx + 2} / span ${instr.spanCount}`,
+              gridRow: 1,
+            }}
+            className="min-h-[28px]"
+          >
+            {renderCard(instr, isAllDay)}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   if (columns.length === 0) return null;
 
   return (
     <div className="mt-3 border-t border-border pt-2">
-      {/* Column headers */}
-      <div className="grid gap-1 mb-2" style={{ gridTemplateColumns: `40px repeat(${columns.length}, 1fr)` }}>
-        <div />
-        {columns.map((col) => {
-          const colors = MEMBER_COLORS[col.colorIndex % MEMBER_COLORS.length];
-          return (
-            <div key={col.id} className={`rounded-lg px-2 py-1.5 flex items-center gap-1.5 ${colors.bg}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 ${colors.avatarBg}`}>
-                {col.initial}
-              </span>
-              <span className={`text-[11px] font-semibold truncate ${colors.text}`}>{col.label}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* All-day events */}
-      {allDayItems.length > 0 && (
-        <div className="grid gap-1 mb-1" style={{ gridTemplateColumns: `40px repeat(${columns.length}, 1fr)` }}>
-          <div className="flex items-center justify-end pr-1">
-            <span className="text-[9px] text-muted-foreground font-medium">All day</span>
-          </div>
-          {columns.map((_, colIdx) => {
-            const colItems = allDayItems.filter(item => {
-              const cols = itemColumnMap.get(item.id);
-              return cols?.has(colIdx);
-            });
-            // Also check for shared items that span this column
-            const sharedItems = allDayItems.filter(item => {
-              const cols = itemColumnMap.get(item.id);
-              if (!cols || cols.size <= 1) return false;
-              // Only render shared item in first column it spans
-              const firstCol = Math.min(...cols);
-              return firstCol === colIdx;
-            });
-
-            const renderItems = [...colItems.filter(item => {
-              const cols = itemColumnMap.get(item.id);
-              return cols && cols.size === 1;
-            })];
-
+      {/* Column headers with optional reorder */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="grid gap-1 flex-1" style={{ gridTemplateColumns: `40px repeat(${columns.length}, 1fr)` }}>
+          <div />
+          {columns.map((col, idx) => {
+            const colors = MEMBER_COLORS[col.colorIndex % MEMBER_COLORS.length];
             return (
-              <div key={colIdx} className="space-y-0.5 min-h-[32px]">
-                {renderItems.map(item => renderCard(item, itemColumnMap.get(item.id) || new Set(), true))}
-                {colIdx === 0 && sharedItems.map(item => {
-                  const cols = itemColumnMap.get(item.id)!;
-                  return (
-                    <div key={item.id} style={{ gridColumn: `${colIdx + 2} / span ${cols.size}` }}>
-                      {renderCard(item, cols, true)}
-                    </div>
-                  );
-                })}
+              <div
+                key={col.id}
+                draggable={showReorder}
+                onDragStart={() => handleDragStart(idx)}
+                onDragOver={(e) => handleDragOver(e, idx)}
+                onDragEnd={handleDragEnd}
+                className={`rounded-lg px-2 py-1.5 flex items-center gap-1.5 ${colors.bg} ${showReorder ? "cursor-grab active:cursor-grabbing ring-1 ring-primary/20" : ""} ${dragIdx === idx ? "opacity-50" : ""}`}
+              >
+                {showReorder && <GripVertical size={10} className="text-muted-foreground flex-shrink-0" />}
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 ${colors.avatarBg}`}>
+                  {col.initial}
+                </span>
+                <span className={`text-[11px] font-semibold truncate ${colors.text}`}>{col.label}</span>
               </div>
             );
           })}
         </div>
-      )}
+        {columns.length > 1 && (
+          <button
+            onClick={() => setShowReorder(!showReorder)}
+            className={`ml-1 text-[10px] font-medium px-2 py-1 rounded-md flex-shrink-0 transition-colors ${showReorder ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
+          >
+            {showReorder ? "Done" : "⇄"}
+          </button>
+        )}
+      </div>
+
+      {/* All-day events */}
+      {allDayItems.length > 0 && renderItemRow(allDayItems, true)}
 
       {/* Timed rows */}
       <div className="space-y-0.5">
-        {timeRows.map(row => (
-          <div key={row.time} className="grid gap-1" style={{ gridTemplateColumns: `40px repeat(${columns.length}, 1fr)` }}>
-            <div className="flex items-start justify-end pr-1 pt-1">
-              <span className="text-[9px] text-muted-foreground font-medium tabular-nums">
-                {formatMinutes(row.time)}
-              </span>
-            </div>
-            {columns.map((_, colIdx) => {
-              // Single-column items for this column
-              const singleItems = row.items.filter(item => {
-                const cols = itemColumnMap.get(item.id);
-                return cols && cols.size === 1 && cols.has(colIdx);
-              });
-
-              // Shared items: render only at leftmost assigned column, spanning across
-              const sharedItems = row.items.filter(item => {
-                const cols = itemColumnMap.get(item.id);
-                if (!cols || cols.size <= 1) return false;
-                return Math.min(...cols) === colIdx;
-              });
-
-              return (
-                <div key={colIdx} className="space-y-0.5 min-h-[28px]">
-                  {singleItems.map(item => renderCard(item, itemColumnMap.get(item.id) || new Set([colIdx])))}
-                  {sharedItems.map(item => {
-                    const cols = itemColumnMap.get(item.id)!;
-                    const minCol = Math.min(...cols);
-                    const maxCol = Math.max(...cols);
-                    const span = maxCol - minCol + 1;
-                    return (
-                      <div key={item.id} style={{ gridColumn: `${colIdx + 2} / span ${span}` }}>
-                        {renderCard(item, cols)}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+        {timeRows.map(row => renderItemRow(row.items, false, formatMinutes(row.time)))}
       </div>
 
       {items.length === 0 && (

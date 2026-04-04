@@ -735,7 +735,39 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
   const handleEditFromDetail = (item: CalItem) => {
     setSelectedItem(null);
-    if (item.type === "gcal") return;
+    if (item.type === "gcal") {
+      // For Google Calendar events, convert to a synthetic event for editing
+      const ge = item.raw as GoogleCalendarEvent;
+      const startDate = ge.start ? new Date(ge.start) : new Date();
+      setEditingItem({
+        id: item.id,
+        type: "event",
+        raw: {
+          id: ge.id,
+          title: ge.title,
+          description: ge.description || "",
+          time: ge.allDay ? "" : startDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }),
+          endTime: ge.end ? new Date(ge.end).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "",
+          day: startDate.getDate(),
+          month: startDate.getMonth(),
+          year: startDate.getFullYear(),
+          allDay: ge.allDay,
+          user: ge.assignee || "me",
+          done: ge.done,
+          groupId: null,
+          ownerUserId: ge.ownerUserId,
+          assigneeUserIds: ge.assigneeUserIds || null,
+          calendarId: null,
+          location: ge.location || undefined,
+          // Mark as gcal source for the edit modal
+          _gcalSource: true,
+          _gcalId: ge.id,
+          _gcalCalendarId: ge.calendarId,
+        } as any,
+        done: ge.done,
+      });
+      return;
+    }
     setEditingItem({
       id: item.id,
       type: item.type,
@@ -747,19 +779,9 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
   // Direct edit on tap: skip detail modal for non-gcal items
   const handleItemTap = useCallback((item: CalItem) => {
-    if (item.type === "gcal") {
-      // Google Calendar events can't be edited, show detail
-      setSelectedItem(item);
-      return;
-    }
-    // Go directly to edit form
-    setEditingItem({
-      id: item.id,
-      type: item.type,
-      raw: item.raw as ScheduledEvent | Task,
-      isDueDateTask: item.isDueDateTask,
-      done: item.done,
-    });
+    // All items (including Google Calendar) open the detail modal first
+    // For gcal events, the detail modal now shows Edit button
+    setSelectedItem(item);
   }, []);
 
   // Scroll time grid to 8am
