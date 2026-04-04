@@ -161,8 +161,18 @@ const Index = () => {
   };
 
   const handleCreateInterestGroup = () => {
-    setCreateGroupCategory("interest");
+    setCreateGroupCategory(undefined);
     setCreateGroupOpen(true);
+  };
+
+  const handleOpenGroupHub = (group: Group) => {
+    setHubGroup(group);
+    setActiveTab("group-hub" as FullTab);
+  };
+
+  const handleBackFromHub = () => {
+    setHubGroup(null);
+    setActiveTab("shared-interests" as FullTab);
   };
 
   const handleDragEnd = (_: any, info: PanInfo) => {
