@@ -246,53 +246,35 @@ const CalendarsManager = ({ open, onClose }: Props) => {
     if (!user) return;
     const currentMode = mode || getVisibilityMode(calId, ctxId);
     
-    // Mutual exclusivity: Private vs Group toggles
-    const isPrivateCtx = ctxId === "__personal__";
-    const groupCtxIds = contextOptions.filter(c => c.id !== "__personal__").map(c => c.id);
+    // Mine (__personal__) is always on and cannot be toggled off
+    if (ctxId === "__personal__") return;
     
-    if (visible) {
-      if (isPrivateCtx) {
-        // Turning on Private → turn off all group contexts
-        const groupOffRows: ContextVisRow[] = groupCtxIds.map(gid => ({
-          calendar_id: calId, context_id: gid, is_visible: false, visibility_mode: getVisibilityMode(calId, gid),
-        }));
-        
-        setContextVisRows((prev) => {
-          let filtered = prev.filter(r => !(r.calendar_id === calId && (r.context_id === ctxId || groupCtxIds.includes(r.context_id))));
-          filtered.push({ calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode });
-          filtered.push(...groupOffRows);
-          return filtered;
-        });
-        
-        // Persist: turn on Private
-        await supabase.from("calendar_context_visibility").upsert({
-          user_id: user.id, calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode,
-        } as any, { onConflict: "user_id,calendar_id,context_id" });
-        // Persist: turn off all groups
-        for (const gid of groupCtxIds) {
-          await supabase.from("calendar_context_visibility").upsert({
-            user_id: user.id, calendar_id: calId, context_id: gid, is_visible: false, visibility_mode: getVisibilityMode(calId, gid),
-          } as any, { onConflict: "user_id,calendar_id,context_id" });
-        }
-        return;
-      } else {
-        // Turning on a group → turn off Private
-        setContextVisRows((prev) => {
-          let filtered = prev.filter(r => !(r.calendar_id === calId && (r.context_id === ctxId || r.context_id === "__personal__")));
-          filtered.push({ calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode });
-          filtered.push({ calendar_id: calId, context_id: "__personal__", is_visible: false, visibility_mode: getVisibilityMode(calId, "__personal__") });
-          return filtered;
-        });
-        
-        await supabase.from("calendar_context_visibility").upsert({
-          user_id: user.id, calendar_id: calId, context_id: ctxId, is_visible: true, visibility_mode: currentMode,
-        } as any, { onConflict: "user_id,calendar_id,context_id" });
-        await supabase.from("calendar_context_visibility").upsert({
-          user_id: user.id, calendar_id: calId, context_id: "__personal__", is_visible: false, visibility_mode: getVisibilityMode(calId, "__personal__"),
-        } as any, { onConflict: "user_id,calendar_id,context_id" });
-        return;
-      }
-    }
+    // Simple toggle — no mutual exclusivity anymore
+    setContextVisRows((prev) => {
+      const filtered = prev.filter(
+        (r) => !(r.calendar_id === calId && r.context_id === ctxId)
+      );
+      filtered.push({
+        calendar_id: calId,
+        context_id: ctxId,
+        is_visible: visible,
+        visibility_mode: currentMode,
+      });
+      return filtered;
+    });
+
+    await supabase
+      .from("calendar_context_visibility")
+      .upsert(
+        {
+          user_id: user.id,
+          calendar_id: calId,
+          context_id: ctxId,
+          is_visible: visible,
+          visibility_mode: currentMode,
+        } as any,
+        { onConflict: "user_id,calendar_id,context_id" }
+      );
     
     // Simple toggle off
     setContextVisRows((prev) => {
