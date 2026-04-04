@@ -1660,14 +1660,17 @@ const EventList = ({
 
         return (
           <button key={item.id} onClick={() => onItemTap?.(item)}
-            className="w-full flex items-center gap-2.5 py-2 px-1 text-left hover:bg-secondary/50 rounded-lg transition-colors active:bg-secondary">
-            <span className="w-[3px] h-5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-            <span className="text-[11px] text-muted-foreground w-16 flex-shrink-0 tabular-nums">
-              {displayTime}{displayEndTime && displayEndTime !== displayTime ? `–${displayEndTime}` : ""}
-            </span>
-            <span className={`text-[13px] font-medium flex-1 truncate ${item.done ? "line-through opacity-40" : "text-foreground"}`}>
-              {item.title}
-            </span>
+            className="w-full flex items-center gap-2.5 py-2.5 px-3 text-left rounded-xl border border-border bg-card shadow-sm mb-1 transition-colors hover:bg-secondary/30 active:bg-secondary/50"
+            style={{ borderLeftWidth: "3px", borderLeftColor: color }}
+          >
+            <div className="flex-1 min-w-0">
+              <span className={`text-[13px] font-medium block truncate ${item.done ? "line-through opacity-40" : "text-foreground"}`}>
+                {item.title}
+              </span>
+              <span className="text-[11px] text-muted-foreground tabular-nums">
+                {displayTime}{displayEndTime && displayEndTime !== displayTime ? ` – ${displayEndTime}` : ""}
+              </span>
+            </div>
             {item.type === "gcal" && <GoogleBadge />}
             {group && (
               <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
