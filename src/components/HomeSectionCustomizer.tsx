@@ -16,7 +16,7 @@ export interface HomeSection {
 export const FIXED_SECTIONS: HomeSection[] = [
   { id: "scheduled", label: "Scheduled", icon: "🕐", locked: true },
   { id: "todo", label: "To Do List", icon: "✅", locked: true },
-  { id: "habits", label: "Habits", icon: "🔥" },
+  { id: "water", label: "Water Intake", icon: "💧" },
   { id: "nutrition", label: "Nutrition", icon: "🍎" },
   { id: "workout", label: "Today's Workout", icon: "💪" },
   { id: "sobriety", label: "Sobriety Tracker", icon: "🏆" },
@@ -29,8 +29,8 @@ export function buildAllSections(): HomeSection[] {
   return [...FIXED_SECTIONS];
 }
 
-export const DEFAULT_ORDER = ["habits", "scheduled", "todo"];
-export const DEFAULT_VISIBLE = new Set(["habits", "scheduled", "todo"]);
+export const DEFAULT_ORDER = ["scheduled", "todo", "water"];
+export const DEFAULT_VISIBLE = new Set(["scheduled", "todo", "water"]);
 
 function getStorageKey(groupId: string | null) {
   return `homeSections_${groupId || "personal"}`;
@@ -50,11 +50,11 @@ export function loadSectionPrefs(groupId: string | null): SectionPrefs {
     if (raw) {
       const parsed = JSON.parse(raw);
       const migrateId = (id: string) => {
-        if (id === "morning-habits") return "habits";
-        if (id === "other-habits") return "habits";
+        if (id === "morning-habits") return "scheduled";
+        if (id === "other-habits") return "scheduled";
         if (id === "justdoit") return "todo";
-        if (id === "water") return "habits";
-        if (id.startsWith("habit:")) return "habits";
+        if (id === "habits") return "water"; // migrate old "habits" toggle to "water"
+        if (id.startsWith("habit:")) return "scheduled";
         return id;
       };
       let order = (parsed.order || DEFAULT_ORDER).map(migrateId);
@@ -279,32 +279,18 @@ const HomeSectionCustomizer = ({
 
   const ALL_SECTIONS = FIXED_SECTIONS;
 
-  // Build available habit sub-items based on actual user data
-  const waterEnabled = (() => {
-    const saved = localStorage.getItem("habits_show_water");
-    return saved !== null ? saved === "true" : true;
-  })();
+  // Build available habit sub-items (always show all 4 categories under Scheduled)
 
   const habitSubItems = (() => {
     const items: { id: string; label: string; icon: string }[] = [];
-    if (waterEnabled) {
-      items.push({ id: "water", label: "Water Intake", icon: "💧" });
-    }
     const categories = [
-      { key: "morning", label: "Morning", icon: "🌅" },
-      { key: "afternoon", label: "Afternoon", icon: "☀️" },
-      { key: "evening", label: "Evening", icon: "🌙" },
-      { key: "other", label: "Other", icon: "📋" },
+      { key: "morning", label: "Morning Habits", icon: "🌅" },
+      { key: "afternoon", label: "Afternoon Habits", icon: "☀️" },
+      { key: "evening", label: "Evening Habits", icon: "🌙" },
+      { key: "other", label: "Other Habits", icon: "📋" },
     ];
     for (const cat of categories) {
-      const hasHabits = filteredHabits.some((h) => {
-        const hCat = (h.category || "other").toLowerCase();
-        // Match both "morning" and legacy "morning-habits" etc.
-        return hCat === cat.key || hCat === `${cat.key}-habits`;
-      });
-      if (hasHabits) {
-        items.push({ id: `habit:${cat.key}`, label: cat.label, icon: cat.icon });
-      }
+      items.push({ id: `habit:${cat.key}`, label: cat.label, icon: cat.icon });
     }
     return items;
   })();
@@ -382,11 +368,6 @@ const HomeSectionCustomizer = ({
       specialDayIds = specialDayOptions.map((o) => o.id);
       setLocalSpecialDayIds(specialDayIds);
     }
-    // If enabling habits and no sub-items selected, select all available
-    if (id === "habits" && next.has("habits") && localHabitSubIds.length === 0 && habitSubItems.length > 0) {
-      habitIds = habitSubItems.map((o) => o.id);
-      setLocalHabitSubIds(habitIds);
-    }
 
     save(fullOrder, next, sobrietyIds, specialDayIds, habitIds);
   };
@@ -399,10 +380,7 @@ const HomeSectionCustomizer = ({
       next = [...localHabitSubIds, subId];
     }
     setLocalHabitSubIds(next);
-    const vis = new Set(localVisible);
-    if (next.length > 0) vis.add("habits");
-    setLocalVisible(vis);
-    save(fullOrder, vis, localSobrietyIds, localSpecialDayIds, next);
+    save(fullOrder, localVisible, localSobrietyIds, localSpecialDayIds, next);
   };
 
   const toggleSobrietyTracker = (trackerId: string) => {
@@ -536,22 +514,22 @@ const HomeSectionCustomizer = ({
                 if (!section) return null;
                 const isVisible = localVisible.has(id);
                 const isLocked = section.locked;
-                const isHabits = id === "habits";
+                const isScheduled = id === "scheduled";
                 const isSobriety = id === "sobriety";
                 const isSpecialDays = id === "special-days";
 
                 const hasExpandable =
-                  (isHabits && habitSubItems.length > 0) ||
+                  (isScheduled && habitSubItems.length > 0) ||
                   (isSobriety && sobrietyOptions.length > 0) ||
                   (isSpecialDays && specialDayOptions.length > 0);
 
                 const isExpanded =
-                  (isHabits && habitsExpanded) ||
+                  (isScheduled && habitsExpanded) ||
                   (isSobriety && sobrietyExpanded) ||
                   (isSpecialDays && specialDaysExpanded);
 
                 const toggleExpand = () => {
-                  if (isHabits) setHabitsExpanded(!habitsExpanded);
+                  if (isScheduled) setHabitsExpanded(!habitsExpanded);
                   if (isSobriety) setSobrietyExpanded(!sobrietyExpanded);
                   if (isSpecialDays) setSpecialDaysExpanded(!specialDaysExpanded);
                 };
@@ -592,7 +570,7 @@ const HomeSectionCustomizer = ({
                           )}
                         </div>
 
-                        {isHabits && isVisible && habitsExpanded && habitSubItems.length > 0 &&
+                        {isScheduled && isVisible && habitsExpanded && habitSubItems.length > 0 &&
                           renderSubItems(habitSubItems, localHabitSubIds, toggleHabitSub, reorderHabitSubs)}
 
                         {isSobriety && isVisible && sobrietyExpanded && sobrietyOptions.length > 0 &&

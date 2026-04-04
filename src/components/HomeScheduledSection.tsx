@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
+import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
 import { formatTime } from "@/lib/formatTime";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -101,7 +101,20 @@ interface Props {
   onToggleGcal: (id: string) => void;
   onCongrats: () => void;
   onNavigate?: (page: string) => void;
+  enabledHabitCategories?: string[];
+  selectedDate?: Date;
+  isViewingMemberName?: string;
 }
+
+const CATEGORY_TO_PERIOD: Record<string, Period> = {
+  morning: "morning",
+  afternoon: "afternoon",
+  evening: "evening",
+  other: "flexible",
+};
+
+const fmtDateStr = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const HomeScheduledSection = ({
   allDayItems,
@@ -113,8 +126,14 @@ const HomeScheduledSection = ({
   onToggleGcal,
   onCongrats,
   onNavigate,
+  enabledHabitCategories = [],
+  selectedDate,
+  isViewingMemberName,
 }: Props) => {
   const { groups, activeGroup, user } = useAuth();
+  const { filteredHabits, toggleHabit, getHabitStreak } = useAppContext();
+  const dateStr = selectedDate ? fmtDateStr(selectedDate) : fmtDateStr(new Date());
+  const isTodayForHabits = dateStr === fmtDateStr(new Date());
   const [nowMinutes, setNowMinutes] = useState(() => {
     const n = new Date();
     return n.getHours() * 60 + n.getMinutes();
@@ -178,11 +197,30 @@ const HomeScheduledSection = ({
     return map;
   }, [unifiedItems]);
 
-  const activePeriods = (["morning", "afternoon", "evening", "flexible"] as Period[]).filter(p => periodMap[p].length > 0);
+  // Get habits grouped by period for enabled categories
+  const habitsByPeriod = useMemo(() => {
+    const map: Record<Period, typeof filteredHabits> = { morning: [], afternoon: [], evening: [], flexible: [] };
+    for (const cat of enabledHabitCategories) {
+      const period = CATEGORY_TO_PERIOD[cat] || "flexible";
+      const catHabits = filteredHabits.filter((h) => {
+        const hCat = (h.category || "other").toLowerCase();
+        return hCat === cat || hCat === `${cat}-habits`;
+      });
+      map[period].push(...catHabits);
+    }
+    return map;
+  }, [filteredHabits, enabledHabitCategories]);
 
-  // Progress
-  const totalItems = unifiedItems.length;
-  const doneItems = unifiedItems.filter(i => i.done).length;
+  const activePeriods = (["morning", "afternoon", "evening", "flexible"] as Period[]).filter(
+    p => periodMap[p].length > 0 || habitsByPeriod[p].length > 0
+  );
+
+  // Progress (include habits in count)
+  const allPeriodHabits = useMemo(() => {
+    return Object.values(habitsByPeriod).flat();
+  }, [habitsByPeriod]);
+  const totalItems = unifiedItems.length + allPeriodHabits.length;
+  const doneItems = unifiedItems.filter(i => i.done).length + allPeriodHabits.filter(h => h.completionDates.includes(dateStr)).length;
   const progressPercent = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
 
   // NOW item: the item whose time window contains current time
@@ -275,16 +313,62 @@ const HomeScheduledSection = ({
       <div className="space-y-4">
         {activePeriods.map(period => {
           const items = periodMap[period];
+          const periodHabits = habitsByPeriod[period];
           const config = PERIOD_CONFIG[period];
+          const totalCount = items.length + periodHabits.length;
           return (
             <div key={period}>
               {/* Period separator */}
               <div className="flex items-center gap-2 mb-2">
                 {config.icon}
                 <span className="text-xs font-semibold text-muted-foreground">{config.label}</span>
-                <span className="text-[10px] text-muted-foreground/60">({items.length})</span>
+                <span className="text-[10px] text-muted-foreground/60">({totalCount})</span>
                 <div className="flex-1 h-px bg-border ml-1" />
               </div>
+
+              {/* Habits at top of period */}
+              {periodHabits.length > 0 && (
+                <div className="mb-2">
+                  <LayoutGroup id={`scheduled-habits-${period}`}>
+                    <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+                      <AnimatePresence mode="popLayout">
+                        {(() => {
+                          const incomplete = periodHabits.filter((h) => !h.completionDates.includes(dateStr));
+                          const complete = periodHabits.filter((h) => h.completionDates.includes(dateStr));
+                          return [...incomplete, ...complete].map((habit) => {
+                            const doneForDate = habit.completionDates.includes(dateStr);
+                            return (
+                              <motion.button
+                                key={habit.id}
+                                layout
+                                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                                onClick={() => isTodayForHabits && !isViewingPartner && toggleHabit(habit.id)}
+                                disabled={!isTodayForHabits || isViewingPartner}
+                                className={cn(
+                                  "flex items-center gap-2 px-4 py-2.5 rounded-full border whitespace-nowrap text-sm font-medium transition-colors active:scale-[0.97]",
+                                  doneForDate
+                                    ? "border-habit-green bg-habit-green/10 text-habit-green"
+                                    : "border-border bg-card text-foreground",
+                                  (!isTodayForHabits || isViewingPartner) && "opacity-80"
+                                )}
+                              >
+                                {doneForDate ? (
+                                  <span className="w-5 h-5 rounded-full bg-habit-green flex items-center justify-center">
+                                    <Check size={12} className="text-primary-foreground" />
+                                  </span>
+                                ) : (
+                                  <span className="w-5 h-5 rounded-full border-2 border-muted" />
+                                )}
+                                {habit.label}
+                              </motion.button>
+                            );
+                          });
+                        })()}
+                      </AnimatePresence>
+                    </div>
+                  </LayoutGroup>
+                </div>
+              )}
 
               {/* Cards */}
               <div className="space-y-2">

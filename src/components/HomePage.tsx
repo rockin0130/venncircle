@@ -362,31 +362,8 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   // Habit sections from context
   const { habitSections, waterGoal, waterIntake } = useAppContext();
 
-  // Compute which habit sub-items actually exist right now
-  const waterEnabled = (() => {
-    const saved = localStorage.getItem("habits_show_water");
-    return saved !== null ? saved === "true" : true;
-  })();
-
-  const eligibleHabitSubIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (waterEnabled) ids.add("water");
-    const categories = ["morning", "afternoon", "evening", "other"];
-    for (const cat of categories) {
-      const hasHabits = filteredHabits.some((h) => {
-        const hCat = (h.category || "other").toLowerCase();
-        return hCat === cat || hCat === `${cat}-habits`;
-      });
-      if (hasHabits) ids.add(`habit:${cat}`);
-    }
-    return ids;
-  }, [filteredHabits, waterEnabled]);
-
-  // Effective habit sub-items: intersection of user preference and actual existence
-  const effectiveHabitSubIds = useMemo(
-    () => selectedHabitSubIds.filter((id) => eligibleHabitSubIds.has(id)),
-    [selectedHabitSubIds, eligibleHabitSubIds]
-  );
+  // Effective habit sub-items: just the habit category toggles from preferences
+  const effectiveHabitSubIds = selectedHabitSubIds;
 
   const { filters: groupFilters, otherName, hasOther, showGoogleCalendar } = useGroupContext();
   const partnerName = otherName;
@@ -936,7 +913,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
             if (activeGroup?.shared_pages && !isPersonalActive) {
               const sp = activeGroup.shared_pages;
               if (id === "scheduled" || id === "todo") return sp.includes("calendar");
-              if (id === "habits") return sp.includes("habits");
+              if (id === "water") return sp.includes("habits");
               if (id === "nutrition") return sp.includes("nutrition");
               if (id === "workout") return sp.includes("workout");
               if (id === "sobriety") return sp.includes("sobriety");
@@ -946,45 +923,6 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
             return true;
           }).map((sectionId) => {
             switch (sectionId) {
-              case "habits": {
-                if (effectiveHabitSubIds.length === 0) return null;
-                const HABIT_SECTION_META: Record<string, { label: string; icon: string }> = {
-                  morning: { label: "Morning", icon: "🌅" },
-                  afternoon: { label: "Afternoon", icon: "☀️" },
-                  evening: { label: "Evening", icon: "🌙" },
-                  other: { label: "Other", icon: "📋" },
-                };
-                return (
-                  <div key="habits">
-                    {effectiveHabitSubIds.map((subId) => {
-                      if (subId === "water") {
-                        return (
-                          <section key="water" className="mb-6">
-                            <HomeWaterWidget selectedDate={selectedDate} />
-                          </section>
-                        );
-                      }
-                      if (subId.startsWith("habit:")) {
-                        const categoryKey = subId.replace("habit:", "");
-                        const meta = HABIT_SECTION_META[categoryKey];
-                        if (!meta) return null;
-                        return (
-                          <section key={subId} className="mb-6">
-                            <HomeHabitSectionWidget
-                              selectedDate={selectedDate}
-                              categoryKey={categoryKey}
-                              sectionLabel={(filter === "partner" || isSpecificMemberFilter) ? `${selectedMemberName}'s ${meta.label}` : meta.label}
-                              sectionIcon={meta.icon}
-                            />
-                          </section>
-                        );
-                      }
-                      return null;
-                    })}
-                  </div>
-                );
-              }
-
               case "scheduled":
                 return (
                   <HomeScheduledSection
@@ -998,6 +936,9 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                     onToggleGcal={toggleGcalCompletion}
                     onCongrats={() => setCongratsType("task")}
                     onNavigate={onNavigate}
+                    enabledHabitCategories={effectiveHabitSubIds.filter(id => id.startsWith("habit:")).map(id => id.replace("habit:", ""))}
+                    selectedDate={selectedDate}
+                    isViewingMemberName={isViewingPartner ? selectedMemberName : undefined}
                   />
                 );
 
@@ -1013,6 +954,13 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                     selectedDate={selectedDate}
                     memberFilters={groupFilters}
                   />
+                );
+
+              case "water":
+                return (
+                  <section key={sectionId} className="mb-6">
+                    <HomeWaterWidget selectedDate={selectedDate} />
+                  </section>
                 );
 
               case "nutrition":
