@@ -35,6 +35,44 @@ interface Props {
 function resolveItemOwnerIds(item: CalItem, currentUserId: string, groups: Group[]): Set<string> {
   const raw = item.raw as any;
   const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+
+  // Google Calendar events always default to current user only
+  if (item.type === "gcal") {
+    // Check if explicitly assigned via gcal designation
+    const gcalAssignee = raw.assignee;
+    if (gcalAssignee === "both") {
+      const ids = new Set<string>();
+      ids.add(currentUserId);
+      const groupId = item.groupId;
+      if (groupId) {
+        const grp = groups.find(g => g.id === groupId);
+        grp?.members?.filter((m: any) => m.user_id !== currentUserId && m.status === "active")
+          .forEach((m: any) => ids.add(m.user_id));
+      }
+      return ids;
+    }
+    if (gcalAssignee === "partner") {
+      const ids = new Set<string>();
+      const groupId = item.groupId;
+      if (groupId) {
+        const grp = groups.find(g => g.id === groupId);
+        grp?.members?.filter((m: any) => m.user_id !== currentUserId && m.status === "active")
+          .forEach((m: any) => ids.add(m.user_id));
+      }
+      if (ids.size === 0) ids.add(currentUserId);
+      return ids;
+    }
+    // Default: Mine only
+    return new Set([currentUserId]);
+  }
+
+  // For regular events/tasks: prefer assignee_user_ids array if available
+  const assigneeUserIds: string[] | null = raw.assignee_user_ids;
+  if (assigneeUserIds && assigneeUserIds.length > 0) {
+    return new Set(assigneeUserIds);
+  }
+
+  // Fallback to legacy assignee field
   const assignee = item.assignee;
   const groupId = item.groupId;
   const ids = new Set<string>();
@@ -270,21 +308,32 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
               </span>
             </div>
             {columns.map((_, colIdx) => {
-              const colItems = row.items.filter(item => {
+              // Single-column items for this column
+              const singleItems = row.items.filter(item => {
                 const cols = itemColumnMap.get(item.id);
-                if (!cols) return false;
-                if (cols.size > 1) {
-                  // Shared: only render in first column
-                  return Math.min(...cols) === colIdx;
-                }
-                return cols.has(colIdx);
+                return cols && cols.size === 1 && cols.has(colIdx);
+              });
+
+              // Shared items: render only at leftmost assigned column, spanning across
+              const sharedItems = row.items.filter(item => {
+                const cols = itemColumnMap.get(item.id);
+                if (!cols || cols.size <= 1) return false;
+                return Math.min(...cols) === colIdx;
               });
 
               return (
                 <div key={colIdx} className="space-y-0.5 min-h-[28px]">
-                  {colItems.map(item => {
-                    const cols = itemColumnMap.get(item.id) || new Set([colIdx]);
-                    return renderCard(item, cols);
+                  {singleItems.map(item => renderCard(item, itemColumnMap.get(item.id) || new Set([colIdx])))}
+                  {sharedItems.map(item => {
+                    const cols = itemColumnMap.get(item.id)!;
+                    const minCol = Math.min(...cols);
+                    const maxCol = Math.max(...cols);
+                    const span = maxCol - minCol + 1;
+                    return (
+                      <div key={item.id} style={{ gridColumn: `${colIdx + 2} / span ${span}` }}>
+                        {renderCard(item, cols)}
+                      </div>
+                    );
                   })}
                 </div>
               );
