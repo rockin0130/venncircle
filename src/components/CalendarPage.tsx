@@ -995,7 +995,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
         </div>
       </header>
 
-      <PageGroupSelector page="calendar" personalLabel="Private" personalEmoji="🔒" />
+      <PageGroupSelector page="calendar" personalLabel="Mine" personalEmoji="👤" hideAllPill />
       <CalendarUserFilter
         selectedUserIds={userFilterIds}
         onSelectionChange={setUserFilterIds}
