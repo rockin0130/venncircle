@@ -279,11 +279,7 @@ const HomeSectionCustomizer = ({
 
   const ALL_SECTIONS = FIXED_SECTIONS;
 
-  // Build available habit sub-items based on actual user data
-  const waterEnabled = (() => {
-    const saved = localStorage.getItem("habits_show_water");
-    return saved !== null ? saved === "true" : true;
-  })();
+  // Build available habit sub-items (always show all 4 categories under Scheduled)
 
   const habitSubItems = (() => {
     const items: { id: string; label: string; icon: string }[] = [];
