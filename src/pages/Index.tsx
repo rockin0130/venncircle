@@ -18,6 +18,7 @@ import LauncherPage from "@/components/LauncherPage";
 import AuthPage from "@/components/AuthPage";
 import ProfileSetupPage from "@/components/ProfileSetupPage";
 import SharedInterestsPage from "@/components/SharedInterestsPage";
+import GroupHubPage from "@/components/GroupHubPage";
 import ProfilePage from "@/components/ProfilePage";
 import AppDrawer from "@/components/AppDrawer";
 import DrawerMenuButton from "@/components/DrawerMenuButton";
@@ -42,6 +43,7 @@ const Index = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [createGroupCategory, setCreateGroupCategory] = useState<"home" | "interest" | undefined>(undefined);
+  const [hubGroup, setHubGroup] = useState<Group | null>(null);
   const { navStyle, setNavStyle } = useNavStyle();
   const { weekStart, setWeekStart } = useWeekStart();
 
@@ -159,8 +161,18 @@ const Index = () => {
   };
 
   const handleCreateInterestGroup = () => {
-    setCreateGroupCategory("interest");
+    setCreateGroupCategory(undefined);
     setCreateGroupOpen(true);
+  };
+
+  const handleOpenGroupHub = (group: Group) => {
+    setHubGroup(group);
+    setActiveTab("group-hub" as FullTab);
+  };
+
+  const handleBackFromHub = () => {
+    setHubGroup(null);
+    setActiveTab("shared-interests" as FullTab);
   };
 
   const handleDragEnd = (_: any, info: PanInfo) => {
@@ -178,8 +190,16 @@ const Index = () => {
       <SharedInterestsPage
         onNavigateToFeature={handleNavigateToFeature}
         onCreateGroup={handleCreateInterestGroup}
+        onOpenGroupHub={handleOpenGroupHub}
       />
     ),
+    "group-hub": hubGroup ? (
+      <GroupHubPage
+        group={hubGroup}
+        onBack={handleBackFromHub}
+        onNavigateToFeature={handleNavigateToFeature}
+      />
+    ) : null,
     profile: <ProfilePage onNavigate={(tab) => setActiveTab(tab as FullTab)} />,
     workout: <WorkoutsPage />,
     nutrition: <NutritionPage />,

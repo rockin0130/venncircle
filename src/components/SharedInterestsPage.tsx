@@ -10,6 +10,7 @@ interface FeedItem {
   timestamp: string;
   userId: string;
   userName: string;
+  groupId: string;
   groupName: string;
   categoryLabel: string;
   categoryColor: string;
@@ -18,45 +19,67 @@ interface FeedItem {
 interface SharedInterestsPageProps {
   onNavigateToFeature?: (tab: string, groupId?: string) => void;
   onCreateGroup?: () => void;
+  onOpenGroupHub?: (group: Group) => void;
 }
 
-const CATEGORY_COLORS: Record<string, { bg: string; text: string; pill: string }> = {
-  workout: { bg: "bg-[hsl(210,70%,95%)]", text: "text-[hsl(210,70%,40%)]", pill: "bg-[hsl(210,70%,92%)] text-[hsl(210,70%,35%)]" },
-  nutrition: { bg: "bg-[hsl(90,40%,92%)]", text: "text-[hsl(90,40%,35%)]", pill: "bg-[hsl(90,40%,89%)] text-[hsl(90,40%,30%)]" },
-  sobriety: { bg: "bg-[hsl(260,50%,95%)]", text: "text-[hsl(260,50%,40%)]", pill: "bg-[hsl(260,50%,92%)] text-[hsl(260,50%,35%)]" },
-  habits: { bg: "bg-[hsl(35,70%,93%)]", text: "text-[hsl(35,70%,35%)]", pill: "bg-[hsl(35,70%,90%)] text-[hsl(35,70%,30%)]" },
-  calendar: { bg: "bg-[hsl(0,60%,95%)]", text: "text-[hsl(0,60%,40%)]", pill: "bg-[hsl(0,60%,92%)] text-[hsl(0,60%,35%)]" },
-  special_days: { bg: "bg-[hsl(340,60%,95%)]", text: "text-[hsl(340,60%,40%)]", pill: "bg-[hsl(340,60%,92%)] text-[hsl(340,60%,35%)]" },
-  shopping: { bg: "bg-[hsl(170,50%,93%)]", text: "text-[hsl(170,50%,35%)]", pill: "bg-[hsl(170,50%,90%)] text-[hsl(170,50%,30%)]" },
+const INTEREST_PILL_COLORS: Record<string, string> = {
+  workout: "bg-[hsl(210,70%,92%)] text-[hsl(210,70%,35%)]",
+  nutrition: "bg-[hsl(90,40%,89%)] text-[hsl(90,40%,30%)]",
+  sobriety: "bg-[hsl(260,50%,92%)] text-[hsl(260,50%,35%)]",
+  habits: "bg-[hsl(35,70%,90%)] text-[hsl(35,70%,30%)]",
+  calendar: "bg-[hsl(220,15%,91%)] text-[hsl(220,15%,35%)]",
+  special_days: "bg-[hsl(340,60%,92%)] text-[hsl(340,60%,35%)]",
+  shopping: "bg-[hsl(170,50%,90%)] text-[hsl(170,50%,30%)]",
 };
 
-const GROUP_SQUARE_COLORS = [
-  "bg-[hsl(210,60%,88%)]",
-  "bg-[hsl(160,45%,88%)]",
-  "bg-[hsl(260,45%,90%)]",
-  "bg-[hsl(35,60%,88%)]",
-  "bg-[hsl(340,50%,90%)]",
-  "bg-[hsl(190,50%,88%)]",
+const GROUP_AVATAR_COLORS = [
+  "bg-[hsl(210,60%,82%)]",
+  "bg-[hsl(160,45%,80%)]",
+  "bg-[hsl(260,45%,85%)]",
+  "bg-[hsl(35,60%,82%)]",
+  "bg-[hsl(340,50%,85%)]",
+  "bg-[hsl(190,50%,82%)]",
+  "bg-[hsl(120,40%,82%)]",
+  "bg-[hsl(20,60%,82%)]",
+];
+
+const MEMBER_COLORS = [
+  "bg-[hsl(210,55%,75%)]",
+  "bg-[hsl(340,50%,78%)]",
+  "bg-[hsl(160,40%,72%)]",
+  "bg-[hsl(35,55%,75%)]",
+  "bg-[hsl(260,40%,78%)]",
+  "bg-[hsl(190,45%,72%)]",
 ];
 
 const getInitials = (name: string) =>
   name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 
-const MemberDots = ({ members }: { members: { display_name: string | null }[] }) => {
-  const visible = members.slice(0, 3);
-  const extra = members.length - 3;
+const getTimeAgo = (ts: string) => {
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+};
+
+const MemberDots = ({ members }: { members: { display_name: string | null; user_id: string }[] }) => {
+  const visible = members.slice(0, 4);
+  const extra = members.length - 4;
   return (
-    <div className="flex -space-x-1.5 mt-1 justify-center">
+    <div className="flex -space-x-1.5">
       {visible.map((m, i) => (
         <div
-          key={i}
-          className="w-[13px] h-[13px] rounded-full bg-muted-foreground/20 flex items-center justify-center text-[6px] font-bold text-foreground ring-1 ring-card"
+          key={m.user_id}
+          className={`w-[15px] h-[15px] rounded-full ${MEMBER_COLORS[i % MEMBER_COLORS.length]} flex items-center justify-center text-[7px] font-bold text-white ring-1 ring-card`}
         >
           {(m.display_name || "?")[0].toUpperCase()}
         </div>
       ))}
       {extra > 0 && (
-        <div className="w-[13px] h-[13px] rounded-full bg-muted flex items-center justify-center text-[5px] font-bold text-muted-foreground ring-1 ring-card">
+        <div className="w-[15px] h-[15px] rounded-full bg-muted flex items-center justify-center text-[6px] font-bold text-muted-foreground ring-1 ring-card">
           +{extra}
         </div>
       )}
@@ -64,44 +87,27 @@ const MemberDots = ({ members }: { members: { display_name: string | null }[] })
   );
 };
 
-const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup }: SharedInterestsPageProps) => {
+const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHub }: SharedInterestsPageProps) => {
   const { groups, user } = useAuth();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
 
-  const interestGroups = useMemo(
-    () => groups.filter((g: any) => g.category === "interest"),
+  // Show all groups except the personal sentinel
+  const allGroups = useMemo(
+    () => groups.filter((g: any) => !g._personal && g.id !== "__personal__"),
     [groups]
   );
 
-  // Build categories dynamically from groups' shared_pages
-  const categories = useMemo(() => {
-    const catMap = new Map<string, Group[]>();
-    interestGroups.forEach((g) => {
-      (g.shared_pages || []).forEach((page) => {
-        if (!catMap.has(page)) catMap.set(page, []);
-        catMap.get(page)!.push(g);
-      });
-    });
-    return Array.from(catMap.entries()).map(([page, grps]) => ({
-      key: page,
-      label: PAGE_LABELS[page as ShareablePage] || page.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase()),
-      icon: PAGE_ICONS[page as ShareablePage] || "📋",
-      groups: grps,
-      colors: CATEGORY_COLORS[page] || CATEGORY_COLORS.workout,
-    }));
-  }, [interestGroups]);
-
-  // Load feed
+  // Load activity feed from all groups
   useEffect(() => {
-    if (!user || interestGroups.length === 0) {
+    if (!user || allGroups.length === 0) {
       setFeedItems([]);
       setFeedLoading(false);
       return;
     }
     const loadFeed = async () => {
       setFeedLoading(true);
-      const groupIds = interestGroups.map((g) => g.id);
+      const groupIds = allGroups.map((g) => g.id);
       const { data: workouts } = await supabase
         .from("workouts")
         .select("id, title, emoji, done, completed_date, user_id, group_id, created_at")
@@ -122,7 +128,7 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup }: SharedInter
           });
         }
       }
-      const groupMap = new Map(interestGroups.map((g) => [g.id, g]));
+      const groupMap = new Map(allGroups.map((g) => [g.id, g]));
       const items: FeedItem[] = (workouts || []).map((w: any) => {
         const profile = profileMap.get(w.user_id);
         const group = groupMap.get(w.group_id);
@@ -133,32 +139,34 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup }: SharedInter
           timestamp: w.completed_date || w.created_at,
           userId: w.user_id,
           userName: profile?.display_name || "Someone",
+          groupId: w.group_id,
           groupName: group?.name || "Group",
           categoryLabel: "Workout",
-          categoryColor: CATEGORY_COLORS.workout.pill,
+          categoryColor: INTEREST_PILL_COLORS.workout,
         };
       });
       setFeedItems(items);
       setFeedLoading(false);
     };
     loadFeed();
-  }, [user, interestGroups]);
+  }, [user, allGroups]);
 
-  const getTimeAgo = (ts: string) => {
-    const diff = Date.now() - new Date(ts).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    const days = Math.floor(hrs / 24);
-    return `${days}d ago`;
+  const handleGroupTap = (group: Group) => {
+    // If group has only one interest, go directly to that page
+    if (group.shared_pages.length === 1) {
+      const page = group.shared_pages[0];
+      const tab = page === "special_days" ? "specialdays" : page;
+      onNavigateToFeature?.(tab, group.id);
+    } else {
+      onOpenGroupHub?.(group);
+    }
   };
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <header className="px-5 pt-12 pb-4 flex-shrink-0 flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight text-foreground">Shared Interests</h1>
+        <h1 className="text-xl font-bold tracking-tight text-foreground">Explore</h1>
         <button
           onClick={onCreateGroup}
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-primary text-primary text-xs font-semibold hover:bg-primary/5 transition-colors"
@@ -169,112 +177,97 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup }: SharedInter
       </header>
 
       <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-5">
-        {/* My Groups - Category Cards */}
-        {categories.length > 0 && (
-          <section className="space-y-3">
+        {/* Group Cards */}
+        {allGroups.length > 0 ? (
+          <section className="space-y-2.5">
             <h2 className="text-sm font-semibold text-foreground">My Groups</h2>
-            {categories.map((cat) => (
-              <div
-                key={cat.key}
-                className="bg-card rounded-xl border border-border p-3"
-              >
-                {/* Title row */}
+            {allGroups.map((group, gi) => {
+              const activeMembers = group.members.filter((m) => m.status === "active");
+              return (
                 <button
-                  onClick={() => onNavigateToFeature?.(cat.key === "special_days" ? "specialdays" : cat.key)}
-                  className="flex items-center justify-between w-full mb-3"
+                  key={group.id}
+                  onClick={() => handleGroupTap(group)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary/20 transition-all active:scale-[0.99] text-left"
                 >
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{cat.label}</span>
-                  <ChevronRight size={14} className="text-muted-foreground" />
-                </button>
+                  {/* Group avatar */}
+                  <div className={`w-9 h-9 rounded-lg ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex items-center justify-center shrink-0`}>
+                    <span className="text-xs font-bold text-foreground/80">{getInitials(group.name)}</span>
+                  </div>
 
-                {/* Icon + groups row */}
-                <div className="flex items-start gap-0 overflow-x-auto scrollbar-hide">
-                  {/* Category icon block */}
-                  <button
-                    onClick={() => onNavigateToFeature?.(cat.key === "special_days" ? "specialdays" : cat.key)}
-                    className="flex flex-col items-center shrink-0"
-                  >
-                    <div className={`w-11 h-11 rounded-lg ${cat.colors.bg} flex items-center justify-center text-lg`}>
-                      {cat.icon}
-                    </div>
-                    <span className="text-[10px] text-muted-foreground mt-1 leading-tight">All groups</span>
-                  </button>
+                  {/* Name + member dots */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{group.name}</p>
+                    <MemberDots members={activeMembers} />
+                  </div>
 
-                  {/* Divider */}
-                  <div className="w-px h-11 bg-border mx-2.5 shrink-0 self-start" />
-
-                  {/* Group squares */}
-                  {cat.groups.map((group, gi) => (
-                    <button
-                      key={group.id}
-                      onClick={() => onNavigateToFeature?.(cat.key === "special_days" ? "specialdays" : cat.key, group.id)}
-                      className="flex flex-col items-center shrink-0 mr-2.5 min-w-0"
-                    >
-                      <div className={`w-11 h-11 rounded-lg ${GROUP_SQUARE_COLORS[gi % GROUP_SQUARE_COLORS.length]} flex flex-col items-center justify-center relative`}>
-                        <span className="text-xs font-semibold text-foreground/80 leading-none">
-                          {getInitials(group.name)}
-                        </span>
-                        <MemberDots members={group.members.filter(m => m.status === "active")} />
-                      </div>
-                      <span className="text-[10px] text-muted-foreground mt-1 leading-tight max-w-[44px] truncate">
-                        {group.name}
+                  {/* Interest pills */}
+                  <div className="flex flex-wrap gap-1 max-w-[160px] justify-end shrink-0">
+                    {(group.shared_pages || []).slice(0, 4).map((page) => (
+                      <span
+                        key={page}
+                        className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
+                      >
+                        {PAGE_LABELS[page as ShareablePage] || page}
                       </span>
-                    </button>
-                  ))}
+                    ))}
+                    {(group.shared_pages || []).length > 4 && (
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                        +{group.shared_pages.length - 4}
+                      </span>
+                    )}
+                  </div>
 
-                  {/* Add square */}
-                  <button
-                    onClick={onCreateGroup}
-                    className="flex flex-col items-center shrink-0"
-                  >
-                    <div className="w-11 h-11 rounded-lg border border-dashed border-border flex items-center justify-center">
-                      <Plus size={16} className="text-muted-foreground" />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground mt-1 leading-tight">Add</span>
-                  </button>
-                </div>
-              </div>
-            ))}
+                  <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+                </button>
+              );
+            })}
           </section>
-        )}
-
-        {categories.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-            <p className="text-sm font-medium">No shared interest groups yet</p>
-            <p className="text-xs mt-1">Create or join a group to get started</p>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
+              <span className="text-2xl">👥</span>
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">No groups yet</p>
+            <p className="text-xs text-muted-foreground max-w-[240px]">
+              Create one or ask a friend to invite you.
+            </p>
           </div>
         )}
 
         {/* Recent Activity */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-foreground">Recent Activity</h2>
-          {feedLoading ? (
-            <p className="text-xs text-muted-foreground text-center py-4">Loading activity...</p>
-          ) : feedItems.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-4">No recent activity</p>
-          ) : (
-            feedItems.map((item) => (
-              <div key={item.id} className="flex items-start gap-3 p-3 rounded-xl bg-card border border-border">
-                <div className="w-[26px] h-[26px] rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
-                  {getInitials(item.userName)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs leading-snug">
-                    <span className="font-semibold">{item.userName}</span>{" "}
-                    <span className="text-muted-foreground">{item.description} in </span>
-                    <span className="font-medium">{item.groupName}</span>
-                  </p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className="text-[10px] text-muted-foreground">{getTimeAgo(item.timestamp)}</span>
-                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${item.categoryColor}`}>
-                      {item.categoryLabel}
-                    </span>
+        {feedItems.length > 0 && (
+          <section className="space-y-2.5">
+            <h2 className="text-sm font-semibold text-foreground">Recent Activity</h2>
+            {feedLoading ? (
+              <p className="text-xs text-muted-foreground text-center py-4">Loading activity...</p>
+            ) : (
+              feedItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => onNavigateToFeature?.(item.type, item.groupId)}
+                  className="w-full flex items-start gap-3 p-3 rounded-xl bg-card border border-border text-left hover:border-primary/20 transition-colors"
+                >
+                  <div className="w-[26px] h-[26px] rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
+                    {getInitials(item.userName)}
                   </div>
-                </div>
-              </div>
-            ))
-          )}
-        </section>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs leading-snug">
+                      <span className="font-semibold">{item.userName}</span>{" "}
+                      <span className="text-muted-foreground">{item.description} in </span>
+                      <span className="font-medium">{item.groupName}</span>
+                    </p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[10px] text-muted-foreground">{getTimeAgo(item.timestamp)}</span>
+                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${item.categoryColor}`}>
+                        {item.categoryLabel}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))
+            )}
+          </section>
+        )}
       </div>
     </div>
   );
