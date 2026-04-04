@@ -1651,7 +1651,7 @@ const EventList = ({
       )}
 
       {timedItems.map((item) => {
-        const color = resolveItemColor(item, groups, colorMap);
+        const color = getPersonColor(item);
         const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
         const displayTime = item.type === "gcal" && item.time
           ? new Date(item.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
