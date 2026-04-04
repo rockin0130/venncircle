@@ -446,7 +446,7 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
   if (columns.length === 0) return null;
 
   return (
-    <div className="mt-3 border-t border-border pt-2">
+    <div className="mt-3 border-t border-border pt-2 w-full overflow-hidden" style={{ boxSizing: "border-box" }}>
       {/* Column headers with optional reorder */}
       <div className="flex items-center justify-between mb-2">
         <div className="grid gap-1 flex-1" style={{ gridTemplateColumns: `40px repeat(${columns.length}, 1fr)` }}>
