@@ -849,20 +849,35 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     return otherUserMeals.some(m => m.user_id === userId && m.meal_date === dateStr && m.consumed);
   }, [otherUserMeals, dateStr]);
 
-  // Date strip data
-  const loggedDatesSet = useMemo(() => {
-    const s = new Set<string>();
-    allMeals.forEach(m => { if (m.consumed) s.add(m.meal_date); });
-    otherUserMeals.forEach(m => { if (m.consumed) s.add(m.meal_date); });
-    return s;
-  }, [allMeals, otherUserMeals]);
+  // Date strip data — fetch all meal dates from DB for accurate dots
+  const [allMealDatesLogged, setAllMealDatesLogged] = useState<Set<string>>(new Set());
+  const [allMealDatesPlanned, setAllMealDatesPlanned] = useState<Set<string>>(new Set());
 
-  const plannedDatesSet = useMemo(() => {
-    const s = new Set<string>();
-    const todayStr = fmtDate(new Date());
-    allMeals.forEach(m => { if (!m.consumed && m.meal_date > todayStr) s.add(m.meal_date); });
-    return s;
-  }, [allMeals]);
+  useEffect(() => {
+    if (!user) return;
+    const loadDates = async () => {
+      const todayStr = fmtDate(new Date());
+      // Fetch distinct dates with consumed meals (logged)
+      const { data: loggedData } = await supabase
+        .from("meal_logs")
+        .select("meal_date, consumed")
+        .eq("user_id", user.id);
+      if (loggedData) {
+        const logged = new Set<string>();
+        const planned = new Set<string>();
+        for (const m of loggedData) {
+          if (m.consumed) logged.add(m.meal_date);
+          if (!m.consumed && m.meal_date >= todayStr) planned.add(m.meal_date);
+        }
+        setAllMealDatesLogged(logged);
+        setAllMealDatesPlanned(planned);
+      }
+    };
+    loadDates();
+  }, [user, allMeals.length]); // re-run when meals change
+
+  const loggedDatesSet = allMealDatesLogged;
+  const plannedDatesSet = allMealDatesPlanned;
 
   const dateLabel = selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 
