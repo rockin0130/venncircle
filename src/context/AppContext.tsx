@@ -851,6 +851,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       hiddenFromPartner: row.hidden_from_partner || false,
       groupId: row.group_id || null,
       user: row.assignee as "me" | "partner" | "both",
+      assigneeUserIds: row.assignee_user_ids || null,
+      calendarId: row.calendar_id || null,
+      ownerUserId: row.user_id,
     });
 
     const applyWorkoutUpdate = (row: any) => ({
