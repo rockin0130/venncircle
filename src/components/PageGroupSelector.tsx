@@ -8,6 +8,7 @@ interface PageGroupSelectorProps {
   isHomePage?: boolean;
   personalLabel?: string;
   personalEmoji?: string;
+  hideAllPill?: boolean;
 }
 
 const PERSONAL_SENTINEL = "__personal__";
