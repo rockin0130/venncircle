@@ -326,13 +326,37 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
         setLocation((ev as any).location || "");
         setNotificationMinutes((ev as any).notificationMinutes ?? -1);
         setRepeatRule((ev as any).repeatRule || { frequency: "none" });
-        setSelectedAssignees([ev.user || "me"]);
-
         // Set context based on event's group
         const evGroupId = (ev as any).groupId;
         const editCtx = evGroupId || "__personal__";
         setSelectedContextId(editCtx);
         loadCalendarForContext(editCtx);
+
+        // Expand assignee to member IDs for proper pill highlighting
+        const evAssignee = ev.user || "me";
+        if (evAssignee === "both" && evGroupId) {
+          const grp = groups?.find(g => g.id === evGroupId);
+          if (grp) {
+            const memberIds = grp.members
+              ?.filter((m: any) => m.user_id !== user?.id && m.status === "active")
+              .map((m: any) => m.user_id) || [];
+            setSelectedAssignees(["me", ...memberIds]);
+          } else {
+            setSelectedAssignees(["me"]);
+          }
+        } else if (evAssignee === "partner" && evGroupId) {
+          const grp = groups?.find(g => g.id === evGroupId);
+          if (grp) {
+            const otherIds = grp.members
+              ?.filter((m: any) => m.user_id !== user?.id && m.status === "active")
+              .map((m: any) => m.user_id) || [];
+            setSelectedAssignees(otherIds.length > 0 ? otherIds : ["me"]);
+          } else {
+            setSelectedAssignees(["me"]);
+          }
+        } else {
+          setSelectedAssignees(["me"]);
+        }
       } else {
         const tk = editItem.raw as Task;
         setMode("todo");
