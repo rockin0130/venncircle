@@ -263,7 +263,7 @@ interface AppContextType {
   hideGcalEvent: (eventId: string) => Promise<void>;
   toggleGcalCompletion: (eventId: string) => Promise<void>;
   toggleEventVisibility: (eventId: string) => Promise<void>;
-  designateGcalEvent: (eventId: string, assignee: "me" | "partner" | "both") => Promise<void>;
+  designateGcalEvent: (eventId: string, assignee: "me" | "partner" | "both", assigneeUserIds?: string[]) => Promise<void>;
   // Partner data (raw)
   partnerHabits: Habit[];
   partnerEvents: ScheduledEvent[];
