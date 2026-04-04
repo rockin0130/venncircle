@@ -1169,6 +1169,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         endTime: event.endTime ?? (isAllDay ? "" : (event.time || "")),
         allDay: isAllDay,
         calendarId: (data as any).calendar_id || event.calendarId || null,
+        ownerUserId: user.id,
+        assigneeUserIds: (data as any).assignee_user_ids || event.assigneeUserIds || null,
       }]);
     }
   };
