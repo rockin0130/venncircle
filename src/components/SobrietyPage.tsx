@@ -84,7 +84,7 @@ interface SobrietyPageProps {
   onOpenSettings?: () => void;
 }
 
-const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
+const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
   const { user, activeGroup, profile, groups } = useAuth();
   const [categories, setCategories] = useState<SobrietyCategory[]>([]);
   const [checkins, setCheckins] = useState<SobrietyCheckin[]>([]);
