@@ -165,6 +165,7 @@ export interface GoogleCalendarEvent {
   htmlLink: string;
   ownerUserId?: string;
   assignee?: "me" | "partner" | "both";
+  assigneeUserIds?: string[] | null;
   done?: boolean;
   completedAt?: string | null;
   completedBy?: string | null;
