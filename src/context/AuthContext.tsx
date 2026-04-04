@@ -160,10 +160,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setGroups(cachedGroups);
     setActiveGroup((prev) => {
+      if ((prev as any)?._personal) return prev; // Keep "Mine" if already selected
       if (prev) {
-        return cachedGroups.find((g) => g.id === prev.id) ?? cachedGroups[0] ?? null;
+        return cachedGroups.find((g) => g.id === prev.id) ?? prev;
       }
-      return cachedGroups[0] ?? null;
+      return prev;
     });
     return true;
   };
