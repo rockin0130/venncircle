@@ -272,8 +272,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }));
           setGroups(fallbackEnriched);
           setActiveGroup((prev) => {
-            if (!prev) return fallbackEnriched[0] ?? null;
-            return fallbackEnriched.find((g) => g.id === prev.id) ?? fallbackEnriched[0] ?? null;
+            if ((prev as any)?._personal) return prev;
+            if (!prev) return prev;
+            return fallbackEnriched.find((g) => g.id === prev.id) ?? prev;
           });
           saveCachedGroups(user.id, fallbackEnriched);
           return;
