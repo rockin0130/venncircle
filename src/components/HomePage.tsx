@@ -366,8 +366,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   // Effective habit sub-items: just the habit category toggles from preferences
   const effectiveHabitSubIds = selectedHabitSubIds;
 
-  const { filters: groupFilters, otherName, hasOther, showGoogleCalendar } = useGroupContext();
-  const partnerName = otherName;
+  const { showGoogleCalendar } = useGroupContext();
 
   // Home page is always the aggregate "mine" view — no group/member filtering
   const isViewingPartner = false;
