@@ -186,13 +186,12 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
   // In "Mine" mode on Calendar, show ALL of the logged-in user's own events across all contexts
   const calFilteredEvents = useMemo(() => {
     if (!isPrivateMode) return filteredEvents;
-    // Show everything the user owns — personal + group events + hidden_from_partner
-    return events.filter((e) => e.userId === user?.id);
+    return events.filter((e) => e.ownerUserId === user?.id);
   }, [isPrivateMode, filteredEvents, events, user?.id]);
 
   const calFilteredTasks = useMemo(() => {
     if (!isPrivateMode) return filteredTasks;
-    return tasks.filter((t) => t.userId === user?.id);
+    return tasks.filter((t) => t.ownerUserId === user?.id);
   }, [isPrivateMode, filteredTasks, tasks, user?.id]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
