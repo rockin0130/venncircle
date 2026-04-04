@@ -1209,7 +1209,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
               getItemsForDate={getItemsForDate}
               groups={groups}
               timeGridRef={timeGridRef}
-              onItemTap={setSelectedItem}
+              onItemTap={handleItemTap}
               colorMap={calendarColorMap}
             />
           </motion.div>

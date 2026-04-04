@@ -200,7 +200,12 @@ const HomeScheduledSection = ({
   const getContextTag = useCallback((item: UnifiedScheduledItem) => {
     if (item.groupId) {
       const group = groups.find(g => g.id === item.groupId);
-      if (group) return { label: group.name, bg: "bg-violet-100 dark:bg-violet-900/30", text: "text-violet-700 dark:text-violet-300" };
+      if (group) {
+        // Family groups use green
+        const isFamily = group.name.toLowerCase() === "family" || group.category === "home";
+        if (isFamily) return { label: group.name, bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-300" };
+        return { label: group.name, bg: "bg-violet-100 dark:bg-violet-900/30", text: "text-violet-700 dark:text-violet-300" };
+      }
     }
     return { label: "Mine", bg: "bg-sky-100 dark:bg-sky-900/30", text: "text-sky-700 dark:text-sky-300" };
   }, [groups]);
