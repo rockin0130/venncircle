@@ -1856,16 +1856,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await supabase.from("events").update({ hidden_from_partner: newHidden }).eq("id", eventId);
   };
 
-  const designateGcalEvent = async (eventId: string, assignee: "me" | "partner" | "both") => {
+  const designateGcalEvent = async (eventId: string, assignee: "me" | "partner" | "both", assigneeUserIds?: string[]) => {
     if (!user) return;
     setGoogleCalendarEvents((prev) =>
-      prev.map((e) => e.id === eventId ? { ...e, assignee } : e)
+      prev.map((e) => e.id === eventId ? { ...e, assignee, assigneeUserIds: assigneeUserIds || null } : e)
     );
     if (eventId.startsWith("apple-")) return;
+    // Future: sync edits back to Google Calendar via the Google Calendar API.
+    // For now edits are stored in the app's database only and do not push back to Google.
     await supabase.from("gcal_event_designations").upsert({
       user_id: user.id,
       gcal_event_id: eventId,
       assignee,
+      assignee_user_ids: assigneeUserIds || [],
     }, { onConflict: "user_id,gcal_event_id" });
   };
 
