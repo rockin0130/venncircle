@@ -772,7 +772,7 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
                               </div>
                               <div
                                 className="w-3 h-3 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: opt.id === "__personal__" ? calendarColor : CALENDAR_COLORS[2].value }}
+                                style={{ backgroundColor: opt.color }}
                               />
                               <span className={cn(
                                 "text-[15px] text-left truncate",
