@@ -287,24 +287,14 @@ const HomeSectionCustomizer = ({
 
   const habitSubItems = (() => {
     const items: { id: string; label: string; icon: string }[] = [];
-    if (waterEnabled) {
-      items.push({ id: "water", label: "Water Intake", icon: "💧" });
-    }
     const categories = [
-      { key: "morning", label: "Morning", icon: "🌅" },
-      { key: "afternoon", label: "Afternoon", icon: "☀️" },
-      { key: "evening", label: "Evening", icon: "🌙" },
-      { key: "other", label: "Other", icon: "📋" },
+      { key: "morning", label: "Morning Habits", icon: "🌅" },
+      { key: "afternoon", label: "Afternoon Habits", icon: "☀️" },
+      { key: "evening", label: "Evening Habits", icon: "🌙" },
+      { key: "other", label: "Other Habits", icon: "📋" },
     ];
     for (const cat of categories) {
-      const hasHabits = filteredHabits.some((h) => {
-        const hCat = (h.category || "other").toLowerCase();
-        // Match both "morning" and legacy "morning-habits" etc.
-        return hCat === cat.key || hCat === `${cat.key}-habits`;
-      });
-      if (hasHabits) {
-        items.push({ id: `habit:${cat.key}`, label: cat.label, icon: cat.icon });
-      }
+      items.push({ id: `habit:${cat.key}`, label: cat.label, icon: cat.icon });
     }
     return items;
   })();
