@@ -35,6 +35,44 @@ interface Props {
 function resolveItemOwnerIds(item: CalItem, currentUserId: string, groups: Group[]): Set<string> {
   const raw = item.raw as any;
   const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+
+  // Google Calendar events always default to current user only
+  if (item.type === "gcal") {
+    // Check if explicitly assigned via gcal designation
+    const gcalAssignee = raw.assignee;
+    if (gcalAssignee === "both") {
+      const ids = new Set<string>();
+      ids.add(currentUserId);
+      const groupId = item.groupId;
+      if (groupId) {
+        const grp = groups.find(g => g.id === groupId);
+        grp?.members?.filter((m: any) => m.user_id !== currentUserId && m.status === "active")
+          .forEach((m: any) => ids.add(m.user_id));
+      }
+      return ids;
+    }
+    if (gcalAssignee === "partner") {
+      const ids = new Set<string>();
+      const groupId = item.groupId;
+      if (groupId) {
+        const grp = groups.find(g => g.id === groupId);
+        grp?.members?.filter((m: any) => m.user_id !== currentUserId && m.status === "active")
+          .forEach((m: any) => ids.add(m.user_id));
+      }
+      if (ids.size === 0) ids.add(currentUserId);
+      return ids;
+    }
+    // Default: Mine only
+    return new Set([currentUserId]);
+  }
+
+  // For regular events/tasks: prefer assignee_user_ids array if available
+  const assigneeUserIds: string[] | null = raw.assignee_user_ids;
+  if (assigneeUserIds && assigneeUserIds.length > 0) {
+    return new Set(assigneeUserIds);
+  }
+
+  // Fallback to legacy assignee field
   const assignee = item.assignee;
   const groupId = item.groupId;
   const ids = new Set<string>();
