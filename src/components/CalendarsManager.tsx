@@ -635,6 +635,8 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                         const mode = getVisibilityMode(settingsCal.id, ctx.id);
                         const effectiveMode = isGroupCalSharingToOtherGroup ? "busy" : mode;
 
+                        const isMineCtx = ctx.id === "__personal__";
+
                         return (
                           <div key={ctx.id} className="px-4">
                             <div className="flex items-center justify-between py-3">
@@ -644,12 +646,18 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                                   <span className="text-[14px] text-foreground truncate block">
                                     {ctx.label}
                                   </span>
-                                  {isOwnGroupContext && (
+                                  {(isOwnGroupContext || isMineCtx) && (
                                     <span className="text-[11px] text-muted-foreground">Always visible</span>
                                   )}
                                 </div>
                               </div>
-                              {!isOwnGroupContext && (
+                              {isMineCtx ? (
+                                <Switch
+                                  checked={true}
+                                  disabled
+                                  className="opacity-50"
+                                />
+                              ) : !isOwnGroupContext ? (
                                 <Switch
                                   checked={visible}
                                   onCheckedChange={(checked) => {
@@ -657,11 +665,11 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                                     upsertContextVisibility(settingsCal.id, ctx.id, checked, checked ? newMode : undefined);
                                   }}
                                 />
-                              )}
+                              ) : null}
                             </div>
 
                             {/* Privacy option when toggle is on */}
-                            {visible && !isOwnGroupContext && ctx.id !== "__personal__" && (
+                            {visible && !isOwnGroupContext && !isMineCtx && (
                               <div className="pb-3 pl-8">
                                 {isGroupCalSharingToOtherGroup ? (
                                   <p className="text-[12px] text-muted-foreground italic">
@@ -699,9 +707,6 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                         );
                       })}
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-2 px-1">
-                      A calendar can be private or shared, not both
-                    </p>
                   </div>
 
                   {/* Delete option for non-default local calendars */}
