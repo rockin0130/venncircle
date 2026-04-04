@@ -449,7 +449,7 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
     <div className="mt-3 border-t border-border pt-2 w-full overflow-hidden" style={{ boxSizing: "border-box" }}>
       {/* Column headers with optional reorder */}
       <div className="flex items-center justify-between mb-2">
-        <div className="grid gap-1 flex-1" style={{ gridTemplateColumns: `40px repeat(${columns.length}, 1fr)` }}>
+        <div className="grid gap-1 flex-1 min-w-0 overflow-hidden" style={{ gridTemplateColumns: `48px repeat(${columns.length}, minmax(0, 1fr))` }}>
           <div />
           {columns.map((col, idx) => {
             const colors = MEMBER_COLORS[col.colorIndex % MEMBER_COLORS.length];
