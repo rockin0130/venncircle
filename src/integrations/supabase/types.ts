@@ -288,6 +288,7 @@ export type Database = {
         Row: {
           all_day: boolean
           assignee: string
+          assignee_user_ids: string[] | null
           calendar_id: string | null
           completed_at: string | null
           completed_by: string | null
@@ -316,6 +317,7 @@ export type Database = {
         Insert: {
           all_day?: boolean
           assignee?: string
+          assignee_user_ids?: string[] | null
           calendar_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
@@ -344,6 +346,7 @@ export type Database = {
         Update: {
           all_day?: boolean
           assignee?: string
+          assignee_user_ids?: string[] | null
           calendar_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
@@ -1616,6 +1619,7 @@ export type Database = {
         Returns: {
           all_day: boolean
           assignee: string
+          assignee_user_ids: string[] | null
           calendar_id: string | null
           completed_at: string | null
           completed_by: string | null
