@@ -4,7 +4,7 @@ import {
   Calendar as CalendarIcon, Settings,
 } from "lucide-react";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
-import { useAuth, Group } from "@/context/AuthContext";
+import { useAuth, Group, GroupMember } from "@/context/AuthContext";
 import UserBadge from "@/components/UserBadge";
 import PageGroupSelector from "@/components/PageGroupSelector";
 import { useGroupContext } from "@/hooks/useGroupContext";
