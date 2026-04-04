@@ -46,6 +46,15 @@ const GROUP_COLOR_CLASSES = [
   { bg: "bg-yellow-500", text: "text-yellow-500", bgLight: "bg-yellow-500/15", border: "border-yellow-500/30" },
 ];
 
+// Resolve Family/home groups to green color index (2 = emerald)
+function getGroupColorIndex(groupId: string | null | undefined, groups: Group[]): number {
+  if (!groupId) return 0;
+  const grp = groups.find((g) => g.id === groupId);
+  if (grp && (grp.name.toLowerCase() === "family" || grp.category === "home")) return 2; // emerald/green
+  const idx = groups.findIndex((g) => g.id === groupId);
+  return idx >= 0 ? idx % GROUP_COLOR_CLASSES.length : 0;
+}
+
 type ViewMode = "month" | "list" | "day" | "3day";
 const VIEW_LABELS: Record<ViewMode, string> = { month: "Month", list: "List", day: "Day", "3day": "3 Day" };
 

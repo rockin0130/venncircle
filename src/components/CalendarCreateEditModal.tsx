@@ -297,6 +297,12 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
         setNotificationMinutes((ev as any).notificationMinutes ?? -1);
         setRepeatRule((ev as any).repeatRule || { frequency: "none" });
         setSelectedAssignees([ev.user || "me"]);
+
+        // Set context based on event's group
+        const evGroupId = (ev as any).groupId;
+        const editCtx = evGroupId || "__personal__";
+        setSelectedContextId(editCtx);
+        loadCalendarForContext(editCtx);
       } else {
         const tk = editItem.raw as Task;
         setMode("todo");
@@ -305,6 +311,13 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
         setTodoPriorNotice(tk.priorNoticeDays ?? 0);
         setDescription((tk as any).description || "");
         setSelectedAssignees([tk.assignee || "me"]);
+
+        // Set context based on task's group
+        const tkGroupId = (tk as any).groupId;
+        const editCtx = tkGroupId || "__personal__";
+        setSelectedContextId(editCtx);
+        loadCalendarForContext(editCtx);
+
         if (tk.dueDate) {
           const [y, m, d] = tk.dueDate.split("-").map(Number);
           setTodoDueDate(new Date(y, m - 1, d));
