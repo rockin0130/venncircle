@@ -735,7 +735,39 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
   const handleEditFromDetail = (item: CalItem) => {
     setSelectedItem(null);
-    if (item.type === "gcal") return;
+    if (item.type === "gcal") {
+      // For Google Calendar events, convert to a synthetic event for editing
+      const ge = item.raw as GoogleCalendarEvent;
+      const startDate = ge.start ? new Date(ge.start) : new Date();
+      setEditingItem({
+        id: item.id,
+        type: "event",
+        raw: {
+          id: ge.id,
+          title: ge.title,
+          description: ge.description || "",
+          time: ge.allDay ? "" : startDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }),
+          endTime: ge.end ? new Date(ge.end).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "",
+          day: startDate.getDate(),
+          month: startDate.getMonth(),
+          year: startDate.getFullYear(),
+          allDay: ge.allDay,
+          user: ge.assignee || "me",
+          done: ge.done,
+          groupId: null,
+          ownerUserId: ge.ownerUserId,
+          assigneeUserIds: ge.assigneeUserIds || null,
+          calendarId: null,
+          location: ge.location || undefined,
+          // Mark as gcal source for the edit modal
+          _gcalSource: true,
+          _gcalId: ge.id,
+          _gcalCalendarId: ge.calendarId,
+        } as any,
+        done: ge.done,
+      });
+      return;
+    }
     setEditingItem({
       id: item.id,
       type: item.type,
