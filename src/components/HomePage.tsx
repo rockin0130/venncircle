@@ -533,7 +533,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Determine if we can toggle items (only own items)
-  const isViewingPartner = filter === "partner" || isSpecificMemberFilter;
+  
 
   // Notification badge count (simple: incomplete habits after 6pm + upcoming events)
   const notificationCount = useMemo(() => {
