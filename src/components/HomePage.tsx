@@ -733,25 +733,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
       </AnimatePresence>
 
 
-      {filter === "household" ? (
-        <TeamDashboard
-          myTasks={householdMyTasks}
-          myEvents={householdMyEvents}
-          partnerTasks={householdPartnerTasks}
-          partnerEvents={householdPartnerEvents}
-          gcalEvents={gcalEventsForDay}
-          toggleTask={toggleTask}
-          toggleEventCompletion={toggleEventCompletion}
-          toggleGcalCompletion={toggleGcalCompletion}
-          removeEvent={removeEvent}
-          removeTask={removeTask}
-          toggleEventVisibility={toggleEventVisibility}
-          rescheduleEvent={rescheduleEvent}
-          hideGcalEvent={hideGcalEvent}
-          designateGcalEvent={designateGcalEvent}
-          onCongrats={() => setCongratsType("task")}
-        />
-      ) : (
+      {(
         <>
           {sectionOrder.filter((id) => {
             // Home page always shows all toggled-on sections — no group shared_pages filtering
