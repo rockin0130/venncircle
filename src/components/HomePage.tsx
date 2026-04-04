@@ -369,9 +369,9 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   const { filters: groupFilters, otherName, hasOther, showGoogleCalendar } = useGroupContext();
   const partnerName = otherName;
 
-  // Determine if "Personal" sentinel is active
-  const isPersonalActive = (activeGroup as any)?._personal === true;
-  const isAllActive = activeGroup === null && !isPersonalActive;
+  // Home page is always aggregate — no group/personal sentinel logic needed
+  const isPersonalActive = false;
+  const isAllActive = true;
 
   // Build "All view" member filter pills from all home/family groups
   const allViewMembers = useMemo(() => {
