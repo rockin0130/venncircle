@@ -304,32 +304,33 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
     return (
       <button
         onClick={() => onItemTap?.(item as CalItem)}
-        className="w-full text-left rounded-lg border transition-all hover:brightness-95 active:brightness-90 overflow-hidden max-w-full"
+        className="w-full text-left rounded-lg border transition-all hover:brightness-95 active:brightness-90 max-w-full box-border"
         style={{
           backgroundColor: colors.cardBg,
           borderColor: colors.cardBorder,
           minHeight: `${minHeight}px`,
+          overflow: "hidden",
         }}
       >
-        <div className="px-2 py-1.5">
-          <p className={`text-[12px] font-semibold leading-tight truncate ${item.done ? "line-through opacity-40" : ""}`}
-            style={{ color: colors.cardBorder }}>
+        <div className="px-2 py-1.5 overflow-hidden">
+          <p className={`text-[12px] font-semibold leading-tight ${item.done ? "line-through opacity-40" : ""}`}
+            style={{ color: colors.cardBorder, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {item.title}
           </p>
           {!isAllDay && (
-            <p className="text-[10px] mt-0.5 opacity-70" style={{ color: colors.cardBorder }}>
+            <p className="text-[10px] mt-0.5 opacity-70 truncate" style={{ color: colors.cardBorder }}>
               {displayTime}{displayEndTime && displayEndTime !== displayTime ? ` – ${displayEndTime}` : ""}
             </p>
           )}
           {isShared && (
-            <div className="flex -space-x-1 mt-1">
+            <div className="flex -space-x-1 mt-1 flex-nowrap overflow-hidden">
               {assignedColIndices.map(colIdx => {
                 const col = columns[colIdx];
                 if (!col) return null;
                 return (
                   <div
                     key={col.id}
-                    className={`w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white ring-1 ring-white/50 ${MEMBER_COLORS[col.colorIndex % MEMBER_COLORS.length].avatarBg}`}
+                    className={`w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white ring-1 ring-white/50 flex-shrink-0 ${MEMBER_COLORS[col.colorIndex % MEMBER_COLORS.length].avatarBg}`}
                   >
                     {col.initial}
                   </div>
@@ -373,42 +374,71 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
       }
     });
 
+    // If there are spanning items, they need their own row to avoid overlapping single-column items
+    const hasSingleItems = singleByCol.size > 0;
+
     return (
-      <div key={timeLabel ?? "allday"} className="grid gap-1 items-start" style={{ gridTemplateColumns: `40px repeat(${columns.length}, 1fr)` }}>
-        <div className="flex items-start justify-end pr-1 pt-1">
-          <span className="text-[9px] text-muted-foreground font-medium tabular-nums">
-            {timeLabel ?? "All day"}
-          </span>
-        </div>
-
-        {/* Render single-column items in their respective columns */}
-        {columns.map((_, colIdx) => {
-          const singles = singleByCol.get(colIdx) || [];
-          if (singles.length === 0) {
-            return <div key={colIdx} className="min-h-[28px]" />;
-          }
-          return (
-            <div key={colIdx} className="space-y-0.5 min-h-[28px]">
-              {singles.map((instr, i) => (
-                <div key={`${instr.item.id}-${i}`}>{renderCard(instr, isAllDay)}</div>
-              ))}
+      <div key={timeLabel ?? "allday"} className="space-y-0.5">
+        {/* Single-column items row */}
+        {hasSingleItems && (
+          <div className="grid gap-1 items-start" style={{ gridTemplateColumns: `48px repeat(${columns.length}, minmax(0, 1fr))` }}>
+            <div className="flex items-start justify-end pr-1 pt-1 flex-shrink-0 w-[48px]">
+              <span className="text-[9px] text-muted-foreground font-medium tabular-nums whitespace-nowrap">
+                {timeLabel ?? "All day"}
+              </span>
             </div>
-          );
-        })}
+            {columns.map((_, colIdx) => {
+              const singles = singleByCol.get(colIdx) || [];
+              if (singles.length === 0) {
+                return <div key={colIdx} className="min-h-[28px] min-w-0" />;
+              }
+              return (
+                <div key={colIdx} className="space-y-0.5 min-h-[28px] min-w-0 overflow-hidden">
+                  {singles.map((instr, i) => (
+                    <div key={`${instr.item.id}-${i}`} className="min-w-0 overflow-hidden">{renderCard(instr, isAllDay)}</div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-        {/* Render spanning items overlaid on top using absolute positioning within the grid */}
+        {/* Spanning items — each in its own grid row */}
         {spanItems.map((instr, i) => (
           <div
             key={`span-${instr.item.id}-${i}`}
-            style={{
-              gridColumn: `${instr.startColIdx + 2} / span ${instr.spanCount}`,
-              gridRow: 1,
-            }}
-            className="min-h-[28px]"
+            className="grid gap-1 items-start"
+            style={{ gridTemplateColumns: `48px repeat(${columns.length}, minmax(0, 1fr))` }}
           >
-            {renderCard(instr, isAllDay)}
+            {/* Time label for first span item only if no singles rendered above */}
+            <div className="flex items-start justify-end pr-1 pt-1 flex-shrink-0 w-[48px]">
+              {!hasSingleItems && i === 0 && (
+                <span className="text-[9px] text-muted-foreground font-medium tabular-nums whitespace-nowrap">
+                  {timeLabel ?? "All day"}
+                </span>
+              )}
+            </div>
+            <div
+              className="min-h-[28px] min-w-0 overflow-hidden"
+              style={{
+                gridColumn: `${instr.startColIdx + 2} / span ${instr.spanCount}`,
+              }}
+            >
+              {renderCard(instr, isAllDay)}
+            </div>
           </div>
         ))}
+
+        {/* If no items at all, still show the time label */}
+        {!hasSingleItems && spanItems.length === 0 && (
+          <div className="grid gap-1 items-start" style={{ gridTemplateColumns: `48px repeat(${columns.length}, minmax(0, 1fr))` }}>
+            <div className="flex items-start justify-end pr-1 pt-1 flex-shrink-0 w-[48px]">
+              <span className="text-[9px] text-muted-foreground font-medium tabular-nums whitespace-nowrap">
+                {timeLabel ?? "All day"}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -416,10 +446,10 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
   if (columns.length === 0) return null;
 
   return (
-    <div className="mt-3 border-t border-border pt-2">
+    <div className="mt-3 border-t border-border pt-2 w-full overflow-hidden" style={{ boxSizing: "border-box" }}>
       {/* Column headers with optional reorder */}
       <div className="flex items-center justify-between mb-2">
-        <div className="grid gap-1 flex-1" style={{ gridTemplateColumns: `40px repeat(${columns.length}, 1fr)` }}>
+        <div className="grid gap-1 flex-1 min-w-0 overflow-hidden" style={{ gridTemplateColumns: `48px repeat(${columns.length}, minmax(0, 1fr))` }}>
           <div />
           {columns.map((col, idx) => {
             const colors = MEMBER_COLORS[col.colorIndex % MEMBER_COLORS.length];
