@@ -454,7 +454,9 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                       ? "Mine"
                       : item.groupName || "Group";
                     const emoji = item.type === "personal" ? "👤" : item.groupEmoji || "📅";
-                    const color = cal?.color || CALENDAR_COLORS[0].value;
+                    const isFamily = item.type === "group" && (item.groupName?.toLowerCase() === "family");
+                    const defaultColor = isFamily ? "hsl(150 60% 42%)" : CALENDAR_COLORS[0].value;
+                    const color = cal?.color || defaultColor;
                     const subtitle = item.type === "personal" ? "Your calendar" : "Shared group calendar";
 
                     return (

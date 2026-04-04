@@ -173,13 +173,13 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
 
     if (groups) {
       for (const g of groups) {
-        // Only include groups that have Calendar page enabled
         if (g.shared_pages?.includes("calendar")) {
+          const isFamily = g.name.toLowerCase() === "family" || g.category === "home";
           opts.push({
             id: g.id,
             label: `${g.emoji || ""} ${g.name}`.trim(),
             calendarId: null,
-            color: CALENDAR_COLORS[2].value,
+            color: isFamily ? "hsl(150 60% 42%)" : CALENDAR_COLORS[2].value,
             groupId: g.id,
             members: g.members || [],
           });
