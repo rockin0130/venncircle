@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Clock, Flame, Check, Trash2, ChevronDown, ChevronUp, Loader2, X, Dumbbell, AlertTriangle, Target, ArrowRight, RotateCcw, Calendar as CalIcon, Plus, Pencil, Settings, Heart, Gauge, Mountain, Footprints, Smartphone, ImageIcon, History, CloudDownload, Bell } from "lucide-react";
+import { Clock, Flame, Check, Trash2, ChevronDown, ChevronUp, Loader2, X, Dumbbell, AlertTriangle, Target, ArrowRight, RotateCcw, Calendar as CalIcon, Plus, Pencil, Settings, Heart, Gauge, Mountain, Footprints, Smartphone, ImageIcon, History, CloudDownload, Bell, ClipboardList } from "lucide-react";
 import CustomWorkoutBuilder from "@/components/CustomWorkoutBuilder";
-import WorkoutStatsCards from "@/components/WorkoutStatsCards";
 import WorkoutAiSuggest from "@/components/WorkoutAiSuggest";
 import GroupBadge from "@/components/GroupBadge";
 import { useAppContext, Workout, isCardioWorkout } from "@/context/AppContext";
@@ -24,6 +23,8 @@ import ExerciseLibrarySheet from "@/components/ExerciseLibrarySheet";
 import WorkoutUserFilter, { EVERYONE_SENTINEL } from "@/components/WorkoutUserFilter";
 import { type UserWorkoutData } from "@/components/WorkoutStatsCards";
 import { type GroupMember } from "@/context/AuthContext";
+import WorkoutLogPage from "@/components/WorkoutLogPage";
+import { getWeekStartDate, loadWeekStart } from "@/hooks/useWeekStart";
 
 interface AIPlan {
   title: string;
@@ -56,13 +57,11 @@ const todayStr = () => fmtDate(new Date());
 
 const MANUAL_ACTIVITIES = [
   { emoji: "🏃", title: "Running", tag: "Cardio", defaultDuration: "30 min", defaultCal: 300 },
-  { emoji: "🧘", title: "Yoga", tag: "Flexibility", defaultDuration: "45 min", defaultCal: 200 },
   { emoji: "🚴", title: "Cycling", tag: "Cardio", defaultDuration: "40 min", defaultCal: 350 },
+  { emoji: "🧘", title: "Yoga", tag: "Flexibility", defaultDuration: "45 min", defaultCal: 200 },
+  { emoji: "💪", title: "Strength", tag: "Full Body", defaultDuration: "45 min", defaultCal: 300 },
   { emoji: "🏊", title: "Swimming", tag: "Full Body", defaultDuration: "30 min", defaultCal: 400 },
   { emoji: "🚶", title: "Walking", tag: "Cardio", defaultDuration: "30 min", defaultCal: 150 },
-  { emoji: "🤸", title: "Stretching", tag: "Flexibility", defaultDuration: "15 min", defaultCal: 50 },
-  { emoji: "🥊", title: "Boxing", tag: "Cardio", defaultDuration: "30 min", defaultCal: 350 },
-  { emoji: "⚽", title: "Sports", tag: "Full Body", defaultDuration: "60 min", defaultCal: 500 },
 ];
 
 // Detect delete/management intent from natural language
@@ -75,149 +74,284 @@ function detectManagementIntent(prompt: string): { type: "delete"; filter: "all"
   if (/\b(month|monthly|30.day|4.week)\b/.test(lower)) return { type: "delete", filter: "month" };
   if (/\b(week|weekly|7.day|this week|next week)\b/.test(lower)) return { type: "delete", filter: "week" };
   if (/\btomorrow\b/.test(lower)) return { type: "delete", filter: "tomorrow" };
-  // Default broad delete = all
   return { type: "delete", filter: "all" };
 }
 
-const DEFAULT_QUICK_ADD_ORDER = ["Running", "Walking", "Cycling", "Yoga", "Swimming", "Stretching", "Boxing", "Sports"];
+const DEFAULT_QUICK_ADD_ORDER = ["Running", "Cycling", "Yoga", "Strength", "Swimming", "Walking"];
 
-const SmartQuickAdd = ({ workouts, onAddActivity, onOpenCustomBuilder, onAddWorkouts, selectedDate }: {
-  workouts: Workout[]; onAddActivity: (a: typeof MANUAL_ACTIVITIES[0]) => void; onOpenCustomBuilder: () => void; onAddWorkouts: (w: Workout[]) => void; selectedDate: string;
-}) => {
-  const [showLibrary, setShowLibrary] = useState(false);
+/* ── Muscle group tag colors ── */
+const TAG_COLORS: Record<string, string> = {
+  "Legs": "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  "Back": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  "Full Body": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  "Cardio": "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
+  "Flexibility": "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  "Upper Body": "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+  "Chest": "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
+  "Arms": "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+};
 
-  const { allItems, rankedItems } = useMemo(() => {
-    const now = Date.now();
-    const scores = new Map<string, { freq: number; recency: number }>();
-    for (const w of workouts) {
-      if (!w.done) continue;
-      const prev = scores.get(w.title) || { freq: 0, recency: 0 };
-      prev.freq += 1;
-      const ct = w.completedDate ? new Date(w.completedDate + "T00:00:00").getTime() : (w.scheduledDate ? new Date(w.scheduledDate + "T00:00:00").getTime() : now);
-      prev.recency = Math.max(prev.recency, 10 / Math.max(1, (now - ct) / 86400000));
-      scores.set(w.title, prev);
-    }
-    type QuickItem = { type: "activity"; data: typeof MANUAL_ACTIVITIES[0]; score: number } | { type: "template"; title: string; emoji: string; exercises: { name: string; sets: number; reps: string }[]; tag: string; duration: string; cal: number; score: number };
-    const items: QuickItem[] = [];
-    for (const act of MANUAL_ACTIVITIES) {
-      const s = scores.get(act.title);
-      items.push({ type: "activity", data: act, score: s ? s.freq * 3 + s.recency * 2 : 0 });
-    }
-    const tplMap = new Map<string, { workout: Workout; freq: number; recency: number }>();
-    for (const w of workouts) {
-      if (!w.exercises || w.exercises.length === 0 || !w.done) continue;
-      if (MANUAL_ACTIVITIES.some(a => a.title === w.title)) continue;
-      const prev = tplMap.get(w.title);
-      const ds = Math.max(1, (now - (w.completedDate ? new Date(w.completedDate + "T00:00:00").getTime() : now)) / 86400000);
-      const rs = 10 / ds;
-      if (!prev || rs > prev.recency) tplMap.set(w.title, { workout: w, freq: (prev?.freq || 0) + 1, recency: Math.max(prev?.recency || 0, rs) });
-      else { prev.freq += 1; tplMap.set(w.title, prev); }
-    }
-    for (const [title, d] of tplMap) {
-      items.push({ type: "template", title, emoji: d.workout.emoji, exercises: d.workout.exercises!, tag: d.workout.tag, duration: d.workout.duration, cal: d.workout.cal, score: d.freq * 3 + d.recency * 2 });
-    }
-    items.sort((a, b) => b.score !== a.score ? b.score - a.score : (a.type === "activity" && b.type === "activity" ? DEFAULT_QUICK_ADD_ORDER.indexOf(a.data.title) - DEFAULT_QUICK_ADD_ORDER.indexOf(b.data.title) : 0));
-    return { allItems: items, rankedItems: items.slice(0, 8) };
+const getTagColor = (tag: string) => TAG_COLORS[tag] || "bg-secondary text-muted-foreground";
+
+/* ── Hero Card: Weekly Goal + Stats ── */
+const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[]; weeklyGoal: number; onGoalChange: (g: number) => void }) => {
+  const today = todayStr();
+  const weekStart = loadWeekStart();
+  const startStr = getWeekStartDate(new Date(), weekStart);
+  const [goalOpen, setGoalOpen] = useState(false);
+
+  const weekDone = useMemo(() => {
+    const days = new Set(
+      workouts
+        .filter((w) => w.done && (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today)
+        .map((w) => w.completedDate || w.scheduledDate!)
+    );
+    return days.size;
+  }, [workouts, startStr, today]);
+
+  const weekCals = useMemo(() => {
+    return workouts
+      .filter((w) => w.done && (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today)
+      .reduce((s, w) => s + (w.cal || 0), 0);
+  }, [workouts, startStr, today]);
+
+  const weekDist = useMemo(() => {
+    return workouts
+      .filter((w) => w.done && w.distance && (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today)
+      .reduce((s, w) => s + (w.distance || 0), 0);
+  }, [workouts, startStr, today]);
+
+  const distUnit = localStorage.getItem("workout_distance_unit") || "mi";
+
+  // Streak
+  const streak = useMemo(() => {
+    const doneDates = new Set(
+      workouts.filter((w) => w.done && (w.completedDate || w.scheduledDate)).map((w) => w.completedDate || w.scheduledDate!)
+    );
+    if (doneDates.size === 0) return 0;
+    let s = 0;
+    const d = new Date();
+    if (!doneDates.has(fmtDate(d))) d.setDate(d.getDate() - 1);
+    while (doneDates.has(fmtDate(d))) { s++; d.setDate(d.getDate() - 1); }
+    return s;
   }, [workouts]);
 
-  const handleAddTemplate = (item: { title: string; emoji: string; exercises: { name: string; sets: number; reps: string }[]; tag: string; duration: string; cal: number }) => {
-    onAddWorkouts([{ id: Date.now().toString() + Math.random().toString(36).slice(2, 6), title: item.title, duration: item.duration, cal: item.cal, tag: item.tag, emoji: item.emoji, done: false, scheduledDate: selectedDate, exercises: [...item.exercises] }]);
-    toast.success(`Added ${item.title}`);
-  };
+  const clamped = Math.min(weekDone, weeklyGoal);
+  const pct = weeklyGoal > 0 ? (clamped / weeklyGoal) * 100 : 0;
+  const remaining = Math.max(0, weeklyGoal - clamped);
 
-  const handleAddFromLibrary = (item: typeof allItems[0]) => {
-    if (item.type === "activity") onAddActivity(item.data);
-    else handleAddTemplate(item);
-    setShowLibrary(false);
-  };
+  // SVG ring
+  const R = 22;
+  const C = 2 * Math.PI * R;
+  const offset = C - (pct / 100) * C;
 
   return (
-    <div className="mb-5">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold">Quick Add</h3>
-        <button onClick={onOpenCustomBuilder} className="text-xs text-primary font-semibold flex items-center gap-1"><Plus size={12} /> Custom</button>
-      </div>
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-        {rankedItems.map((item) =>
-          item.type === "activity" ? (
-            <button key={item.data.title} onClick={() => onAddActivity(item.data)} className="flex flex-col items-center min-w-[72px] p-3 rounded-xl bg-card border border-border hover:border-primary/50 transition-all active:scale-[0.97]">
-              <span className="text-2xl mb-1">{item.data.emoji}</span>
-              <span className="text-[11px] font-medium text-center">{item.data.title}</span>
-            </button>
-          ) : (
-            <button key={item.title} onClick={() => handleAddTemplate(item)} className="flex flex-col items-center min-w-[72px] p-3 rounded-xl bg-card border border-border hover:border-primary/50 transition-all active:scale-[0.97]">
-              <span className="text-2xl mb-1">{item.emoji}</span>
-              <span className="text-[11px] font-medium text-center leading-tight max-w-[68px] truncate">{item.title}</span>
-              {item.exercises && <span className="text-[9px] text-muted-foreground mt-0.5">{item.exercises.length} ex</span>}
-            </button>
-          )
+    <div className="bg-card rounded-2xl border border-border shadow-sm p-4 mb-5">
+      <div className="flex items-center gap-4 mb-3">
+        {/* Ring */}
+        <div className="relative w-[52px] h-[52px] flex-shrink-0">
+          <svg className="w-[52px] h-[52px] -rotate-90" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r={R} fill="none" stroke="hsl(var(--muted))" strokeWidth="4" />
+            <circle cx="26" cy="26" r={R} fill="none" stroke="hsl(var(--primary))" strokeWidth="4"
+              strokeDasharray={C} strokeDashoffset={offset} strokeLinecap="round"
+              className="transition-all duration-500" />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-xs font-bold">{clamped}<span className="text-[9px] text-muted-foreground">/{weeklyGoal}</span></span>
+          </div>
+        </div>
+
+        {/* Labels */}
+        <div className="flex-1 min-w-0">
+          <button onClick={() => setGoalOpen(!goalOpen)} className="text-sm font-semibold text-foreground hover:text-primary transition-colors">
+            Weekly Goal
+          </button>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {clamped >= weeklyGoal ? "Goal reached! 🎉" : `${remaining} workout${remaining !== 1 ? "s" : ""} to go`}
+          </p>
+        </div>
+
+        {/* Streak badge */}
+        {streak > 0 && (
+          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-semibold flex-shrink-0">
+            🔥 {streak} day{streak !== 1 ? "s" : ""}
+          </div>
         )}
-        {/* See More card */}
-        <button
-          onClick={() => setShowLibrary(true)}
-          className="flex flex-col items-center justify-center min-w-[72px] p-3 rounded-xl bg-secondary/60 border border-border hover:border-primary/50 transition-all active:scale-[0.97]"
-        >
-          <span className="w-8 h-8 rounded-full bg-muted flex items-center justify-center mb-1">
-            <ChevronDown size={16} className="text-muted-foreground rotate-[-90deg]" />
-          </span>
-          <span className="text-[11px] font-medium text-muted-foreground">See More</span>
-        </button>
       </div>
 
-      {/* Full workout library sheet */}
-      <Sheet open={showLibrary} onOpenChange={setShowLibrary}>
-        <SheetContent side="bottom" className="rounded-t-2xl pb-8 px-4 pt-4 max-h-[75vh]">
-          <SheetHeader className="pb-3">
-            <SheetTitle className="text-base font-bold text-foreground">All Workouts</SheetTitle>
-          </SheetHeader>
-          <ScrollArea className="h-[55vh]">
-            <div className="space-y-2 pr-2">
-              {allItems.map((item) => (
-                <button
-                  key={item.type === "activity" ? item.data.title : item.title}
-                  onClick={() => handleAddFromLibrary(item)}
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary/60 transition-all text-left"
-                >
-                  <span className="text-2xl flex-shrink-0">{item.type === "activity" ? item.data.emoji : item.emoji}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{item.type === "activity" ? item.data.title : item.title}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {item.type === "activity" ? item.data.tag : `${item.exercises.length} exercises · ${item.tag}`}
-                    </p>
-                  </div>
-                  <Plus size={16} className="text-muted-foreground flex-shrink-0" />
-                </button>
+      {/* Goal picker */}
+      <AnimatePresence>
+        {goalOpen && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <div className="flex gap-2 py-2">
+              {[2, 3, 4, 5, 6, 7].map((g) => (
+                <button key={g} onClick={() => { onGoalChange(g); setGoalOpen(false); }}
+                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${weeklyGoal === g ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:bg-secondary/80"}`}
+                >{g}x</button>
               ))}
             </div>
-          </ScrollArea>
-        </SheetContent>
-      </Sheet>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Stats grid */}
+      <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border mt-2">
+        <div className="text-center">
+          <p className="text-lg font-bold">{weekDone}</p>
+          <p className="text-[10px] text-muted-foreground font-medium">Done</p>
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-bold">{weekCals.toLocaleString()}</p>
+          <p className="text-[10px] text-muted-foreground font-medium">kcal</p>
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-bold">{weekDist < 10 ? weekDist.toFixed(1) : Math.round(weekDist)}</p>
+          <p className="text-[10px] text-muted-foreground font-medium">{distUnit}</p>
+        </div>
+      </div>
     </div>
   );
 };
+
+/* ── Multi-user hero ── */
+const MultiUserHeroCard = ({ userData, weeklyGoal }: { userData: UserWorkoutData[]; weeklyGoal: number }) => {
+  const today = todayStr();
+  const weekStart = loadWeekStart();
+  const startStr = getWeekStartDate(new Date(), weekStart);
+  const distUnit = localStorage.getItem("workout_distance_unit") || "mi";
+
+  const USER_COLORS = ["bg-blue-50 dark:bg-blue-950/30", "bg-green-50 dark:bg-green-950/30", "bg-pink-50 dark:bg-pink-950/30"];
+
+  return (
+    <div className="flex gap-2.5 mb-5 overflow-x-auto scrollbar-hide pb-1" style={{ WebkitOverflowScrolling: "touch" }}>
+      {userData.map((u, idx) => {
+        const weekDone = new Set(
+          u.workouts
+            .filter((w) => w.done && (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today)
+            .map((w) => w.completedDate || w.scheduledDate!)
+        ).size;
+        const weekCals = u.workouts
+          .filter((w) => w.done && (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today)
+          .reduce((s, w) => s + (w.cal || 0), 0);
+        const weekDist = u.workouts
+          .filter((w) => w.done && w.distance && (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today)
+          .reduce((s, w) => s + (w.distance || 0), 0);
+
+        // Streak
+        const doneDates = new Set(u.workouts.filter((w) => w.done && (w.completedDate || w.scheduledDate)).map((w) => w.completedDate || w.scheduledDate!));
+        let streak = 0;
+        const d = new Date();
+        if (!doneDates.has(fmtDate(d))) d.setDate(d.getDate() - 1);
+        while (doneDates.has(fmtDate(d))) { streak++; d.setDate(d.getDate() - 1); }
+
+        return (
+          <div key={u.userId} className={`flex-1 min-w-[140px] rounded-2xl border border-border p-3 ${USER_COLORS[idx % USER_COLORS.length]}`}>
+            <div className="flex items-center gap-2 mb-2">
+              {u.avatarUrl ? (
+                <img src={u.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+              ) : (
+                <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">{u.initial}</span>
+              )}
+              <span className="text-xs font-semibold truncate">{u.label}</span>
+              {streak > 0 && (
+                <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 ml-auto">🔥{streak}</span>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-1 text-center">
+              <div>
+                <p className="text-sm font-bold">{weekDone}<span className="text-[9px] text-muted-foreground">/{weeklyGoal}</span></p>
+                <p className="text-[9px] text-muted-foreground">Goal</p>
+              </div>
+              <div>
+                <p className="text-sm font-bold">{weekCals >= 1000 ? `${(weekCals / 1000).toFixed(1)}k` : weekCals}</p>
+                <p className="text-[9px] text-muted-foreground">kcal</p>
+              </div>
+              <div>
+                <p className="text-sm font-bold">{weekDist < 10 ? weekDist.toFixed(1) : Math.round(weekDist)}</p>
+                <p className="text-[9px] text-muted-foreground">{distUnit}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+/* ── Quick Add Section ── */
+const QuickAddSection = ({ workouts, onAddActivity, onOpenCustomBuilder, onAddWorkouts, selectedDate }: {
+  workouts: Workout[]; onAddActivity: (a: typeof MANUAL_ACTIVITIES[0]) => void; onOpenCustomBuilder: () => void; onAddWorkouts: (w: Workout[]) => void; selectedDate: string;
+}) => {
+  return (
+    <div className="mb-5">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quick Add</h3>
+        <button onClick={onOpenCustomBuilder} className="text-xs text-primary font-semibold flex items-center gap-1"><Plus size={12} /> Custom</button>
+      </div>
+      <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide" style={{ WebkitOverflowScrolling: "touch" }}>
+        {MANUAL_ACTIVITIES.map((act) => (
+          <button
+            key={act.title}
+            onClick={() => onAddActivity(act)}
+            className="flex flex-col items-center justify-center w-[68px] h-[68px] rounded-2xl bg-card border border-border hover:border-primary/40 transition-all active:scale-[0.95] flex-shrink-0"
+          >
+            <span className="text-xl mb-0.5">{act.emoji}</span>
+            <span className="text-[10px] font-medium text-muted-foreground">{act.title}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ── Member filter pills with colors ── */
+const MEMBER_PILL_COLORS: Record<string, { active: string; dot: string }> = {};
+const getMemberPillColor = (label: string, index: number) => {
+  const colors = [
+    { active: "border-blue-400/50 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300", dot: "bg-blue-500" },
+    { active: "border-green-400/50 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300", dot: "bg-green-500" },
+    { active: "border-pink-400/50 bg-pink-50 dark:bg-pink-950/30 text-pink-700 dark:text-pink-300", dot: "bg-pink-500" },
+    { active: "border-purple-400/50 bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300", dot: "bg-purple-500" },
+  ];
+  return colors[index % colors.length];
+};
+
+const USER_BORDER_COLORS = [
+  "border-l-blue-400",
+  "border-l-green-400",
+  "border-l-pink-400",
+  "border-l-purple-400",
+];
 
 const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) => {
   const { workouts, filteredWorkouts, filteredPartnerWorkouts, toggleWorkout, removeWorkout, removeWorkoutsByFilter, updateWorkout, setWorkouts, addWorkouts, rescheduleWorkout, rescheduleWorkoutCascade } = useAppContext();
   const { user, profile, activeGroup, groups } = useAuth();
   const [showCongrats, setShowCongrats] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(todayStr());
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [showCustomBuilder, setShowCustomBuilder] = useState(false);
-  // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<{ filter: "all" | "week" | "month" | "date" | "tomorrow"; message: string } | null>(null);
   const [exerciseDeleteConfirm, setExerciseDeleteConfirm] = useState<{ workoutId: string; index: number; exerciseName: string } | null>(null);
-  // Exercise editing
   const [editingWorkout, setEditingWorkout] = useState<{ workoutId: string; exerciseIndex: number } | null>(null);
   const [editExName, setEditExName] = useState("");
   const [editExSets, setEditExSets] = useState("");
   const [editExReps, setEditExReps] = useState("");
-  // Exercise logging
   const [loggingWorkout, setLoggingWorkout] = useState<Workout | null>(null);
-  // Photo sharing prompt
   const [photoPromptWorkout, setPhotoPromptWorkout] = useState<Workout | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  // Nudge cooldown
+  const [showLog, setShowLog] = useState(false);
   const [nudgeCooldown, setNudgeCooldown] = useState<Set<string>>(new Set());
+
+  const selectedDate = todayStr(); // Main page always shows today
+
+  const [weeklyGoal, setWeeklyGoal] = useState(() => {
+    const saved = localStorage.getItem("workout_weekly_goal");
+    return saved ? parseInt(saved, 10) : 4;
+  });
+
+  const saveGoal = (g: number) => {
+    setWeeklyGoal(g);
+    localStorage.setItem("workout_weekly_goal", String(g));
+  };
 
   // Check for incoming nudges on mount
   useEffect(() => {
@@ -267,7 +401,7 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     }
   };
 
-  // Per-context user filter state (independent per group/view)
+  // Per-context user filter state
   const [userFilterMap, setUserFilterMap] = useState<Record<string, Set<string>>>({});
   const contextKey = useMemo(() => {
     if (!activeGroup) return "__all__";
@@ -280,7 +414,6 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     setUserFilterMap((prev) => ({ ...prev, [contextKey]: ids }));
   }, [contextKey]);
 
-  // Reset filter when context changes to ensure fresh Everyone default
   useEffect(() => {
     if (!userFilterMap[contextKey]) {
       setUserFilterMap((prev) => ({ ...prev, [contextKey]: new Set([EVERYONE_SENTINEL]) }));
@@ -291,10 +424,8 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
   const isAllView = activeGroup === null && !isPersonalView;
   const isGroupView = !!activeGroup && !isPersonalView;
 
-  // Combine own + partner workouts into a single list, then apply user filter
   const allContextWorkouts = useMemo(() => {
-    if (isPersonalView) return filteredWorkouts; // Personal = only own, no partners
-    // Merge own + partner workouts, deduplicate by id
+    if (isPersonalView) return filteredWorkouts;
     const combined = [...filteredWorkouts];
     const ids = new Set(combined.map(w => w.id));
     for (const pw of filteredPartnerWorkouts) {
@@ -306,7 +437,6 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     return combined;
   }, [filteredWorkouts, filteredPartnerWorkouts, isPersonalView]);
 
-  // Apply user filter pills
   const userFilteredWorkouts = useMemo(() => {
     if (isPersonalView) return filteredWorkouts;
     if (userFilterIds.has(EVERYONE_SENTINEL)) return allContextWorkouts;
@@ -316,7 +446,6 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     });
   }, [allContextWorkouts, filteredWorkouts, userFilterIds, isPersonalView, user?.id]);
 
-  // Compute selected user info for multi-user display
   const selectedUserInfos = useMemo(() => {
     const infos: { userId: string; label: string; initial: string; avatarUrl: string | null }[] = [];
     if (isPersonalView) {
@@ -324,7 +453,6 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
       return infos;
     }
 
-    // Build full member list for this context
     const allMembers: { userId: string; label: string; initial: string; avatarUrl: string | null }[] = [];
     allMembers.push({ userId: user?.id || "me", label: "Mine", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
 
@@ -344,7 +472,6 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
       });
     }
 
-    // Filter to only selected users
     const isEveryone = userFilterIds.has(EVERYONE_SENTINEL);
     for (const m of allMembers) {
       if (isEveryone || userFilterIds.has(m.userId)) infos.push(m);
@@ -352,7 +479,6 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     return infos;
   }, [user, profile, activeGroup, groups, isPersonalView, isGroupView, isAllView, userFilterIds]);
 
-  // Build per-user workout data for stats
   const userWorkoutData: UserWorkoutData[] = useMemo(() => {
     return selectedUserInfos.map((u) => ({
       ...u,
@@ -364,22 +490,10 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
   const today = todayStr();
 
-  const dateRange = useMemo(() => {
-    const dates: string[] = [];
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    for (let i = 0; i < 28; i++) {
-      dates.push(fmtDate(d));
-      d.setDate(d.getDate() + 1);
-    }
-    return dates;
-  }, []);
-
   const dateWorkouts = useMemo(() => {
     return userFilteredWorkouts.filter((w) => w.scheduledDate === selectedDate);
   }, [selectedDate, userFilteredWorkouts]);
 
-  // Per-user date workouts for sectioned display
   const perUserDateWorkouts = useMemo(() => {
     if (!isMultiUserView) return [];
     return selectedUserInfos.map((u) => ({
@@ -388,10 +502,7 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     }));
   }, [isMultiUserView, selectedUserInfos, dateWorkouts, user?.id]);
 
-  const activeWorkouts = userFilteredWorkouts;
-
   const missedWorkouts = useMemo(() => {
-    // Only show missed workouts for the user's own workouts
     return userFilteredWorkouts.filter((w) => w.ownerUserId === user?.id && w.scheduledDate && w.scheduledDate < today && !w.done);
   }, [userFilteredWorkouts, today, user?.id]);
 
@@ -440,8 +551,6 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     toast.success(`Added ${activity.title}`);
   };
 
-  // Custom activity via simple inline form removed — now uses CustomWorkoutBuilder
-
   const handleToggleWorkout = (id: string) => {
     const w = workouts.find((w) => w.id === id);
     const isOwnWorkout = !w?.ownerUserId || w.ownerUserId === user?.id;
@@ -449,9 +558,7 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     const workout = workouts.find((w) => w.id === id);
     if (workout && !workout.done) {
       setShowCongrats(true);
-      // If workout belongs to a group, offer photo sharing
       if (workout.groupId && !isWorkoutPhotoPromptSuppressed()) {
-        // Small delay so congrats shows first
         setTimeout(() => setPhotoPromptWorkout(workout), 1200);
       }
     }
@@ -464,10 +571,7 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
   const handleCopyWorkout = async (sourceWorkout: Workout, scheduledDate: string, groupIds?: (string | null)[]) => {
     if (!user) return;
-    // Default: Personal only
     const contexts = groupIds || [null];
-
-    // Deduplication check: look for same title on same date in user's workouts
     const existingDupe = workouts.find(
       (w) => w.title === sourceWorkout.title && w.scheduledDate === scheduledDate && !w.ownerUserId
     );
@@ -476,8 +580,6 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
       const confirmed = window.confirm(`You already have "${sourceWorkout.title}" on ${dateLabel}. Add again?`);
       if (!confirmed) return;
     }
-
-    // Create one workout per context, linked together
     const linkedId = Date.now().toString() + Math.random().toString(36).slice(2, 6);
     const newWorkouts: Workout[] = contexts.map((gid, i) => ({
       id: linkedId + (i > 0 ? `-${i}` : ""),
@@ -499,7 +601,6 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     toast.success(`"${sourceWorkout.title}" added to ${dateLabel}!`);
   };
 
-  // Exercise editing handlers
   const startEditExercise = (workoutId: string, index: number, ex: { name: string; sets: number; reps: string }) => {
     setEditingWorkout({ workoutId, exerciseIndex: index });
     setEditExName(ex.name);
@@ -525,36 +626,23 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     setExerciseDeleteConfirm({ workoutId, index, exerciseName });
   };
 
-
-  // Track workout progress from exercise logs
   const [workoutProgress, setWorkoutProgress] = useState<Record<string, { progress: number; cal: number }>>({});
 
   const handleProgressUpdate = useCallback((workoutId: string, progress: number, cal: number) => {
-    setWorkoutProgress(prev => ({
-      ...prev,
-      [workoutId]: { progress, cal },
-    }));
-
-    // Single source of truth: always write recalculated calories to workout
+    setWorkoutProgress(prev => ({ ...prev, [workoutId]: { progress, cal } }));
     updateWorkout(workoutId, { cal });
-
-    // Auto-complete if 100% and not already done
     if (progress >= 100) {
       const w = workouts.find(w => w.id === workoutId);
-      if (w && !w.done) {
-        handleToggleWorkout(workoutId);
-      }
+      if (w && !w.done) handleToggleWorkout(workoutId);
     }
   }, [workouts, updateWorkout]);
 
   const handleCaloriesSaved = useCallback((workoutId: string, cal: number) => {
     updateWorkout(workoutId, { cal });
-    setWorkoutProgress(prev => ({
-      ...prev,
-      [workoutId]: { ...prev[workoutId], cal },
-    }));
+    setWorkoutProgress(prev => ({ ...prev, [workoutId]: { ...prev[workoutId], cal } }));
   }, [updateWorkout]);
 
+  // Sub-pages
   if (showHistory) {
     return (
       <div className="px-5 pb-24 pt-12">
@@ -562,6 +650,20 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
       </div>
     );
   }
+
+  if (showLog) {
+    return (
+      <WorkoutLogPage
+        onBack={() => setShowLog(false)}
+        onRecordWorkout={() => {
+          setShowLog(false);
+          setShowCustomBuilder(true);
+        }}
+      />
+    );
+  }
+
+  const todayFormatted = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 
   return (
     <div className="px-5 pb-24">
@@ -642,19 +744,32 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
       <>
 
-      <header className="pt-12 pb-4 flex items-center gap-2">
-        <h1 className="text-[1.75rem] font-bold tracking-display">Workouts</h1>
-        <div className="flex-1" />
-        {onOpenSettings && (
-          <button onClick={onOpenSettings} className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" aria-label="Settings">
-            <Settings size={18} />
+      {/* ── NEW HEADER ── */}
+      <header className="pt-12 pb-3 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Workouts</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">{todayFormatted}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowLog(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary border border-border text-xs font-semibold text-foreground hover:bg-accent transition-colors"
+          >
+            <ClipboardList size={13} />
+            Log
           </button>
-        )}
+          <button
+            onClick={() => setShowCustomBuilder(true)}
+            className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm hover:bg-primary/90 transition-colors active:scale-95"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
       </header>
 
       <PageGroupSelector page="workout" personalLabel="Mine" hideAllPill />
 
-      {/* User filter pills — shown in All and Group views, not Personal */}
+      {/* User filter pills */}
       {!isPersonalView && (
         <WorkoutUserFilter
           selectedUserIds={userFilterIds}
@@ -662,275 +777,139 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
         />
       )}
 
-
       {/* Main workout view */}
-      {(
-        <>
-          {/* Top Stats Summary */}
-          <WorkoutStatsCards workouts={activeWorkouts} selectedDate={selectedDate} todayStr={today} onResetToToday={() => setSelectedDate(todayStr())} userWorkouts={isMultiUserView ? userWorkoutData : undefined} />
+      <>
+        {/* Hero Stats Card */}
+        {isMultiUserView ? (
+          <MultiUserHeroCard userData={userWorkoutData} weeklyGoal={weeklyGoal} />
+        ) : (
+          <HeroCard workouts={userFilteredWorkouts} weeklyGoal={weeklyGoal} onGoalChange={saveGoal} />
+        )}
 
-          {/* Missed Workouts Banner */}
-          {missedWorkouts.length > 0 && selectedDate === today && (
-            <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-4 mb-5">
-              <h3 className="text-sm font-semibold text-destructive flex items-center gap-2 mb-3">
-                <AlertTriangle size={14} />
-                {missedWorkouts.length} Missed Workout{missedWorkouts.length > 1 ? "s" : ""}
-              </h3>
-              <div className="space-y-2">
-                {missedWorkouts.map((w) => (
-                  <div key={w.id} className="flex items-center gap-3 bg-card rounded-lg p-3 border border-border">
-                    <span className="text-xl">{w.emoji}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{w.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Was: {new Date(w.scheduledDate! + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                      </p>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <button onClick={() => handleReschedule(w.id, today)} className="px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1">
-                        <RotateCcw size={10} /> Today
-                      </button>
-                      <button onClick={() => handleReschedule(w.id, getNextDay(today))} className="px-2.5 py-1.5 rounded-lg bg-secondary text-foreground text-xs font-medium flex items-center gap-1">
-                        <ArrowRight size={10} /> Tomorrow
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm("Delete this missed workout?")) {
-                            removeWorkout(w.id);
-                            toast.success("Missed workout deleted");
-                          }
-                        }}
-                        className="px-2 py-1.5 rounded-lg bg-destructive/10 text-destructive text-xs font-medium flex items-center"
-                        title="Delete"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
+        {/* Missed Workouts Banner */}
+        {missedWorkouts.length > 0 && (
+          <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-4 mb-5">
+            <h3 className="text-sm font-semibold text-destructive flex items-center gap-2 mb-3">
+              <AlertTriangle size={14} />
+              {missedWorkouts.length} Missed Workout{missedWorkouts.length > 1 ? "s" : ""}
+            </h3>
+            <div className="space-y-2">
+              {missedWorkouts.map((w) => (
+                <div key={w.id} className="flex items-center gap-3 bg-card rounded-lg p-3 border border-border">
+                  <span className="text-xl">{w.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{w.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Was: {new Date(w.scheduledDate! + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                    </p>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Date selector strip */}
-          <div className="mb-5 -mx-5">
-            <div
-              className="flex gap-2 px-5 pb-2 overflow-x-auto scrollbar-hide"
-              style={{ WebkitOverflowScrolling: "touch" }}
-              ref={(el) => {
-                if (el) {
-                  const selectedEl = el.querySelector('[data-selected="true"]');
-                  if (selectedEl) {
-                    selectedEl.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
-                  }
-                }
-              }}
-            >
-              {dateRange.map((date) => {
-                const d = new Date(date + "T00:00:00");
-                const dayNum = d.getDate();
-                const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
-                const isSelected = date === selectedDate;
-                const isT = date === today;
-                const hasWorkouts = userFilteredWorkouts.some((w) => w.scheduledDate === date || w.completedDate === date);
-
-                return (
-                  <button
-                    key={date}
-                    data-selected={isSelected}
-                    onClick={() => setSelectedDate(date)}
-                    className={`flex flex-col items-center min-w-[48px] flex-shrink-0 py-2 px-1 rounded-xl border transition-all ${
-                      isSelected
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-transparent text-muted-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    <span className="text-[10px] font-medium">{dayName}</span>
-                    <span className={`text-base font-bold ${isT && !isSelected ? "text-primary" : ""}`}>{dayNum}</span>
-                    {hasWorkouts && <span className="w-1.5 h-1.5 rounded-full bg-primary mt-0.5" />}
-                  </button>
-                );
-              })}
+                  <div className="flex gap-1.5">
+                    <button onClick={() => handleReschedule(w.id, today)} className="px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1">
+                      <RotateCcw size={10} /> Today
+                    </button>
+                    <button onClick={() => handleReschedule(w.id, getNextDay(today))} className="px-2.5 py-1.5 rounded-lg bg-secondary text-foreground text-xs font-medium flex items-center gap-1">
+                      <ArrowRight size={10} /> Tomorrow
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm("Delete this missed workout?")) {
+                          removeWorkout(w.id);
+                          toast.success("Missed workout deleted");
+                        }
+                      }}
+                      className="px-2 py-1.5 rounded-lg bg-destructive/10 text-destructive text-xs font-medium flex items-center"
+                      title="Delete"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+        )}
 
-          {/* Smart Quick Add */}
-          <SmartQuickAdd
-            workouts={userFilteredWorkouts}
-            onAddActivity={addManualActivity}
-            onOpenCustomBuilder={() => setShowCustomBuilder(true)}
-            onAddWorkouts={addWorkouts}
-            selectedDate={selectedDate}
-          />
+        {/* Quick Add */}
+        <QuickAddSection
+          workouts={userFilteredWorkouts}
+          onAddActivity={addManualActivity}
+          onOpenCustomBuilder={() => setShowCustomBuilder(true)}
+          onAddWorkouts={addWorkouts}
+          selectedDate={selectedDate}
+        />
 
-          {/* Custom Workout Builder Modal */}
-          <CustomWorkoutBuilder
-            open={showCustomBuilder}
-            onClose={() => setShowCustomBuilder(false)}
-            onAdd={addWorkouts}
-            selectedDate={selectedDate}
-          />
+        {/* Custom Workout Builder Modal */}
+        <CustomWorkoutBuilder
+          open={showCustomBuilder}
+          onClose={() => setShowCustomBuilder(false)}
+          onAdd={addWorkouts}
+          selectedDate={selectedDate}
+        />
 
-          {/* Workout Section */}
-          <section className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <CalIcon size={14} className="text-muted-foreground" />
-                {selectedDate === today
-                  ? "Today's Workouts"
-                  : selectedDate > today
-                    ? "Upcoming Workout"
-                    : `Workout for ${new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
-                <button
-                  onClick={() => setShowHistory(true)}
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors ml-0.5"
-                  aria-label="Exercise History"
-                >
-                  <History size={14} />
-                </button>
-              </h3>
-              <div className="flex items-center gap-2">
-                <WorkoutAiSuggest
-                  selectedDate={selectedDate}
-                  recentWorkouts={userFilteredWorkouts}
-                  onAddWorkout={addWorkouts}
-                />
-              </div>
-            </div>
+        {/* Today's Workouts Section */}
+        <section className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Today's Workouts</h3>
+            <WorkoutAiSuggest
+              selectedDate={selectedDate}
+              recentWorkouts={userFilteredWorkouts}
+              onAddWorkout={addWorkouts}
+            />
+          </div>
 
-            {isMultiUserView ? (
-              /* Multi-user: sectioned per user */
-              <div className="space-y-4">
-                {perUserDateWorkouts.map((section) => {
-                  const isOwnSection = section.userId === user?.id;
-                  const hasWorkoutsToday = section.workouts.length > 0;
-                  const allTodayComplete = hasWorkoutsToday && section.workouts.every(w => w.done);
-                  const hasIncompleteToday = hasWorkoutsToday && section.workouts.some(w => !w.done);
+          {isMultiUserView ? (
+            <div className="space-y-4">
+              {perUserDateWorkouts.map((section, sectionIdx) => {
+                const isOwnSection = section.userId === user?.id;
+                const hasWorkoutsToday = section.workouts.length > 0;
+                const allTodayComplete = hasWorkoutsToday && section.workouts.every(w => w.done);
+                const hasIncompleteToday = hasWorkoutsToday && section.workouts.some(w => !w.done);
 
-                  // Compute weekly completed for this user
-                  const now = new Date();
-                  const dayOfWeek = now.getDay();
-                  const weekStart = new Date(now);
-                  weekStart.setDate(now.getDate() - ((dayOfWeek + 6) % 7)); // Monday
-                  weekStart.setHours(0, 0, 0, 0);
-                  const weekStartStr = fmtDate(weekStart);
-                  const weeklyCompleted = userFilteredWorkouts.filter(w =>
-                    (w.ownerUserId || user?.id) === section.userId &&
-                    w.done &&
-                    w.completedDate &&
-                    w.completedDate >= weekStartStr
-                  ).length;
-                  const WEEKLY_GOAL = 4; // default
-                  const weeklyGoalMet = weeklyCompleted >= WEEKLY_GOAL;
+                const now = new Date();
+                const dayOfWeek = now.getDay();
+                const wkStart = new Date(now);
+                wkStart.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
+                wkStart.setHours(0, 0, 0, 0);
+                const weekStartStr = fmtDate(wkStart);
+                const weeklyCompleted = userFilteredWorkouts.filter(w =>
+                  (w.ownerUserId || user?.id) === section.userId &&
+                  w.done && w.completedDate && w.completedDate >= weekStartStr
+                ).length;
+                const weeklyGoalMet = weeklyCompleted >= weeklyGoal;
 
-                  // Nudge logic: show only for other users
-                  // Has workout today, not complete → Yes
-                  // Has workout today, complete → No
-                  // No workout today, weekly goal not complete → Yes
-                  // No workout today, weekly goal complete → No
-                  // Own section → Never
-                  const showNudge = !isOwnSection && selectedDate === today && (
-                    (hasIncompleteToday) ||
-                    (!hasWorkoutsToday && !weeklyGoalMet)
-                  ) && !allTodayComplete;
-
-                  return (
-                    <div key={section.userId}>
-                      <div className="flex items-center gap-2 mb-2">
-                        {section.avatarUrl ? (
-                          <img src={section.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
-                        ) : (
-                          <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[9px] font-bold">{section.initial}</span>
-                        )}
-                        <span className="text-xs font-semibold text-foreground">
-                          {isOwnSection ? "Mine" : `${section.label}'s Workouts`}
-                        </span>
-                      </div>
-                      {section.workouts.length === 0 ? (
-                        <p className="text-xs text-muted-foreground pl-7 py-2">No workouts today</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {section.workouts.map((w) => (
-                            <WorkoutCard
-                              key={w.id}
-                              workout={w}
-                              onToggle={handleToggleWorkout}
-                              onRemove={removeWorkout}
-                              onReschedule={handleReschedule}
-                              onRescheduleCascade={rescheduleWorkoutCascade}
-                              allWorkouts={userFilteredWorkouts}
-                              onSelectExercise={setSelectedExercise}
-                              onEditExercise={startEditExercise}
-                              onDeleteExercise={deleteExercise}
-                              onLogWorkout={setLoggingWorkout}
-                              onUpdateWorkout={updateWorkout}
-                              onAddExercises={(id, newExercises) => {
-                                const existing = workouts.find(wk => wk.id === id);
-                                if (!existing) return;
-                                const updated = [...(existing.exercises || []), ...newExercises];
-                                updateWorkout(id, { exercises: updated });
-                                toast.success(`Added ${newExercises.length} exercise${newExercises.length > 1 ? "s" : ""}`);
-                              }}
-                              onProgressUpdate={handleProgressUpdate}
-                              onCaloriesSaved={handleCaloriesSaved}
-                              readOnly={!!w.ownerUserId && w.ownerUserId !== user?.id}
-                              progress={workoutProgress[w.id]?.progress}
-                              onCopyWorkout={handleCopyWorkout}
-                            />
-                          ))}
-                        </div>
-                      )}
-                      {/* Nudge button */}
-                      {showNudge && (
-                        <div className="flex items-center justify-end mt-1 mb-1 ml-7">
-                          <button
-                            onClick={() => sendWorkoutNudge(section.userId, section.label)}
-                            disabled={nudgeCooldown.has(section.userId)}
-                            className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-semibold hover:bg-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <Bell size={10} />
-                            🔔 Nudge {section.label}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              /* Single user: normal layout */
-              (() => {
-                // Nudge logic for single-user view of another user
-                const singleOtherUser = !isPersonalView && selectedUserInfos.length === 1 && selectedUserInfos[0].userId !== user?.id ? selectedUserInfos[0] : null;
-                const hasWorkoutsToday = dateWorkouts.length > 0;
-                const allTodayComplete = hasWorkoutsToday && dateWorkouts.every(w => w.done);
-                const hasIncompleteToday = hasWorkoutsToday && dateWorkouts.some(w => !w.done);
-                const now2 = new Date();
-                const dayOfWeek2 = now2.getDay();
-                const weekStart2 = new Date(now2);
-                weekStart2.setDate(now2.getDate() - ((dayOfWeek2 + 6) % 7));
-                weekStart2.setHours(0, 0, 0, 0);
-                const weekStartStr2 = fmtDate(weekStart2);
-                const weeklyCompleted2 = singleOtherUser ? userFilteredWorkouts.filter(w =>
-                  (w.ownerUserId || user?.id) === singleOtherUser.userId &&
-                  w.done && w.completedDate && w.completedDate >= weekStartStr2
-                ).length : 0;
-                const weeklyGoalMet2 = weeklyCompleted2 >= 4;
-                const showSingleNudge = singleOtherUser && selectedDate === today && (
-                  hasIncompleteToday || (!hasWorkoutsToday && !weeklyGoalMet2)
+                const showNudge = !isOwnSection && (
+                  (hasIncompleteToday) ||
+                  (!hasWorkoutsToday && !weeklyGoalMet)
                 ) && !allTodayComplete;
 
+                const borderColor = USER_BORDER_COLORS[sectionIdx % USER_BORDER_COLORS.length];
+
                 return (
-                  <>
-                    {dateWorkouts.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-6">
-                        {selectedDate === today
-                          ? "No workouts today. Generate a plan or add one above."
-                          : "No workouts scheduled for this day."}
-                      </p>
+                  <div key={section.userId}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {section.avatarUrl ? (
+                        <img src={section.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                      ) : (
+                        <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[9px] font-bold">{section.initial}</span>
+                      )}
+                      <span className="text-xs font-semibold text-foreground">
+                        {isOwnSection ? "Mine" : `${section.label}'s Workouts`}
+                      </span>
+                      {showNudge && (
+                        <button
+                          onClick={() => sendWorkoutNudge(section.userId, section.label)}
+                          disabled={nudgeCooldown.has(section.userId)}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold hover:bg-primary/20 transition-colors disabled:opacity-50 ml-auto"
+                        >
+                          <Bell size={9} /> Nudge
+                        </button>
+                      )}
+                    </div>
+                    {section.workouts.length === 0 ? (
+                      <p className="text-xs text-muted-foreground pl-7 py-2">No workouts today</p>
                     ) : (
-                      <div className="space-y-3">
-                        {dateWorkouts.map((w) => (
+                      <div className="space-y-2">
+                        {section.workouts.map((w) => (
                           <WorkoutCard
                             key={w.id}
                             workout={w}
@@ -956,38 +935,65 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
                             readOnly={!!w.ownerUserId && w.ownerUserId !== user?.id}
                             progress={workoutProgress[w.id]?.progress}
                             onCopyWorkout={handleCopyWorkout}
+                            accentBorder={borderColor}
                           />
                         ))}
                       </div>
                     )}
-                    {/* Single-user nudge */}
-                    {showSingleNudge && singleOtherUser && (
-                      <div className="flex items-center justify-end mt-2 mb-1">
-                        <button
-                          onClick={() => sendWorkoutNudge(singleOtherUser.userId, singleOtherUser.label)}
-                          disabled={nudgeCooldown.has(singleOtherUser.userId)}
-                          className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-semibold hover:bg-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Bell size={10} />
-                          🔔 Nudge {singleOtherUser.label}
-                        </button>
-                      </div>
-                    )}
-                  </>
+                  </div>
                 );
-              })()
-            )}
-          </section>
-        </>
-      )}
+              })}
+            </div>
+          ) : (
+            <>
+              {dateWorkouts.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-3xl mb-2">🏋️</p>
+                  <p className="text-sm font-medium text-muted-foreground">No workouts today</p>
+                  <p className="text-xs text-muted-foreground mt-1">Add one above or get AI suggestions</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {dateWorkouts.map((w) => (
+                    <WorkoutCard
+                      key={w.id}
+                      workout={w}
+                      onToggle={handleToggleWorkout}
+                      onRemove={removeWorkout}
+                      onReschedule={handleReschedule}
+                      onRescheduleCascade={rescheduleWorkoutCascade}
+                      allWorkouts={userFilteredWorkouts}
+                      onSelectExercise={setSelectedExercise}
+                      onEditExercise={startEditExercise}
+                      onDeleteExercise={deleteExercise}
+                      onLogWorkout={setLoggingWorkout}
+                      onUpdateWorkout={updateWorkout}
+                      onAddExercises={(id, newExercises) => {
+                        const existing = workouts.find(wk => wk.id === id);
+                        if (!existing) return;
+                        const updated = [...(existing.exercises || []), ...newExercises];
+                        updateWorkout(id, { exercises: updated });
+                        toast.success(`Added ${newExercises.length} exercise${newExercises.length > 1 ? "s" : ""}`);
+                      }}
+                      onProgressUpdate={handleProgressUpdate}
+                      onCaloriesSaved={handleCaloriesSaved}
+                      readOnly={!!w.ownerUserId && w.ownerUserId !== user?.id}
+                      progress={workoutProgress[w.id]?.progress}
+                      onCopyWorkout={handleCopyWorkout}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      </>
 
       {/* Exercise Detail Dialog */}
       <ExerciseDetailDialog
         exerciseName={selectedExercise}
         onClose={() => setSelectedExercise(null)}
       />
-
-      {/* Exercise Log Modal - now integrated into WorkoutDetailModal */}
 
       {/* Workout Photo Sharing Prompt */}
       {photoPromptWorkout && (
@@ -1022,6 +1028,7 @@ const WorkoutCard = ({
   readOnly,
   progress,
   onCopyWorkout,
+  accentBorder,
 }: {
   workout: Workout;
   onToggle: (id: string) => void;
@@ -1040,11 +1047,11 @@ const WorkoutCard = ({
   readOnly?: boolean;
   progress?: number;
   onCopyWorkout?: (workout: Workout, scheduledDate: string) => void;
+  accentBorder?: string;
 }) => {
   const [showDetail, setShowDetail] = useState(false);
   const [cascadeConfirm, setCascadeConfirm] = useState<{ newDate: string; diffDays: number; followingCount: number } | null>(null);
 
-  const isCardio = isCardioWorkout(workout.title);
   const showDist = ["running", "cycling", "walking", "swimming"].some(t => workout.title.toLowerCase().includes(t));
 
   const fmtD = (d: Date) =>
@@ -1079,31 +1086,25 @@ const WorkoutCard = ({
     handleMoveToDate(d);
   };
 
+  const tagColor = getTagColor(workout.tag);
+
   return (
     <>
-      {/* Cascade Confirmation Dialog */}
       <AlertDialog open={!!cascadeConfirm} onOpenChange={(open) => { if (!open) setCascadeConfirm(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Shift following workouts?</AlertDialogTitle>
             <AlertDialogDescription>
               You're moving this workout by {cascadeConfirm ? Math.abs(cascadeConfirm.diffDays) : 0} day{cascadeConfirm && Math.abs(cascadeConfirm.diffDays) !== 1 ? "s" : ""} {cascadeConfirm && cascadeConfirm.diffDays > 0 ? "forward" : "back"}.
-              There {cascadeConfirm?.followingCount === 1 ? "is" : "are"} {cascadeConfirm?.followingCount} upcoming workout{cascadeConfirm?.followingCount !== 1 ? "s" : ""} after this one. Would you like to shift them too?
+              There {cascadeConfirm?.followingCount === 1 ? "is" : "are"} {cascadeConfirm?.followingCount} upcoming workout{cascadeConfirm?.followingCount !== 1 ? "s" : ""} after this one.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                if (cascadeConfirm) {
-                  onReschedule(workout.id, cascadeConfirm.newDate);
-                  setCascadeConfirm(null);
-                }
-              }}
+              onClick={() => { if (cascadeConfirm) { onReschedule(workout.id, cascadeConfirm.newDate); setCascadeConfirm(null); } }}
               className="bg-secondary text-foreground hover:bg-secondary/80"
-            >
-              Move only this one
-            </AlertDialogAction>
+            >Move only this one</AlertDialogAction>
             <AlertDialogAction
               onClick={() => {
                 if (cascadeConfirm) {
@@ -1112,82 +1113,71 @@ const WorkoutCard = ({
                   toast.success(`Shifted ${cascadeConfirm.followingCount + 1} workouts`);
                 }
               }}
-            >
-              Shift all following
-            </AlertDialogAction>
+            >Shift all following</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <motion.div layout className={`bg-card rounded-xl border shadow-card overflow-hidden ${workout.done ? "border-habit-green/50" : "border-border"}`}>
-        <div className="p-4 flex items-center gap-3">
-          {/* Completion circle - identical for all users, tappable only for owner */}
+      <motion.div
+        layout
+        className={`bg-card rounded-xl border overflow-hidden transition-all ${
+          workout.done ? "border-habit-green/50" : "border-border"
+        } ${accentBorder ? `border-l-[3px] ${accentBorder}` : ""}`}
+      >
+        <div className="p-3.5 flex items-center gap-3">
+          {/* Emoji icon in colored square */}
+          <div className="w-[34px] h-[34px] rounded-lg bg-primary/8 flex items-center justify-center flex-shrink-0">
+            <span className="text-lg">{workout.emoji}</span>
+          </div>
+
+          {/* Card body */}
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowDetail(true)}>
+            <p className={`text-[14px] font-semibold truncate ${workout.done ? "line-through text-muted-foreground" : ""}`}>{workout.title}</p>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
+                <Clock size={9} /> {workout.duration}
+              </span>
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
+                <Flame size={9} /> {workout.cal} cal
+              </span>
+              {workout.tag && (
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${tagColor}`}>
+                  {workout.tag}
+                </span>
+              )}
+              {showDist && (workout.distance ?? 0) > 0 && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
+                  <Footprints size={9} /> {workout.distance} {workout.distanceUnit || "km"}
+                </span>
+              )}
+            </div>
+            {(workout.originType === "imported" || workout.originType === "merged") && (
+              <div className="flex items-center gap-1 mt-1">
+                <CloudDownload size={10} className="text-primary/70" />
+                <span className="text-[10px] font-medium text-primary/70">
+                  {workout.sourceApp === "apple_health" ? "Apple Health" : workout.sourceApp === "health_connect" ? "Health Connect" : "Imported"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Completion circle */}
           <div
             role={readOnly ? undefined : "button"}
             onClick={readOnly ? undefined : (e) => { e.stopPropagation(); onToggle(workout.id); }}
-            className={`relative w-8 h-8 flex items-center justify-center flex-shrink-0 ${readOnly ? "pointer-events-none" : "cursor-pointer"}`}
+            className={`relative w-7 h-7 flex items-center justify-center flex-shrink-0 ${readOnly ? "pointer-events-none" : "cursor-pointer"}`}
           >
-            <svg className="absolute inset-0 w-8 h-8 -rotate-90" viewBox="0 0 32 32">
-              <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" className="text-muted-foreground/20" strokeWidth="2.5" />
+            <svg className="absolute inset-0 w-7 h-7 -rotate-90" viewBox="0 0 28 28">
+              <circle cx="14" cy="14" r="11" fill="none" stroke="currentColor" className="text-muted-foreground/20" strokeWidth="2" />
               {(progress || 0) > 0 && !workout.done && (
-                <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" className="text-habit-green" strokeWidth="2.5"
-                  strokeDasharray={`${((progress || 0) / 100) * 81.68} 81.68`} strokeLinecap="round" />
+                <circle cx="14" cy="14" r="11" fill="none" stroke="currentColor" className="text-habit-green" strokeWidth="2"
+                  strokeDasharray={`${((progress || 0) / 100) * 69.12} 69.12`} strokeLinecap="round" />
               )}
             </svg>
-            <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all z-10 ${
+            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all z-10 ${
               workout.done ? "bg-habit-green border-habit-green" : "border-transparent"
             }`}>
-              {workout.done && <Check size={14} className="text-primary-foreground" />}
-            </div>
-          </div>
-
-          {/* Tappable card body - opens detail */}
-          <div
-            className="flex-1 min-w-0 cursor-pointer"
-            onClick={() => setShowDetail(true)}
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">{workout.emoji}</span>
-              <div className="flex-1 min-w-0">
-                <p className={`text-[15px] font-semibold truncate ${workout.done ? "line-through text-muted-foreground" : ""}`}>{workout.title}</p>
-                <div className="flex items-center gap-3 mt-0.5">
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock size={11} /> {workout.duration}
-                  </span>
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Flame size={11} /> {workout.cal} cal
-                  </span>
-                  {showDist && (workout.distance ?? 0) > 0 && (
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Footprints size={11} /> {workout.distance} {workout.distanceUnit || "km"}
-                    </span>
-                  )}
-                </div>
-                {/* Exercise count badge for strength workouts */}
-                {workout.exercises && workout.exercises.length > 0 && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <Dumbbell size={10} className="text-muted-foreground" />
-                    <span className="text-[11px] text-muted-foreground">{workout.exercises.length} exercises</span>
-                  </div>
-                )}
-                {/* Source badge for imported workouts */}
-                {(workout.originType === "imported" || workout.originType === "merged") && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <CloudDownload size={10} className="text-primary/70" />
-                    <span className="text-[10px] font-medium text-primary/70">
-                      {workout.sourceApp === "apple_health" ? "Apple Health" : workout.sourceApp === "health_connect" ? "Health Connect" : "Imported"}
-                    </span>
-                  </div>
-                )}
-                {/* Needs review indicator */}
-                {workout.needsReview && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <AlertTriangle size={10} className="text-destructive/70" />
-                    <span className="text-[10px] font-medium text-destructive/70">Needs review</span>
-                  </div>
-                )}
-              </div>
-              <GroupBadge groupId={workout.groupId} />
+              {workout.done && <Check size={12} className="text-primary-foreground" />}
             </div>
           </div>
         </div>
