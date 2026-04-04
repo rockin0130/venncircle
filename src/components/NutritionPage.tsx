@@ -307,6 +307,15 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   }, [resolvedSelectedUserIds, user]);
   const multipleSelected = resolvedSelectedUserIds.size > 1;
 
+  const getMemberInfo = useCallback((userId: string) => {
+    if (userId === user?.id) return { name: "Mine", displayName: profile?.display_name || "Me", avatarUrl: profile?.avatar_url };
+    for (const g of groups) {
+      const member = g.members.find((m: GroupMember) => m.user_id === userId);
+      if (member) return { name: member.display_name?.split(" ")[0] || "Member", displayName: member.display_name || "Member", avatarUrl: member.avatar_url };
+    }
+    return { name: "Member", displayName: "Member", avatarUrl: null };
+  }, [user, profile, groups]);
+
   // Build ordered list of all selected users for column layout
   const selectedUsersOrdered = useMemo(() => {
     const users: { id: string; name: string; avatarUrl: string | null; index: number }[] = [];
