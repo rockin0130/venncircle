@@ -454,62 +454,27 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
     return day === selDay && month === selMonth && year === selYear;
   };
 
-  // INDIVIDUAL VIEW: show items assigned to me (or specific member) PLUS jointly assigned items
-  let dayTasks: Task[];
-  let visibleEvents: ScheduledEvent[];
-
-  if (filter === "mine") {
-    const myResponsible = filteredTasks.filter((t) =>
+  // Home page is always "mine" aggregate — show all user's own items across all groups
+  {
+    const myResponsible = tasks.filter((t) =>
       (t.assignee === "me" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
     );
-    const partnerAssignedToMe = filteredPartnerTasks.filter((t) =>
+    const partnerAssignedToMe = partnerTasks.filter((t) =>
       (t.assignee === "partner" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
     );
     const seenKeys = new Set(myResponsible.map((t) => `${t.title}|${t.time}|${t.scheduledDay}`));
     const uniquePartner = partnerAssignedToMe.filter((t) => !seenKeys.has(`${t.title}|${t.time}|${t.scheduledDay}`));
     dayTasks = [...myResponsible, ...uniquePartner];
 
-    const myEvents = filteredEvents.filter((e) =>
+    const myEvents = events.filter((e) =>
       (e.user === "me" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
     );
-    const partnerEventsForMe = filteredPartnerEvents.filter((e) =>
+    const partnerEventsForMe = partnerEvents.filter((e) =>
       (e.user === "partner" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
     );
     const seenEventKeys = new Set(myEvents.map((e) => `${e.title}|${e.time}|${e.day}`));
     const uniquePartnerEvents = partnerEventsForMe.filter((e) => !seenEventKeys.has(`${e.title}|${e.time}|${e.day}`));
     visibleEvents = [...myEvents, ...uniquePartnerEvents];
-  } else if (filter === "partner" || isSpecificMemberFilter) {
-    // For "partner" (2-member) or "member:{userId}" (3+ member): show that member's data
-    const memberTasks = selectedMemberUserId
-      ? filteredPartnerTasks.filter((t) => t.ownerUserId === selectedMemberUserId)
-      : filteredPartnerTasks;
-    const memberEvents = selectedMemberUserId
-      ? filteredPartnerEvents.filter((e) => e.ownerUserId === selectedMemberUserId)
-      : filteredPartnerEvents;
-
-    const partnerOwn = memberTasks.filter((t) =>
-      (t.assignee === "me" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
-    );
-    const myAssignedToPartner = filteredTasks.filter((t) =>
-      (t.assignee === "partner" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
-    );
-    const seenKeys = new Set(partnerOwn.map((t) => `${t.title}|${t.time}|${t.scheduledDay}`));
-    const uniqueMy = myAssignedToPartner.filter((t) => !seenKeys.has(`${t.title}|${t.time}|${t.scheduledDay}`));
-    dayTasks = [...partnerOwn, ...uniqueMy];
-
-    const partnerOwnEvents = memberEvents.filter((e) =>
-      (e.user === "me" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
-    );
-    const myEventsForPartner = filteredEvents.filter((e) =>
-      (e.user === "partner" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
-    );
-    const seenEventKeys = new Set(partnerOwnEvents.map((e) => `${e.title}|${e.time}|${e.day}`));
-    const uniqueMyEvents = myEventsForPartner.filter((e) => !seenEventKeys.has(`${e.title}|${e.time}|${e.day}`));
-    visibleEvents = [...partnerOwnEvents, ...uniqueMyEvents];
-  } else {
-    // "household" / shared: collect ALL items for TeamDashboard (handled separately in render)
-    dayTasks = [];
-    visibleEvents = [];
   }
 
   // For Together view: pass all items to TeamDashboard
