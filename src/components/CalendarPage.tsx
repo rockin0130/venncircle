@@ -5,6 +5,8 @@ import {
 } from "lucide-react";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
 import { useAuth, Group, GroupMember } from "@/context/AuthContext";
+import CalendarTeamDashboard from "@/components/CalendarTeamDashboard";
+import { useCalendarFilterUsers, MEMBER_COLORS, EVERYONE_SENTINEL } from "@/components/CalendarUserFilter";
 
 import PageGroupSelector from "@/components/PageGroupSelector";
 import { useGroupContext } from "@/hooks/useGroupContext";
