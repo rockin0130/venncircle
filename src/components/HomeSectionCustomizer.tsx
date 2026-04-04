@@ -372,11 +372,6 @@ const HomeSectionCustomizer = ({
       specialDayIds = specialDayOptions.map((o) => o.id);
       setLocalSpecialDayIds(specialDayIds);
     }
-    // If enabling habits and no sub-items selected, select all available
-    if (id === "habits" && next.has("habits") && localHabitSubIds.length === 0 && habitSubItems.length > 0) {
-      habitIds = habitSubItems.map((o) => o.id);
-      setLocalHabitSubIds(habitIds);
-    }
 
     save(fullOrder, next, sobrietyIds, specialDayIds, habitIds);
   };
@@ -389,10 +384,7 @@ const HomeSectionCustomizer = ({
       next = [...localHabitSubIds, subId];
     }
     setLocalHabitSubIds(next);
-    const vis = new Set(localVisible);
-    if (next.length > 0) vis.add("habits");
-    setLocalVisible(vis);
-    save(fullOrder, vis, localSobrietyIds, localSpecialDayIds, next);
+    save(fullOrder, localVisible, localSobrietyIds, localSpecialDayIds, next);
   };
 
   const toggleSobrietyTracker = (trackerId: string) => {
