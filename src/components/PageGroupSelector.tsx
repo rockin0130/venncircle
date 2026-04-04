@@ -13,7 +13,7 @@ interface PageGroupSelectorProps {
 
 const PERSONAL_SENTINEL = "__personal__";
 
-const PageGroupSelector = ({ page, isHomePage, personalLabel = "Personal", personalEmoji = "👤" }: PageGroupSelectorProps) => {
+const PageGroupSelector = ({ page, isHomePage, personalLabel = "Personal", personalEmoji = "👤", hideAllPill = false }: PageGroupSelectorProps) => {
   const { groups, activeGroup, setActiveGroup } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
 
