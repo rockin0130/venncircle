@@ -326,13 +326,37 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
         setLocation((ev as any).location || "");
         setNotificationMinutes((ev as any).notificationMinutes ?? -1);
         setRepeatRule((ev as any).repeatRule || { frequency: "none" });
-        setSelectedAssignees([ev.user || "me"]);
-
         // Set context based on event's group
         const evGroupId = (ev as any).groupId;
         const editCtx = evGroupId || "__personal__";
         setSelectedContextId(editCtx);
         loadCalendarForContext(editCtx);
+
+        // Expand assignee to member IDs for proper pill highlighting
+        const evAssignee = ev.user || "me";
+        if (evAssignee === "both" && evGroupId) {
+          const grp = groups?.find(g => g.id === evGroupId);
+          if (grp) {
+            const memberIds = grp.members
+              ?.filter((m: any) => m.user_id !== user?.id && m.status === "active")
+              .map((m: any) => m.user_id) || [];
+            setSelectedAssignees(["me", ...memberIds]);
+          } else {
+            setSelectedAssignees(["me"]);
+          }
+        } else if (evAssignee === "partner" && evGroupId) {
+          const grp = groups?.find(g => g.id === evGroupId);
+          if (grp) {
+            const otherIds = grp.members
+              ?.filter((m: any) => m.user_id !== user?.id && m.status === "active")
+              .map((m: any) => m.user_id) || [];
+            setSelectedAssignees(otherIds.length > 0 ? otherIds : ["me"]);
+          } else {
+            setSelectedAssignees(["me"]);
+          }
+        } else {
+          setSelectedAssignees(["me"]);
+        }
       } else {
         const tk = editItem.raw as Task;
         setMode("todo");
@@ -340,13 +364,37 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
         setTodoTag(tk.tag || "Personal");
         setTodoPriorNotice(tk.priorNoticeDays ?? 0);
         setDescription((tk as any).description || "");
-        setSelectedAssignees([tk.assignee || "me"]);
-
         // Set context based on task's group
         const tkGroupId = (tk as any).groupId;
         const editCtx = tkGroupId || "__personal__";
         setSelectedContextId(editCtx);
         loadCalendarForContext(editCtx);
+
+        // Expand assignee for tasks too
+        const tkAssignee = tk.assignee || "me";
+        if (tkAssignee === "both" && tkGroupId) {
+          const grp = groups?.find(g => g.id === tkGroupId);
+          if (grp) {
+            const memberIds = grp.members
+              ?.filter((m: any) => m.user_id !== user?.id && m.status === "active")
+              .map((m: any) => m.user_id) || [];
+            setSelectedAssignees(["me", ...memberIds]);
+          } else {
+            setSelectedAssignees(["me"]);
+          }
+        } else if (tkAssignee === "partner" && tkGroupId) {
+          const grp = groups?.find(g => g.id === tkGroupId);
+          if (grp) {
+            const otherIds = grp.members
+              ?.filter((m: any) => m.user_id !== user?.id && m.status === "active")
+              .map((m: any) => m.user_id) || [];
+            setSelectedAssignees(otherIds.length > 0 ? otherIds : ["me"]);
+          } else {
+            setSelectedAssignees(["me"]);
+          }
+        } else {
+          setSelectedAssignees(["me"]);
+        }
 
         if (tk.dueDate) {
           const [y, m, d] = tk.dueDate.split("-").map(Number);
@@ -429,9 +477,12 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
   // Convert selectedAssignees to the legacy assignee format
   const computeAssignee = (): "me" | "partner" | "both" => {
     if (isPersonalContext) return "me";
-    if (selectedAssignees.length > 1) return "both";
-    if (selectedAssignees[0] === "me") return "me";
-    return "partner";
+    const hasMe = selectedAssignees.includes("me");
+    const hasOthers = selectedAssignees.some(a => a !== "me");
+    if (hasMe && hasOthers) return "both";
+    if (hasMe) return "me";
+    if (hasOthers) return "partner";
+    return "me";
   };
 
   // ── Save handlers ──
@@ -587,10 +638,10 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
             <button
               onClick={() => toggleAssignee("me")}
               className={cn(
-                "px-3 py-1.5 text-[13px] font-medium rounded-full border transition-all whitespace-nowrap",
+                "px-3 py-1.5 text-[13px] font-semibold rounded-full border-2 transition-all whitespace-nowrap",
                 selectedAssignees.includes("me")
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground"
+                  ? "border-primary bg-primary/20 text-primary shadow-sm"
+                  : "border-border/60 bg-secondary/30 text-muted-foreground/70"
               )}
             >
               Mine
@@ -601,10 +652,10 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
                 key={m.user_id}
                 onClick={() => toggleAssignee(m.user_id)}
                 className={cn(
-                  "px-3 py-1.5 text-[13px] font-medium rounded-full border transition-all whitespace-nowrap",
+                  "px-3 py-1.5 text-[13px] font-semibold rounded-full border-2 transition-all whitespace-nowrap",
                   selectedAssignees.includes(m.user_id)
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground"
+                    ? "border-primary bg-primary/20 text-primary shadow-sm"
+                    : "border-border/60 bg-secondary/30 text-muted-foreground/70"
                 )}
               >
                 {m.display_name || "Member"}

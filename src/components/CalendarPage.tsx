@@ -4,8 +4,8 @@ import {
   Calendar as CalendarIcon, Settings,
 } from "lucide-react";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
-import { useAuth, Group } from "@/context/AuthContext";
-import UserBadge from "@/components/UserBadge";
+import { useAuth, Group, GroupMember } from "@/context/AuthContext";
+
 import PageGroupSelector from "@/components/PageGroupSelector";
 import { useGroupContext } from "@/hooks/useGroupContext";
 import { formatTime } from "@/lib/formatTime";
@@ -1410,6 +1410,95 @@ const GoogleBadge = () => (
   </span>
 );
 
+// ── Assignee Avatars Component ──────────────────────────────
+const AVATAR_COLORS = [
+  "bg-blue-500", "bg-amber-500", "bg-emerald-500", "bg-pink-500",
+  "bg-purple-500", "bg-teal-500", "bg-orange-500", "bg-red-500",
+];
+
+function getAvatarColor(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = ((hash << 5) - hash) + userId.charCodeAt(i);
+    hash |= 0;
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName }: {
+  item: CalItem;
+  groups: Group[];
+  currentUserId: string;
+  currentUserName: string;
+}) => {
+  const assignee = item.assignee;
+  const groupId = item.groupId;
+  const raw = item.raw as any;
+  const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+
+  // Build list of assigned members
+  const members: { id: string; initial: string }[] = [];
+
+  if (assignee === "me") {
+    // Only the owner
+    if (ownerId === currentUserId) {
+      members.push({ id: currentUserId, initial: currentUserName.charAt(0).toUpperCase() || "?" });
+    } else {
+      // Find owner name from group
+      const grp = groupId ? groups.find(g => g.id === groupId) : null;
+      const member = grp?.members?.find((m: any) => m.user_id === ownerId);
+      members.push({ id: ownerId, initial: (member?.display_name || "?").charAt(0).toUpperCase() });
+    }
+  } else if (assignee === "partner") {
+    // Only the other members (not the owner)
+    if (groupId) {
+      const grp = groups.find(g => g.id === groupId);
+      if (grp) {
+        grp.members
+          .filter((m: any) => m.user_id !== ownerId && m.status === "active")
+          .forEach((m: any) => {
+            members.push({ id: m.user_id, initial: (m.display_name || "?").charAt(0).toUpperCase() });
+          });
+      }
+    }
+    if (members.length === 0) {
+      members.push({ id: "partner", initial: "P" });
+    }
+  } else if (assignee === "both") {
+    // Owner + all other members
+    members.push({ id: currentUserId === ownerId ? currentUserId : ownerId, initial: (currentUserId === ownerId ? currentUserName : "?").charAt(0).toUpperCase() || "?" });
+    if (groupId) {
+      const grp = groups.find(g => g.id === groupId);
+      if (grp) {
+        grp.members
+          .filter((m: any) => m.user_id !== ownerId && m.status === "active")
+          .forEach((m: any) => {
+            members.push({ id: m.user_id, initial: (m.display_name || "?").charAt(0).toUpperCase() });
+          });
+      }
+    }
+    // If owner is current user, fix initial
+    if (ownerId === currentUserId && members.length > 0) {
+      members[0].initial = currentUserName.charAt(0).toUpperCase() || "?";
+    }
+  }
+
+  if (members.length === 0) return null;
+
+  return (
+    <div className="flex -space-x-1.5 flex-shrink-0">
+      {members.map((m) => (
+        <div
+          key={m.id}
+          className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white ring-1 ring-card ${getAvatarColor(m.id)}`}
+        >
+          {m.initial}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const EventList = ({
   items, groups, getColorClasses, onItemTap, compact, colorMap,
 }: {
@@ -1420,7 +1509,9 @@ const EventList = ({
   compact?: boolean;
   colorMap?: { byId: Map<string, string>; byProvider: Map<string, string> };
 }) => {
-  const { activeGroup } = useAuth();
+  const { activeGroup, user, profile } = useAuth();
+  const currentUserId = user?.id || "";
+  const currentUserName = profile?.display_name || "";
   const todoItems = items.filter((i) => i.isDueDateTask);
   const allDayItems = items.filter((i) => i.allDay && !i.isDueDateTask);
   const timedItems = items.filter((i) => !i.allDay);
@@ -1442,7 +1533,7 @@ const EventList = ({
                 {group && (
                   <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
                 )}
-                <UserBadge user={item.assignee} />
+                <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
               </button>
             );
           })}
@@ -1469,7 +1560,7 @@ const EventList = ({
                 {group && (
                   <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
                 )}
-                <UserBadge user={item.assignee} />
+                <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
               </button>
             );
           })}
@@ -1498,7 +1589,7 @@ const EventList = ({
             {group && (
               <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
             )}
-            <UserBadge user={item.assignee} />
+            <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
           </button>
         );
       })}
