@@ -685,6 +685,23 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     });
   };
 
+  // Direct edit on tap: skip detail modal for non-gcal items
+  const handleItemTap = useCallback((item: CalItem) => {
+    if (item.type === "gcal") {
+      // Google Calendar events can't be edited, show detail
+      setSelectedItem(item);
+      return;
+    }
+    // Go directly to edit form
+    setEditingItem({
+      id: item.id,
+      type: item.type,
+      raw: item.raw as ScheduledEvent | Task,
+      isDueDateTask: item.isDueDateTask,
+      done: item.done,
+    });
+  }, []);
+
   // Scroll time grid to 8am
   useEffect(() => {
     if ((viewMode === "day" || viewMode === "3day") && timeGridRef.current) {
