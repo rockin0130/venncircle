@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+import { motion } from "framer-motion";
 import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
