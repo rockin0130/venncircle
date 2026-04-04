@@ -1561,7 +1561,7 @@ const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName }: {
 };
 
 const EventList = ({
-  items, groups, getColorClasses, onItemTap, compact, colorMap,
+  items, groups, getColorClasses, onItemTap, compact, colorMap, filterUsers,
 }: {
   items: CalItem[];
   groups: Group[];
@@ -1569,6 +1569,7 @@ const EventList = ({
   onItemTap?: (item: CalItem) => void;
   compact?: boolean;
   colorMap?: { byId: Map<string, string>; byProvider: Map<string, string> };
+  filterUsers?: FilterUser[];
 }) => {
   const { activeGroup, user, profile } = useAuth();
   const currentUserId = user?.id || "";
