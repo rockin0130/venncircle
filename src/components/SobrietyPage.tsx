@@ -961,11 +961,6 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
     </div>
   );
 
-  // ── Already-added presets for the add drawer ──
-  const myExistingLabels = useMemo(() => {
-    if (!user) return new Set<string>();
-    return new Set(categories.filter(c => c.user_id === user.id).map(c => normalizeLabel(c.label)));
-  }, [categories, user]);
 
   return (
     <div className="p-4 pb-8">
