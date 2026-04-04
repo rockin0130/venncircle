@@ -121,14 +121,28 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
 
   const handleDelete = async () => {
     setDeleting(true);
-    const { data, error } = await supabase.rpc("delete_group", { _group_id: group.id });
-    if (error) {
-      toast.error("Failed to delete group");
-      setDeleting(false);
-    } else {
+    try {
+      const { data, error } = await supabase.rpc("delete_group", { _group_id: group.id });
+      if (error) {
+        console.error("Delete group DB error:", error);
+        toast.error(`Failed to delete group: ${error.message}`);
+        setDeleting(false);
+        return;
+      }
+      const result = data as any;
+      if (result?.error) {
+        toast.error(result.error);
+        setDeleting(false);
+        return;
+      }
       toast.success("Group deleted");
+      setSettingsOpen(false);
       await refreshGroups();
       onBack();
+    } catch (err: any) {
+      console.error("Delete group error:", err);
+      toast.error("Failed to delete group");
+      setDeleting(false);
     }
   };
 
