@@ -50,11 +50,11 @@ export function loadSectionPrefs(groupId: string | null): SectionPrefs {
     if (raw) {
       const parsed = JSON.parse(raw);
       const migrateId = (id: string) => {
-        if (id === "morning-habits") return "habits";
-        if (id === "other-habits") return "habits";
+        if (id === "morning-habits") return "scheduled";
+        if (id === "other-habits") return "scheduled";
         if (id === "justdoit") return "todo";
-        if (id === "water") return "habits";
-        if (id.startsWith("habit:")) return "habits";
+        if (id === "habits") return "water"; // migrate old "habits" toggle to "water"
+        if (id.startsWith("habit:")) return "scheduled";
         return id;
       };
       let order = (parsed.order || DEFAULT_ORDER).map(migrateId);
