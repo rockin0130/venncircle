@@ -851,21 +851,8 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
       ) : (
         <>
           {sectionOrder.filter((id) => {
-            if (!sectionVisible.has(id)) return false;
-            // Personal view: show all sections (no shared_pages filter)
-            if (isPersonalActive) return true;
-            // If a real group is selected, only show sections for pages the group shares
-            if (activeGroup?.shared_pages && !isPersonalActive) {
-              const sp = activeGroup.shared_pages;
-              if (id === "scheduled" || id === "todo") return sp.includes("calendar");
-              if (id === "water") return sp.includes("habits");
-              if (id === "nutrition") return sp.includes("nutrition");
-              if (id === "workout") return sp.includes("workout");
-              if (id === "sobriety") return sp.includes("sobriety");
-              if (id === "special-days") return sp.includes("special_days");
-              if (id === "shopping") return sp.includes("shopping");
-            }
-            return true;
+            // Home page always shows all toggled-on sections — no group shared_pages filtering
+            return sectionVisible.has(id);
           }).map((sectionId) => {
             switch (sectionId) {
               case "scheduled":
