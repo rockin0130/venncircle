@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, GroupMember } from "@/context/AuthContext";
 import { format, differenceInDays, subDays, parseISO, startOfDay, addDays } from "date-fns";
-import { Plus, Trophy, Flame, Calendar, DollarSign, ChevronDown, ChevronUp, Bell, EyeOff, Lock, Check } from "lucide-react";
+import { Plus, DollarSign, EyeOff, Lock, Check, Calendar, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PageGroupSelector from "@/components/PageGroupSelector";
 import SobrietyUserFilter, { EVERYONE_SENTINEL } from "@/components/SobrietyUserFilter";
+import { useSobrietyViewMode } from "@/hooks/useSobrietyViewMode";
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription,
 } from "@/components/ui/drawer";
@@ -60,7 +61,7 @@ function normalizeLabel(label: string): string {
   return label.toLowerCase().replace(/[\s\-_.,!?'":;()]/g, "").trim();
 }
 
-// ── Dynamic user color palette ──
+// ── Dynamic user color palette (HSL tokens) ──
 const USER_COLORS = [
   { bg: "hsl(210 90% 95%)", border: "hsl(210 70% 78%)", accent: "hsl(210 80% 55%)", pill: "hsl(210 90% 95%)", pillText: "hsl(210 60% 40%)" },
   { bg: "hsl(130 50% 93%)", border: "hsl(130 40% 72%)", accent: "hsl(130 50% 45%)", pill: "hsl(130 50% 93%)", pillText: "hsl(130 40% 30%)" },
@@ -71,7 +72,7 @@ const USER_COLORS = [
 ];
 const getUserColor = (index: number) => USER_COLORS[index % USER_COLORS.length];
 
-// ── Types for display ──
+// ── Display user type ──
 interface DisplayUser {
   id: string;
   name: string;
@@ -100,22 +101,18 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
   const [presetMoneyPerDay, setPresetMoneyPerDay] = useState<Record<string, string>>({});
   const [celebratingMilestone, setCelebratingMilestone] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Pre-fill for Add to Mine
   const [prefillLabel, setPrefillLabel] = useState("");
-
-  // Undo check-in dialog
   const [undoCheckinCat, setUndoCheckinCat] = useState<SobrietyCategory | null>(null);
-
-  // Duplicate warning dialog
   const [duplicateWarning, setDuplicateWarning] = useState<{
     existingName: string;
     pendingLabel: string;
     pendingIcon: string;
     pendingMoney: number;
   } | null>(null);
+  const [nudgeCooldowns, setNudgeCooldowns] = useState<Set<string>>(new Set());
+  const [addGroupIds, setAddGroupIds] = useState<Set<string>>(new Set());
 
-  // Context-specific pill selection state
+  // ── Context state ──
   const pillStateRef = useRef<Map<string, Set<string>>>(new Map());
   const getContextKey = useCallback(() => {
     if ((activeGroup as any)?._personal === true) return "__personal__";
@@ -140,9 +137,6 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
     pillStateRef.current.set(getContextKey(), ids);
   }, [getContextKey]);
 
-  // Add category group selector state
-  const [addGroupIds, setAddGroupIds] = useState<Set<string>>(new Set());
-
   const isPersonalActive = (activeGroup as any)?._personal === true;
   const isAllView = activeGroup === null && !isPersonalActive;
   const isGroupView = !!activeGroup && !isPersonalActive;
@@ -154,7 +148,27 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
     [groups]
   );
 
-  const [nudgeCooldowns, setNudgeCooldowns] = useState<Set<string>>(new Set());
+  // ── Build group member IDs for view mode hook ──
+  const groupMemberIds = useMemo(() => {
+    if (!user) return [];
+    const ids = new Set<string>();
+    ids.add(user.id);
+    if (isGroupView && activeGroup) {
+      activeGroup.members.filter((m: GroupMember) => m.status === "active").forEach((m: GroupMember) => ids.add(m.user_id));
+    } else if (isAllView) {
+      sobrietyGroups.forEach(g => g.members.filter((m: GroupMember) => m.status === "active").forEach((m: GroupMember) => ids.add(m.user_id)));
+    }
+    return Array.from(ids);
+  }, [user, isGroupView, isAllView, activeGroup, sobrietyGroups]);
+
+  // ── View mode hook ──
+  const viewMode = useSobrietyViewMode({
+    activeGroupId: groupId,
+    isPersonalContext: isPersonalActive || isAllView,
+    userId: user?.id,
+    selectedUserIds,
+    groupMemberIds,
+  });
 
   // ── Data fetching (unchanged logic) ──
   const fetchData = useCallback(async () => {
@@ -218,6 +232,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
       }
     }
 
+    // Deduplicate
     const seen = new Set<string>();
     allCats = allCats.filter(c => {
       if (seen.has(c.id)) return false;
@@ -242,26 +257,52 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ── Resolved users ──
-  const effectiveSelectedUserIds = useMemo(() => {
-    if (selectedUserIds.has(EVERYONE_SENTINEL)) return null;
-    return selectedUserIds;
-  }, [selectedUserIds]);
-
+  // ── Filter categories based on view mode ──
   const filteredCategories = useMemo(() => {
     if (!user) return [];
-    let filtered = categories;
-    if (effectiveSelectedUserIds !== null) {
-      filtered = filtered.filter(c => effectiveSelectedUserIds.has(c.user_id));
+
+    const { mode, resolvedUserIds } = viewMode;
+    const resolvedSet = new Set(resolvedUserIds);
+
+    if (mode === "mine_aggregate") {
+      // All user's own trackers, deduplicated by normalized label
+      const mine = categories.filter(c => c.user_id === user.id);
+      const seen = new Set<string>();
+      return mine.filter(c => {
+        const key = normalizeLabel(c.label);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     }
-    return filtered;
-  }, [categories, user, effectiveSelectedUserIds]);
 
-  const isSharedWithCurrentGroup = useCallback((cat: SobrietyCategory) => {
-    if (!groupId) return true;
-    return (cat.shared_group_ids || []).includes(groupId);
-  }, [groupId]);
+    if (mode === "mine_in_group") {
+      // Only user's trackers shared with this specific group
+      return categories.filter(c =>
+        c.user_id === user.id && groupId && (c.shared_group_ids || []).includes(groupId)
+      );
+    }
 
+    if (mode === "single_other") {
+      const otherId = viewMode.otherUserId;
+      if (!otherId || !groupId) return [];
+      return categories.filter(c =>
+        c.user_id === otherId && (c.shared_group_ids || []).includes(groupId)
+      );
+    }
+
+    // multi_user: all categories for resolved users in this group
+    return categories.filter(c => {
+      if (!resolvedSet.has(c.user_id)) return false;
+      if (c.user_id === user.id) {
+        // Show user's own trackers shared with group
+        return groupId ? (c.shared_group_ids || []).includes(groupId) : true;
+      }
+      return groupId ? (c.shared_group_ids || []).includes(groupId) : true;
+    });
+  }, [categories, user, viewMode, groupId]);
+
+  // ── Helper functions ──
   const getUserName = useCallback((userId: string) => {
     if (userId === user?.id) return profile?.display_name || "Me";
     for (const g of groups) {
@@ -280,48 +321,31 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
     return null;
   }, [user, profile, groups]);
 
-  // Build ordered list of selected users
+  const isSharedWithCurrentGroup = useCallback((cat: SobrietyCategory) => {
+    if (!groupId) return true;
+    return (cat.shared_group_ids || []).includes(groupId);
+  }, [groupId]);
+
+  // ── Build ordered display users ──
   const selectedUsersOrdered = useMemo((): DisplayUser[] => {
+    if (!user) return [];
     const result: DisplayUser[] = [];
     let idx = 0;
-    if (!user) return result;
 
-    const resolvedIds = new Set<string>();
-    if (effectiveSelectedUserIds === null) {
-      resolvedIds.add(user.id);
-      if (isGroupView && activeGroup) {
-        activeGroup.members.filter((m: GroupMember) => m.status === "active").forEach((m: GroupMember) => resolvedIds.add(m.user_id));
-      } else if (isAllView) {
-        sobrietyGroups.forEach(g => g.members.filter((m: GroupMember) => m.status === "active").forEach((m: GroupMember) => resolvedIds.add(m.user_id)));
-      }
-    } else {
-      effectiveSelectedUserIds.forEach(id => resolvedIds.add(id));
-    }
-
-    if (resolvedIds.has(user.id)) {
-      result.push({
-        id: user.id,
-        name: profile?.display_name?.split(" ")[0] || "Me",
-        avatarUrl: profile?.avatar_url || null,
-        initial: (profile?.display_name || "M")[0].toUpperCase(),
-        colorIndex: idx++,
-      });
-    }
-    for (const uid of resolvedIds) {
-      if (uid === user.id) continue;
-      const name = getUserName(uid);
+    for (const uid of viewMode.resolvedUserIds) {
+      const isMe = uid === user.id;
+      const name = isMe ? (profile?.display_name?.split(" ")[0] || "Me") : getUserName(uid).split(" ")[0];
+      const avatarUrl = isMe ? (profile?.avatar_url || null) : getUserAvatarUrl(uid);
       result.push({
         id: uid,
-        name: name.split(" ")[0],
-        avatarUrl: getUserAvatarUrl(uid),
+        name,
+        avatarUrl,
         initial: name[0]?.toUpperCase() || "?",
         colorIndex: idx++,
       });
     }
     return result;
-  }, [effectiveSelectedUserIds, user, profile, activeGroup, isGroupView, isAllView, sobrietyGroups, getUserName, getUserAvatarUrl]);
-
-  const multipleSelected = selectedUsersOrdered.length > 1;
+  }, [viewMode.resolvedUserIds, user, profile, getUserName, getUserAvatarUrl]);
 
   // ── Streak & check-in helpers (unchanged logic) ──
   const getStreakInfo = useCallback((cat: SobrietyCategory) => {
@@ -407,7 +431,41 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
     return days;
   }, [getStreakInfo]);
 
-  // Initialize add group selector when drawer opens
+  // ── My existing labels for dedup ──
+  const myExistingLabels = useMemo(() => {
+    if (!user) return new Set<string>();
+    return new Set(categories.filter(c => c.user_id === user.id).map(c => normalizeLabel(c.label)));
+  }, [categories, user]);
+
+  // ── My tracker labels for "Add to Mine" logic ──
+  const myTrackerLabels = useMemo(() => {
+    if (!user) return new Set<string>();
+    return new Set(categories.filter(c => c.user_id === user.id).map(c => normalizeLabel(c.label)));
+  }, [categories, user]);
+
+  // ── Tracker types for multi-user grid ──
+  const trackerTypes = useMemo(() => {
+    const types: { label: string; icon: string; normalizedKey: string }[] = [];
+    const seen = new Set<string>();
+    for (const cat of filteredCategories) {
+      const key = normalizeLabel(cat.label);
+      if (!seen.has(key)) {
+        seen.add(key);
+        types.push({ label: cat.label, icon: cat.icon, normalizedKey: key });
+      }
+    }
+    return types;
+  }, [filteredCategories]);
+
+  // ── Money saved summary ──
+  const totalMoneySaved = useMemo(() => {
+    const catsWithMoney = filteredCategories.filter(c => (c.money_per_day || 0) > 0);
+    if (catsWithMoney.length === 0) return { total: 0, count: 0 };
+    const total = catsWithMoney.reduce((sum, cat) => sum + getStreakInfo(cat).moneySaved, 0);
+    return { total, count: catsWithMoney.length };
+  }, [filteredCategories, getStreakInfo]);
+
+  // ── Initialize add group selector when drawer opens ──
   useEffect(() => {
     if (showAddDrawer) {
       const initial = new Set<string>();
@@ -416,7 +474,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
     }
   }, [showAddDrawer, groupId]);
 
-  // Duplicate check helper
+  // ── Duplicate check helper ──
   const findDuplicateTracker = useCallback((label: string): SobrietyCategory | undefined => {
     if (!user) return undefined;
     const normalized = normalizeLabel(label);
@@ -593,7 +651,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
     setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, shared_group_ids: newIds } : c));
   };
 
-  // Nudge handler
+  // ── Nudge handler ──
   const sendNudge = async (toUserId: string, catId?: string) => {
     if (!user) return;
     const name = getUserName(toUserId);
@@ -615,7 +673,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
     }, 10000);
   };
 
-  // Incoming nudge detection
+  // ── Incoming nudge detection ──
   useEffect(() => {
     if (!user) return;
     const checkNudges = async () => {
@@ -638,7 +696,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
     checkNudges();
   }, [user]);
 
-  // ── Add to Mine: opens add drawer with pre-fill ──
+  // ── Add to Mine: opens drawer pre-filled ──
   const openAddToMine = (cat: SobrietyCategory) => {
     setPrefillLabel(cat.label);
     setCustomLabel(cat.label);
@@ -656,42 +714,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
     });
   };
 
-  // ── Derived data for multi-user column layout ──
-  // Get all unique tracker types (normalized labels) across all visible categories
-  const trackerTypes = useMemo(() => {
-    const types: { label: string; icon: string; normalizedKey: string }[] = [];
-    const seen = new Set<string>();
-    for (const cat of filteredCategories) {
-      const key = normalizeLabel(cat.label);
-      if (!seen.has(key)) {
-        seen.add(key);
-        types.push({ label: cat.label, icon: cat.icon, normalizedKey: key });
-      }
-    }
-    return types;
-  }, [filteredCategories]);
-
-  // Check if logged-in user has a tracker of a given normalized type
-  const myTrackerLabels = useMemo(() => {
-    if (!user) return new Set<string>();
-    return new Set(categories.filter(c => c.user_id === user.id).map(c => normalizeLabel(c.label)));
-  }, [categories, user]);
-
-  // ── Money saved summary ──
-  const totalMoneySaved = useMemo(() => {
-    const catsWithMoney = filteredCategories.filter(c => (c.money_per_day || 0) > 0);
-    if (catsWithMoney.length === 0) return { total: 0, count: 0 };
-    const total = catsWithMoney.reduce((sum, cat) => sum + getStreakInfo(cat).moneySaved, 0);
-    return { total, count: catsWithMoney.length };
-  }, [filteredCategories, getStreakInfo]);
-
-  // ── Already-added presets for the add drawer (must be before early return) ──
-  const myExistingLabels = useMemo(() => {
-    if (!user) return new Set<string>();
-    return new Set(categories.filter(c => c.user_id === user.id).map(c => normalizeLabel(c.label)));
-  }, [categories, user]);
-
-  // ── Rendering ──
+  // ── Loading state ──
   if (loading) {
     return (
       <div className="p-4">
@@ -703,268 +726,22 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
     );
   }
 
-  // ── Single-user tracker card ──
-  const renderSingleUserCard = (cat: SobrietyCategory) => {
-    const info = getStreakInfo(cat);
-    const checkedToday = isCheckedIn(cat.id, today);
-    const nextMile = getNextMilestone(info.currentStreak);
-    const isExpanded = expandedCard === cat.id;
-    const showOnlyYou = !isPersonalActive && !isAllView && !!groupId && !isSharedWithCurrentGroup(cat);
-    const missedDays = getMissedDays(cat);
+  // ─────────────────────────────────────────────────────
+  // RENDERING
+  // ─────────────────────────────────────────────────────
 
-    return (
-      <motion.div
-        key={cat.id}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-card border border-border rounded-2xl overflow-hidden"
-      >
-        {/* Main card content */}
-        <button
-          onClick={() => setExpandedCard(isExpanded ? null : cat.id)}
-          className="w-full p-3 text-left"
-        >
-          {/* Top row */}
-          <div className="flex items-center gap-3">
-            <span className="text-xl">{cat.icon}</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="text-[11px] text-muted-foreground">{cat.label}-free</p>
-                {showOnlyYou && (
-                  <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground bg-secondary/80 px-1 py-0.5 rounded">
-                    <EyeOff size={8} /> Only you
-                  </span>
-                )}
-              </div>
-              <span className="text-2xl font-bold text-foreground tabular-nums">{info.currentStreak} <span className="text-sm font-medium text-muted-foreground">days</span></span>
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              {info.moneySaved > 0 && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[hsl(var(--habit-green))]/15 text-[hsl(var(--habit-green))]">${info.moneySaved.toFixed(0)} saved</span>
-              )}
-              {nextMile && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/15 text-accent">🏆 Next: {nextMile}d</span>
-              )}
-            </div>
-          </div>
+  const showMemberPills = isGroupView || isAllView;
 
-          {/* Progress bar toward next milestone */}
-          {nextMile && (
-            <div className="mt-2">
-              <div className="flex items-center justify-between text-[9px] text-muted-foreground mb-0.5">
-                <span>0</span>
-                <span>Next milestone: {nextMile} days</span>
-                <span>{nextMile}</span>
-              </div>
-              <div className="h-1 bg-secondary rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full bg-primary"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.min((info.currentStreak / nextMile) * 100, 100)}%` }}
-                  transition={{ duration: 0.8, delay: 0.1 }}
-                />
-              </div>
-            </div>
-          )}
-        </button>
-
-        {/* Check-in status bar */}
-        {checkedToday ? (
-          <button
-            onClick={() => setUndoCheckinCat(cat)}
-            className="w-full px-3 py-2 bg-[hsl(var(--habit-green))]/10 text-[hsl(var(--habit-green))] text-xs font-semibold text-center"
-          >
-            ✅ Checked in today
-          </button>
-        ) : (
-          <button
-            onClick={() => {
-              setCheckinCategory(cat);
-              setCheckinDates([today]);
-              setCheckinIsMissed(false);
-              setShowCheckinDialog(true);
-            }}
-            className="w-full px-3 py-2 bg-primary/5 text-primary text-xs font-semibold text-center hover:bg-primary/10 transition-colors"
-          >
-            Check in today
-          </button>
-        )}
-
-        {/* Expanded detail */}
-        <AnimatePresence>
-          {isExpanded && (
-            <ExpandedCardContent
-              cat={cat}
-              info={info}
-              missedDays={missedDays}
-              getHeatmapData={getHeatmapData}
-              onBatchCheckin={handleBatchCheckin}
-              onResetStreak={handleResetStreak}
-              onDeleteCategory={handleDeleteCategory}
-              onUpdateMoneyPerDay={handleUpdateMoneyPerDay}
-              onAddPriorDays={handleAddPriorDays}
-              sobrietyGroups={sobrietyGroups}
-              onToggleSharing={handleToggleSharing}
-              isPersonalActive={isPersonalActive}
-              isAllView={isAllView}
-            />
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
+  // ── Empty state message ──
+  const getEmptyMessage = () => {
+    if (viewMode.mode === "mine_in_group") return "No trackers shared with this group. Tap + to add one.";
+    if (viewMode.mode === "single_other") return `${getUserName(viewMode.otherUserId || "").split(" ")[0]} has no trackers in this group.`;
+    return "Track what you're abstaining from and celebrate every day of progress.";
   };
-
-  // ── Multi-user column card ──
-  const renderColumnCard = (trackerKey: string, displayUser: DisplayUser) => {
-    const color = getUserColor(displayUser.colorIndex);
-    const isMe = displayUser.id === user?.id;
-    const userCat = filteredCategories.find(c => c.user_id === displayUser.id && normalizeLabel(c.label) === trackerKey);
-
-    if (!userCat) {
-      // User doesn't have this tracker
-      if (!isMe) {
-        // Other user doesn't have it
-        return (
-          <div
-            className="rounded-xl border-2 border-dashed border-border/40 p-3 flex items-center justify-center min-h-[80px]"
-          >
-            <span className="text-[10px] text-muted-foreground">Not tracking</span>
-          </div>
-        );
-      }
-      // I don't have it but it shows in the grid because another user does
-      return (
-        <div
-          className="rounded-xl border-2 border-dashed border-border/40 p-3 flex items-center justify-center min-h-[80px]"
-        >
-          <span className="text-[10px] text-muted-foreground">Not tracking</span>
-        </div>
-      );
-    }
-
-    const info = getStreakInfo(userCat);
-    const checkedToday = isCheckedIn(userCat.id, today);
-    const nextMile = getNextMilestone(info.currentStreak);
-    const cooldownKey = `${displayUser.id}_${userCat.id}`;
-
-    if (isMe) {
-      // Own tracker — interactive
-      return (
-        <div
-          className="rounded-xl p-2.5 min-h-[80px]"
-          style={{ backgroundColor: color.bg, borderWidth: 1, borderColor: color.border, borderStyle: "solid" }}
-        >
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-sm">{userCat.icon}</span>
-            <span className="text-lg font-bold text-foreground tabular-nums">{info.currentStreak}<span className="text-[10px] font-normal text-muted-foreground ml-0.5">d</span></span>
-          </div>
-          {nextMile && (
-            <div className="h-1 bg-secondary/60 rounded-full overflow-hidden mb-1.5">
-              <div className="h-full rounded-full" style={{ backgroundColor: color.accent, width: `${Math.min((info.currentStreak / nextMile) * 100, 100)}%` }} />
-            </div>
-          )}
-          {checkedToday ? (
-            <button
-              onClick={() => setUndoCheckinCat(userCat)}
-              className="w-full text-[10px] font-semibold text-[hsl(var(--habit-green))] text-center py-1 rounded-lg bg-[hsl(var(--habit-green))]/10"
-            >
-              ✅ Done
-            </button>
-          ) : (
-            <button
-              onClick={() => {
-                setCheckinCategory(userCat);
-                setCheckinDates([today]);
-                setCheckinIsMissed(false);
-                setShowCheckinDialog(true);
-              }}
-              className="w-full text-[10px] font-semibold text-primary text-center py-1 rounded-lg bg-primary/10 hover:bg-primary/15 transition-colors"
-            >
-              Check in
-            </button>
-          )}
-        </div>
-      );
-    }
-
-    // Other user's tracker — read-only
-    const iHaveThis = myTrackerLabels.has(trackerKey);
-
-    return (
-      <div
-        className="rounded-xl p-2.5 min-h-[80px]"
-        style={{ backgroundColor: color.bg, borderWidth: 1, borderColor: color.border, borderStyle: "solid" }}
-      >
-        <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-sm">{userCat.icon}</span>
-          <span className="text-lg font-bold text-foreground tabular-nums">{info.currentStreak}<span className="text-[10px] font-normal text-muted-foreground ml-0.5">d</span></span>
-        </div>
-        {nextMile && (
-          <div className="h-1 bg-secondary/60 rounded-full overflow-hidden mb-1.5">
-            <div className="h-full rounded-full" style={{ backgroundColor: color.accent, width: `${Math.min((info.currentStreak / nextMile) * 100, 100)}%` }} />
-          </div>
-        )}
-        {checkedToday ? (
-          <div className="text-[10px] font-semibold text-[hsl(var(--habit-green))]/70 text-center py-1">
-            ✅ Done
-          </div>
-        ) : (
-          <button
-            onClick={() => sendNudge(displayUser.id, userCat.id)}
-            disabled={nudgeCooldowns.has(cooldownKey)}
-            className={`w-full text-[10px] font-semibold text-center py-1 rounded-lg transition-all border ${
-              nudgeCooldowns.has(cooldownKey)
-                ? "border-border bg-secondary/50 text-muted-foreground opacity-50 cursor-not-allowed"
-                : "border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
-            }`}
-          >
-            🔔 Nudge {displayUser.name}
-          </button>
-        )}
-        {/* Add to Mine button */}
-        {!iHaveThis && (
-          <button
-            onClick={() => openAddToMine(userCat)}
-            className="w-full text-[10px] font-medium text-primary text-center py-1 mt-1 rounded-lg border border-primary/20 hover:bg-primary/5 transition-colors"
-          >
-            + Add to Mine
-          </button>
-        )}
-      </div>
-    );
-  };
-
-  // ── Column header ──
-  const renderColumnHeaders = () => (
-    <div
-      className="grid gap-[5px] mb-1"
-      style={{ gridTemplateColumns: `repeat(${selectedUsersOrdered.length}, minmax(0, 1fr))` }}
-    >
-      {selectedUsersOrdered.map((u) => {
-        const color = getUserColor(u.colorIndex);
-        return (
-          <div
-            key={u.id}
-            className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold justify-center"
-            style={{ backgroundColor: color.pill, color: color.pillText }}
-          >
-            <div
-              className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0"
-              style={{ backgroundColor: color.accent }}
-            >
-              {u.initial}
-            </div>
-            <span className="truncate">{u.name}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-
 
   return (
     <div className="p-4 pb-8">
-      {/* Header */}
+      {/* ── Step 2.1: Header ── */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-foreground">Sobriety</h1>
         <button
@@ -975,14 +752,18 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
         </button>
       </div>
 
+      {/* ── Step 2.2: Context toggle ── */}
       <PageGroupSelector page="sobriety" personalLabel="Mine" hideAllPill />
 
-      <SobrietyUserFilter
-        selectedUserIds={selectedUserIds}
-        onSelectionChange={handlePillChange}
-      />
+      {/* ── Step 2.3: Member pills (only in group/all context) ── */}
+      {showMemberPills && (
+        <SobrietyUserFilter
+          selectedUserIds={selectedUserIds}
+          onSelectionChange={handlePillChange}
+        />
+      )}
 
-      {/* Money Saved Summary */}
+      {/* ── Step 2.4: Money saved summary card ── */}
       {totalMoneySaved.count > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 6 }}
@@ -995,60 +776,368 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
           <div className="min-w-0">
             <p className="text-base font-bold text-foreground tabular-nums leading-tight">${totalMoneySaved.total.toFixed(0)} saved</p>
             <p className="text-[10px] text-muted-foreground">
-              {multipleSelected ? "Combined across all trackers" : `Across ${totalMoneySaved.count} tracker${totalMoneySaved.count > 1 ? "s" : ""} this week`}
+              {viewMode.mode === "multi_user"
+                ? "Combined across all trackers"
+                : `Across ${totalMoneySaved.count} tracker${totalMoneySaved.count > 1 ? "s" : ""} this week`}
             </p>
           </div>
         </motion.div>
       )}
 
-      {/* Empty state */}
-      {filteredCategories.length === 0 && (
+      {/* ── Step 2.5: Content area based on view mode ── */}
+      {filteredCategories.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center py-16"
         >
           <div className="text-5xl mb-4">🌱</div>
-          <h2 className="text-lg font-semibold text-foreground mb-2">Start Your Journey</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">
+            {viewMode.mode === "mine_aggregate" ? "Start Your Journey" : "No Trackers"}
+          </h2>
           <p className="text-sm text-muted-foreground mb-6 max-w-[260px] mx-auto">
-            Track what you're abstaining from and celebrate every day of progress.
+            {getEmptyMessage()}
           </p>
-          <Button onClick={() => setShowAddDrawer(true)} className="rounded-full px-6">
-            <Plus size={16} className="mr-1" /> Add Tracker
-          </Button>
+          {viewMode.isMyDataOnly && (
+            <Button onClick={() => setShowAddDrawer(true)} className="rounded-full px-6">
+              <Plus size={16} className="mr-1" /> Add Tracker
+            </Button>
+          )}
         </motion.div>
-      )}
-
-      {/* Content */}
-      {filteredCategories.length > 0 && (
-        multipleSelected ? (
-          // ── Multi-user column layout ──
-          <div className="space-y-4">
-            {trackerTypes.map(({ label, icon, normalizedKey }) => (
-              <div key={normalizedKey}>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 px-0.5">
-                  {icon} {label}
-                </p>
-                {renderColumnHeaders()}
-                <div
-                  className={`grid gap-[5px] ${selectedUsersOrdered.length > 3 ? "overflow-x-auto" : ""}`}
-                  style={{ gridTemplateColumns: `repeat(${selectedUsersOrdered.length}, minmax(${selectedUsersOrdered.length > 3 ? "120px" : "0"}, 1fr))` }}
-                >
-                  {selectedUsersOrdered.map(u => (
-                    <div key={u.id}>
-                      {renderColumnCard(normalizedKey, u)}
+      ) : viewMode.mode === "multi_user" ? (
+        /* ── Mode 4: Multi-user column layout ── */
+        <div className="space-y-4">
+          {trackerTypes.map(({ label, icon, normalizedKey }) => (
+            <div key={normalizedKey}>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 px-0.5">
+                {icon} {label}
+              </p>
+              {/* Column headers */}
+              <div
+                className="grid gap-1.5 mb-1"
+                style={{ gridTemplateColumns: `repeat(${selectedUsersOrdered.length}, minmax(0, 1fr))` }}
+              >
+                {selectedUsersOrdered.map((u) => {
+                  const color = getUserColor(u.colorIndex);
+                  return (
+                    <div
+                      key={u.id}
+                      className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold justify-center"
+                      style={{ backgroundColor: color.pill, color: color.pillText }}
+                    >
+                      <div
+                        className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0"
+                        style={{ backgroundColor: color.accent }}
+                      >
+                        {u.initial}
+                      </div>
+                      <span className="truncate">{u.name}</span>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        ) : (
-          // ── Single-user card list ──
-          <div className="space-y-3">
-            {filteredCategories.map(cat => renderSingleUserCard(cat))}
-          </div>
-        )
+              {/* Column grid */}
+              <div
+                className={`grid gap-1.5 ${selectedUsersOrdered.length > 3 ? "overflow-x-auto" : ""}`}
+                style={{ gridTemplateColumns: `repeat(${selectedUsersOrdered.length}, minmax(${selectedUsersOrdered.length > 3 ? "120px" : "0"}, 1fr))` }}
+              >
+                {selectedUsersOrdered.map(displayUser => {
+                  const isMe = displayUser.id === user?.id;
+                  const userCat = filteredCategories.find(c => c.user_id === displayUser.id && normalizeLabel(c.label) === normalizedKey);
+                  const color = getUserColor(displayUser.colorIndex);
+
+                  if (!userCat) {
+                    // Not tracking
+                    return (
+                      <div
+                        key={displayUser.id}
+                        className="rounded-xl border-2 border-dashed border-border/40 p-3 flex items-center justify-center min-h-[80px]"
+                      >
+                        <span className="text-[10px] text-muted-foreground">Not tracking</span>
+                      </div>
+                    );
+                  }
+
+                  const info = getStreakInfo(userCat);
+                  const checkedToday = isCheckedIn(userCat.id, today);
+                  const nextMile = getNextMilestone(info.currentStreak);
+                  const cooldownKey = `${displayUser.id}_${userCat.id}`;
+                  const iHaveThis = myTrackerLabels.has(normalizedKey);
+
+                  if (isMe) {
+                    // Own tracker — interactive
+                    return (
+                      <div
+                        key={displayUser.id}
+                        className="rounded-xl p-2.5 min-h-[80px]"
+                        style={{ backgroundColor: color.bg, borderWidth: 1, borderColor: color.border, borderStyle: "solid" }}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-sm">{userCat.icon}</span>
+                          <span className="text-lg font-bold text-foreground tabular-nums">{info.currentStreak}<span className="text-[10px] font-normal text-muted-foreground ml-0.5">d</span></span>
+                        </div>
+                        {nextMile && (
+                          <div className="h-1 bg-secondary/60 rounded-full overflow-hidden mb-1.5">
+                            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min((info.currentStreak / nextMile) * 100, 100)}%` }} />
+                          </div>
+                        )}
+                        {checkedToday ? (
+                          <button
+                            onClick={() => setUndoCheckinCat(userCat)}
+                            className="w-full text-[10px] font-semibold text-[hsl(var(--habit-green))] text-center py-1 rounded-lg bg-[hsl(var(--habit-green))]/10"
+                          >
+                            ✅ Done
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setCheckinCategory(userCat);
+                              setCheckinDates([today]);
+                              setCheckinIsMissed(false);
+                              setShowCheckinDialog(true);
+                            }}
+                            className="w-full text-[10px] font-semibold text-primary text-center py-1 rounded-lg bg-primary/10 hover:bg-primary/15 transition-colors"
+                          >
+                            Check in
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // Other user's tracker — read-only
+                  return (
+                    <div
+                      key={displayUser.id}
+                      className="rounded-xl p-2.5 min-h-[80px]"
+                      style={{ backgroundColor: color.bg, borderWidth: 1, borderColor: color.border, borderStyle: "solid" }}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-sm">{userCat.icon}</span>
+                        <span className="text-lg font-bold text-foreground tabular-nums">{info.currentStreak}<span className="text-[10px] font-normal text-muted-foreground ml-0.5">d</span></span>
+                      </div>
+                      {nextMile && (
+                        <div className="h-1 bg-secondary/60 rounded-full overflow-hidden mb-1.5">
+                          <div className="h-full rounded-full" style={{ backgroundColor: color.accent, width: `${Math.min((info.currentStreak / nextMile) * 100, 100)}%` }} />
+                        </div>
+                      )}
+                      {checkedToday ? (
+                        <div className="text-[10px] font-semibold text-[hsl(var(--habit-green))]/70 text-center py-1">✅ Done</div>
+                      ) : (
+                        <button
+                          onClick={() => sendNudge(displayUser.id, userCat.id)}
+                          disabled={nudgeCooldowns.has(cooldownKey)}
+                          className={`w-full text-[10px] font-semibold text-center py-1 rounded-lg transition-all border ${
+                            nudgeCooldowns.has(cooldownKey)
+                              ? "border-border bg-secondary/50 text-muted-foreground opacity-50 cursor-not-allowed"
+                              : "border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
+                          }`}
+                        >
+                          🔔 Nudge {displayUser.name}
+                        </button>
+                      )}
+                      {!iHaveThis && (
+                        <button
+                          onClick={() => openAddToMine(userCat)}
+                          className="w-full text-[10px] font-medium text-primary text-center py-1 mt-1 rounded-lg border border-primary/20 hover:bg-primary/5 transition-colors"
+                        >
+                          + Add to Mine
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : viewMode.mode === "single_other" ? (
+        /* ── Mode 3: Single other user view — read-only ── */
+        <div className="space-y-3">
+          {filteredCategories.map(cat => {
+            const otherUser = selectedUsersOrdered[0];
+            if (!otherUser) return null;
+            const color = getUserColor(otherUser.colorIndex);
+            const info = getStreakInfo(cat);
+            const checkedToday = isCheckedIn(cat.id, today);
+            const nextMile = getNextMilestone(info.currentStreak);
+            const cooldownKey = `${otherUser.id}_${cat.id}`;
+            const iHaveThis = myTrackerLabels.has(normalizeLabel(cat.label));
+
+            return (
+              <motion.div
+                key={cat.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl overflow-hidden"
+                style={{ backgroundColor: color.bg, borderWidth: 1, borderColor: color.border, borderStyle: "solid" }}
+              >
+                <div className="p-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{cat.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] text-muted-foreground">{cat.label}-free</p>
+                      <span className="text-2xl font-bold text-foreground tabular-nums">{info.currentStreak} <span className="text-sm font-medium text-muted-foreground">days</span></span>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      {info.moneySaved > 0 && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[hsl(var(--habit-green))]/15 text-[hsl(var(--habit-green))]">${info.moneySaved.toFixed(0)} saved</span>
+                      )}
+                      {nextMile && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/15 text-accent">🏆 Next: {nextMile}d</span>
+                      )}
+                    </div>
+                  </div>
+                  {nextMile && (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between text-[9px] text-muted-foreground mb-0.5">
+                        <span>0</span>
+                        <span>Next milestone: {nextMile} days</span>
+                        <span>{nextMile}</span>
+                      </div>
+                      <div className="h-1 bg-secondary/60 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ backgroundColor: color.accent, width: `${Math.min((info.currentStreak / nextMile) * 100, 100)}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {/* Bottom bar */}
+                {checkedToday ? (
+                  <div className="px-3 py-2 bg-[hsl(var(--habit-green))]/10 text-[hsl(var(--habit-green))] text-xs font-semibold text-center">
+                    ✅ Done
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => sendNudge(otherUser.id, cat.id)}
+                    disabled={nudgeCooldowns.has(cooldownKey)}
+                    className={`w-full px-3 py-2 text-xs font-semibold text-center transition-colors ${
+                      nudgeCooldowns.has(cooldownKey)
+                        ? "bg-secondary/50 text-muted-foreground opacity-50 cursor-not-allowed"
+                        : "bg-primary/5 text-primary hover:bg-primary/10"
+                    }`}
+                  >
+                    🔔 Nudge {otherUser.name}
+                  </button>
+                )}
+                {!iHaveThis && (
+                  <button
+                    onClick={() => openAddToMine(cat)}
+                    className="w-full px-3 py-2 text-xs font-medium text-primary text-center border-t border-border/30 hover:bg-primary/5 transition-colors"
+                  >
+                    + Add to Mine
+                  </button>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
+      ) : (
+        /* ── Mode 1 & 2: Single-user card list (Mine aggregate or Mine in group) ── */
+        <div className="space-y-3">
+          {filteredCategories.map(cat => {
+            const info = getStreakInfo(cat);
+            const checkedToday = isCheckedIn(cat.id, today);
+            const nextMile = getNextMilestone(info.currentStreak);
+            const isExpanded = expandedCard === cat.id;
+            const showOnlyYou = viewMode.mode === "mine_in_group" && !isSharedWithCurrentGroup(cat);
+            const missedDays = getMissedDays(cat);
+
+            return (
+              <motion.div
+                key={cat.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-card border border-border rounded-2xl overflow-hidden"
+              >
+                <button
+                  onClick={() => setExpandedCard(isExpanded ? null : cat.id)}
+                  className="w-full p-3 text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{cat.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[11px] text-muted-foreground">{cat.label}-free</p>
+                        {showOnlyYou && (
+                          <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground bg-secondary/80 px-1 py-0.5 rounded">
+                            <EyeOff size={8} /> Only you
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-2xl font-bold text-foreground tabular-nums">{info.currentStreak} <span className="text-sm font-medium text-muted-foreground">days</span></span>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      {info.moneySaved > 0 && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[hsl(var(--habit-green))]/15 text-[hsl(var(--habit-green))]">${info.moneySaved.toFixed(0)} saved</span>
+                      )}
+                      {nextMile && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/15 text-accent">🏆 Next: {nextMile}d</span>
+                      )}
+                    </div>
+                  </div>
+                  {nextMile && (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between text-[9px] text-muted-foreground mb-0.5">
+                        <span>0</span>
+                        <span>Next milestone: {nextMile} days</span>
+                        <span>{nextMile}</span>
+                      </div>
+                      <div className="h-1 bg-secondary rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full bg-primary"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min((info.currentStreak / nextMile) * 100, 100)}%` }}
+                          transition={{ duration: 0.8, delay: 0.1 }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </button>
+
+                {checkedToday ? (
+                  <button
+                    onClick={() => setUndoCheckinCat(cat)}
+                    className="w-full px-3 py-2 bg-[hsl(var(--habit-green))]/10 text-[hsl(var(--habit-green))] text-xs font-semibold text-center"
+                  >
+                    ✅ Checked in today
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setCheckinCategory(cat);
+                      setCheckinDates([today]);
+                      setCheckinIsMissed(false);
+                      setShowCheckinDialog(true);
+                    }}
+                    className="w-full px-3 py-2 bg-primary/5 text-primary text-xs font-semibold text-center hover:bg-primary/10 transition-colors"
+                  >
+                    Check in today
+                  </button>
+                )}
+
+                <AnimatePresence>
+                  {isExpanded && (
+                    <ExpandedCardContent
+                      cat={cat}
+                      info={info}
+                      missedDays={missedDays}
+                      getHeatmapData={getHeatmapData}
+                      onBatchCheckin={handleBatchCheckin}
+                      onResetStreak={handleResetStreak}
+                      onDeleteCategory={handleDeleteCategory}
+                      onUpdateMoneyPerDay={handleUpdateMoneyPerDay}
+                      onAddPriorDays={handleAddPriorDays}
+                      sobrietyGroups={sobrietyGroups}
+                      onToggleSharing={handleToggleSharing}
+                      isPersonalActive={isPersonalActive}
+                      isAllView={isAllView}
+                    />
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </div>
       )}
 
       {/* ── Add Tracker Bottom Sheet ── */}
@@ -1060,7 +1149,6 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
           </DrawerHeader>
           <ScrollArea className="max-h-[60dvh] px-4 pb-6">
             <div className="space-y-2">
-              {/* Add to section */}
               {sobrietyGroups.length > 0 && (
                 <div className="mb-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Add to</p>
@@ -1088,7 +1176,6 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
                 </div>
               )}
 
-              {/* Preset categories */}
               {PRESET_CATEGORIES.map(preset => {
                 const alreadyAdded = myExistingLabels.has(normalizeLabel(preset.label));
                 return (
@@ -1121,7 +1208,6 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
                 );
               })}
 
-              {/* Custom */}
               <div className="border border-border rounded-xl p-3 mt-3">
                 <p className="text-xs font-medium text-foreground mb-2">Custom</p>
                 <div className="flex items-center gap-2">
@@ -1167,7 +1253,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
         </DrawerContent>
       </Drawer>
 
-      {/* Check-in Dialog */}
+      {/* ── Check-in Dialog ── */}
       <Dialog open={showCheckinDialog} onOpenChange={setShowCheckinDialog}>
         <DialogContent className="max-w-[320px] rounded-2xl">
           <DialogHeader className="text-center">
@@ -1202,7 +1288,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
         </DialogContent>
       </Dialog>
 
-      {/* Undo Check-in Confirmation */}
+      {/* ── Undo Check-in Confirmation ── */}
       <AlertDialog open={!!undoCheckinCat} onOpenChange={(open) => { if (!open) setUndoCheckinCat(null); }}>
         <AlertDialogContent className="max-w-[340px] rounded-2xl">
           <AlertDialogHeader>
@@ -1223,7 +1309,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Duplicate Tracker Warning */}
+      {/* ── Duplicate Tracker Warning ── */}
       <AlertDialog open={!!duplicateWarning} onOpenChange={(open) => { if (!open) setDuplicateWarning(null); }}>
         <AlertDialogContent className="max-w-[340px] rounded-2xl">
           <AlertDialogHeader>
@@ -1249,7 +1335,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Milestone Celebration */}
+      {/* ── Milestone Celebration ── */}
       <AnimatePresence>
         {celebratingMilestone && (
           <motion.div
@@ -1333,7 +1419,6 @@ function ExpandedCardContent({
       className="overflow-hidden"
     >
       <div className="px-4 pb-4 space-y-3 border-t border-border/30 pt-3">
-        {/* Inline sharing pills */}
         {showSharingPills && (
           <div>
             <p className="text-[10px] font-semibold text-muted-foreground mb-1.5">Shared with</p>
@@ -1358,7 +1443,6 @@ function ExpandedCardContent({
           </div>
         )}
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-secondary/50 rounded-xl p-3 text-center">
             <Flame size={16} className="mx-auto text-destructive mb-1" />
@@ -1377,7 +1461,6 @@ function ExpandedCardContent({
               <p className="text-[10px] text-muted-foreground">Money Saved</p>
             </div>
           )}
-
           <div className="col-span-2">
             {editingMoney ? (
               <div className="flex items-center gap-2">
@@ -1422,7 +1505,6 @@ function ExpandedCardContent({
           </div>
         </div>
 
-        {/* Add Prior Sober Days */}
         <div>
           {showPriorDays ? (
             <div className="bg-secondary/50 rounded-xl p-3 space-y-2">
@@ -1470,7 +1552,6 @@ function ExpandedCardContent({
           )}
         </div>
 
-        {/* Missed Days */}
         {missedDays.length > 0 && (
           <div>
             <p className="text-xs font-medium text-foreground mb-2">Missed Days</p>
@@ -1521,13 +1602,11 @@ function ExpandedCardContent({
           </div>
         )}
 
-        {/* Heatmap */}
         <div>
           <p className="text-xs font-medium text-foreground mb-2">Last 13 Weeks</p>
           <HeatmapGrid data={getHeatmapData(cat)} />
         </div>
 
-        {/* Milestones */}
         {milestones.length > 0 && (
           <div>
             <p className="text-xs font-medium text-foreground mb-2">Milestones</p>
@@ -1541,7 +1620,6 @@ function ExpandedCardContent({
           </div>
         )}
 
-        {/* Start date + actions */}
         <div className="flex items-center justify-between pt-1">
           <p className="text-[10px] text-muted-foreground">
             Started {format(parseISO(cat.start_date), "MMM d, yyyy")}
