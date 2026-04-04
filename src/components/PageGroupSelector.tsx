@@ -97,7 +97,7 @@ const PageGroupSelector = ({ page, isHomePage, personalLabel = "Personal", perso
           className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0 border border-dashed border-primary/30 text-primary hover:bg-primary/5"
         >
           <Plus size={12} />
-          <span>{isHomePage ? "Add Family" : "Add Group"}</span>
+          <span>Add Group</span>
         </button>
       </div>
 

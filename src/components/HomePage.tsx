@@ -725,63 +725,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
         )}
       </header>
 
-      <PageGroupSelector page="calendar" isHomePage personalLabel="Mine" hideAllPill />
-
-      {/* All view: member filter pills */}
-      {isAllActive && allViewMembers.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide py-1 mb-4">
-          <button
-            onClick={() => toggleAllViewPill("everyone")}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-              allViewSelectedIds.has("everyone")
-                ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                : "border-border bg-card text-muted-foreground hover:border-primary/30"
-            }`}
-          >
-            Everyone
-          </button>
-          <button
-            onClick={() => toggleAllViewPill("mine")}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-              allViewSelectedIds.has("mine")
-                ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                : "border-border bg-card text-muted-foreground hover:border-primary/30"
-            }`}
-          >
-            Mine
-          </button>
-          {allViewMembers.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => toggleAllViewPill(m.id)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-                allViewSelectedIds.has(m.id)
-                  ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                  : "border-border bg-card text-muted-foreground hover:border-primary/30"
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Group view: member filter tabs */}
-      {!isAllActive && !isPersonalActive && groupFilters.length > 1 && (
-        <div className="flex gap-1 bg-secondary rounded-xl p-1 mb-5 overflow-x-auto scrollbar-hide">
-          {groupFilters.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              className={`flex-shrink-0 px-3 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
-                filter === f.id ? "bg-card text-foreground shadow-card" : "text-muted-foreground"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Home page is always the logged-in user's personal view — no group or member selectors */}
 
       {/* Voice Mode Overlay */}
       <AnimatePresence>
