@@ -210,7 +210,7 @@ const SpecialDaysPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) =>
         </div>
       </div>
 
-      <PageGroupSelector page="special_days" />
+      <PageGroupSelector page="special_days" personalLabel="Mine" hideAllPill />
 
       {/* Active filter badge */}
       {hasActiveFilter && (
