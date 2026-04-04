@@ -445,11 +445,13 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
 
   if (columns.length === 0) return null;
 
+  const reorderBtnWidth = columns.length > 1 ? 32 : 0;
+
   return (
     <div className="mt-3 border-t border-border pt-2 w-full overflow-hidden" style={{ boxSizing: "border-box" }}>
       {/* Column headers with optional reorder */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="grid gap-1 flex-1 min-w-0 overflow-hidden" style={{ gridTemplateColumns: `48px repeat(${columns.length}, minmax(0, 1fr))` }}>
+      <div className="flex items-center mb-2 gap-1">
+        <div className="grid gap-1 min-w-0 overflow-hidden" style={{ gridTemplateColumns: `48px repeat(${columns.length}, minmax(0, 1fr))`, flex: "1 1 0%", minWidth: 0 }}>
           <div />
           {columns.map((col, idx) => {
             const colors = MEMBER_COLORS[col.colorIndex % MEMBER_COLORS.length];
@@ -460,7 +462,7 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={(e) => handleDragOver(e, idx)}
                 onDragEnd={handleDragEnd}
-                className={`rounded-lg px-2 py-1.5 flex items-center gap-1.5 ${colors.bg} ${showReorder ? "cursor-grab active:cursor-grabbing ring-1 ring-primary/20" : ""} ${dragIdx === idx ? "opacity-50" : ""}`}
+                className={`rounded-lg px-2 py-1.5 flex items-center gap-1.5 min-w-0 overflow-hidden ${colors.bg} ${showReorder ? "cursor-grab active:cursor-grabbing ring-1 ring-primary/20" : ""} ${dragIdx === idx ? "opacity-50" : ""}`}
               >
                 {showReorder && <GripVertical size={10} className="text-muted-foreground flex-shrink-0" />}
                 <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 ${colors.avatarBg}`}>
@@ -474,24 +476,27 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
         {columns.length > 1 && (
           <button
             onClick={() => setShowReorder(!showReorder)}
-            className={`ml-1 text-[10px] font-medium px-2 py-1 rounded-md flex-shrink-0 transition-colors ${showReorder ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
+            className={`text-[10px] font-medium px-2 py-1 rounded-md flex-shrink-0 transition-colors ${showReorder ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
           >
             {showReorder ? "Done" : "⇄"}
           </button>
         )}
       </div>
 
-      {/* All-day events */}
-      {allDayItems.length > 0 && renderItemRow(allDayItems, true)}
+      {/* Event rows — right margin matches the reorder button width so cards don't overflow into it */}
+      <div style={{ marginRight: reorderBtnWidth > 0 ? `${reorderBtnWidth + 4}px` : 0 }}>
+        {/* All-day events */}
+        {allDayItems.length > 0 && renderItemRow(allDayItems, true)}
 
-      {/* Timed rows */}
-      <div className="space-y-0.5">
-        {timeRows.map(row => renderItemRow(row.items, false, formatMinutes(row.time)))}
+        {/* Timed rows */}
+        <div className="space-y-0.5">
+          {timeRows.map(row => renderItemRow(row.items, false, formatMinutes(row.time)))}
+        </div>
+
+        {items.length === 0 && (
+          <p className="text-xs text-muted-foreground text-center py-6">No events</p>
+        )}
       </div>
-
-      {items.length === 0 && (
-        <p className="text-xs text-muted-foreground text-center py-6">No events</p>
-      )}
     </div>
   );
 };
