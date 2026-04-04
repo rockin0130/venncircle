@@ -243,43 +243,34 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     consumed: boolean;
   }): Promise<MealLog[]> => {
     if (!user) return [];
-    const targets: (string | null)[] = [null];
-    for (const gid of addMealGroupIds) {
-      if (gid && !targets.includes(gid)) targets.push(gid);
-    }
-    const results = await Promise.all(
-      targets.map((targetGroupId) =>
-        supabase
-          .from("meal_logs")
-          .insert({
-            user_id: user.id,
-            group_id: targetGroupId,
-            meal_date: mealPayload.meal_date,
-            meal_type: mealPayload.meal_type,
-            title: mealPayload.title,
-            ingredients: mealPayload.ingredients || [],
-            prep_steps: mealPayload.prep_steps || [],
-            protein: mealPayload.protein,
-            calories: mealPayload.calories,
-            carbs: mealPayload.carbs || 0,
-            fat: mealPayload.fat || 0,
-            fiber: mealPayload.fiber || 0,
-            is_ai_generated: mealPayload.is_ai_generated,
-            ai_tags: mealPayload.ai_tags || [],
-            consumed: mealPayload.consumed,
-          })
-          .select()
-          .single()
-      )
-    );
-    const insertedMeals = results.flatMap((result) => {
-      if (result.error || !result.data) return [];
-      return [result.data as MealLog];
-    });
-    if (insertedMeals.length === 0) {
+    // Single record — use group_id of the first selected group (or null for personal-only)
+    const targetGroupId = addMealGroupIds.length > 0 ? addMealGroupIds[0] : null;
+    const { data, error } = await supabase
+      .from("meal_logs")
+      .insert({
+        user_id: user.id,
+        group_id: targetGroupId,
+        meal_date: mealPayload.meal_date,
+        meal_type: mealPayload.meal_type,
+        title: mealPayload.title,
+        ingredients: mealPayload.ingredients || [],
+        prep_steps: mealPayload.prep_steps || [],
+        protein: mealPayload.protein,
+        calories: mealPayload.calories,
+        carbs: mealPayload.carbs || 0,
+        fat: mealPayload.fat || 0,
+        fiber: mealPayload.fiber || 0,
+        is_ai_generated: mealPayload.is_ai_generated,
+        ai_tags: mealPayload.ai_tags || [],
+        consumed: mealPayload.consumed,
+      })
+      .select()
+      .single();
+    if (error || !data) {
       toast.error("Couldn't save meal.");
+      return [];
     }
-    return insertedMeals;
+    return [data as MealLog];
   }, [addMealGroupIds, user]);
 
   const rangeDates = useMemo(() => {
@@ -858,20 +849,35 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     return otherUserMeals.some(m => m.user_id === userId && m.meal_date === dateStr && m.consumed);
   }, [otherUserMeals, dateStr]);
 
-  // Date strip data
-  const loggedDatesSet = useMemo(() => {
-    const s = new Set<string>();
-    allMeals.forEach(m => { if (m.consumed) s.add(m.meal_date); });
-    otherUserMeals.forEach(m => { if (m.consumed) s.add(m.meal_date); });
-    return s;
-  }, [allMeals, otherUserMeals]);
+  // Date strip data — fetch all meal dates from DB for accurate dots
+  const [allMealDatesLogged, setAllMealDatesLogged] = useState<Set<string>>(new Set());
+  const [allMealDatesPlanned, setAllMealDatesPlanned] = useState<Set<string>>(new Set());
 
-  const plannedDatesSet = useMemo(() => {
-    const s = new Set<string>();
-    const todayStr = fmtDate(new Date());
-    allMeals.forEach(m => { if (!m.consumed && m.meal_date > todayStr) s.add(m.meal_date); });
-    return s;
-  }, [allMeals]);
+  useEffect(() => {
+    if (!user) return;
+    const loadDates = async () => {
+      const todayStr = fmtDate(new Date());
+      // Fetch distinct dates with consumed meals (logged)
+      const { data: loggedData } = await supabase
+        .from("meal_logs")
+        .select("meal_date, consumed")
+        .eq("user_id", user.id);
+      if (loggedData) {
+        const logged = new Set<string>();
+        const planned = new Set<string>();
+        for (const m of loggedData) {
+          if (m.consumed) logged.add(m.meal_date);
+          if (!m.consumed && m.meal_date >= todayStr) planned.add(m.meal_date);
+        }
+        setAllMealDatesLogged(logged);
+        setAllMealDatesPlanned(planned);
+      }
+    };
+    loadDates();
+  }, [user, allMeals.length]); // re-run when meals change
+
+  const loggedDatesSet = allMealDatesLogged;
+  const plannedDatesSet = allMealDatesPlanned;
 
   const dateLabel = selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 
@@ -881,13 +887,17 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   const caloriesPct = calorieGoal > 0 ? Math.min((caloriesConsumed / calorieGoal) * 100, 100) : 0;
   const caloriesRemaining = Math.max(0, calorieGoal - caloriesConsumed);
 
-  // Macro bars for single-user view (P, C, F)
+  // Macro bars for single-user view — only show enabled trackers
   const macroBarData = useMemo(() => {
-    const p = { key: "protein" as TrackerKey, label: "Protein", val: myTotals.protein, goal: goals.protein_goal || 150, color: "hsl(var(--primary))" };
-    const c = { key: "carbs" as TrackerKey, label: "Carbs", val: myTotals.carbs, goal: goals.carbs_goal || 220, color: "hsl(45 93% 47%)" };
-    const f = { key: "fat" as TrackerKey, label: "Fat", val: myTotals.fat, goal: goals.fat_goal || 70, color: "hsl(340 60% 55%)" };
-    return [p, c, f];
-  }, [myTotals, goals]);
+    const allBars = [
+      { key: "protein" as TrackerKey, label: "Protein", val: myTotals.protein, goal: goals.protein_goal || 150, color: "hsl(var(--primary))" },
+      { key: "calories" as TrackerKey, label: "Calories", val: myTotals.calories, goal: goals.calorie_goal || 2000, color: "hsl(25 95% 53%)" },
+      { key: "carbs" as TrackerKey, label: "Carbs", val: myTotals.carbs, goal: goals.carbs_goal || 220, color: "hsl(45 93% 47%)" },
+      { key: "fat" as TrackerKey, label: "Fat", val: myTotals.fat, goal: goals.fat_goal || 70, color: "hsl(340 60% 55%)" },
+      { key: "fiber" as TrackerKey, label: "Fiber", val: myTotals.fiber, goal: goals.fiber_goal || 30, color: "hsl(142 71% 45%)" },
+    ];
+    return allBars.filter(b => enabledTrackers.includes(b.key));
+  }, [myTotals, goals, enabledTrackers]);
 
   // If showing log page, render it instead
   if (showLogPage) {
@@ -1056,8 +1066,8 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
                   </button>
                 </div>
               </div>
-              {/* Macro bars */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* Macro bars — only enabled trackers */}
+              <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${Math.min(macroBarData.length, 3)}, minmax(0, 1fr))` }}>
                 {macroBarData.map(bar => {
                   const pct = bar.goal > 0 ? Math.min((bar.val / bar.goal) * 100, 100) : 0;
                   return (
@@ -1066,7 +1076,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
                       <div className="h-2 rounded-full bg-secondary overflow-hidden mt-0.5">
                         <motion.div className="h-full rounded-full" style={{ backgroundColor: bar.color }} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6 }} />
                       </div>
-                      <p className="text-[9px] text-muted-foreground mt-0.5">{Math.round(bar.val)}g / {bar.goal}g</p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">{Math.round(bar.val)}{bar.key === "calories" ? "" : "g"} / {bar.goal}{bar.key === "calories" ? " kcal" : "g"}</p>
                     </div>
                   );
                 })}
@@ -1185,12 +1195,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
             </div>
             {/* Meal cards in columns by type */}
             {MEAL_TYPES.map(mt => {
-              const hasMeals = selectedUsersOrdered.some(u => {
-                const isOwn = u.id === user?.id;
-                const meals = isOwn ? myMealsForView.filter(m => m.user_id === user?.id) : otherUserMeals.filter(m => m.user_id === u.id);
-                return meals.some(m => m.meal_date === dateStr && m.meal_type === mt.key);
-              });
-              if (!hasMeals) return null;
+              // Always show all meal types in multi-user view so nudge buttons appear in empty cells
 
               return (
                 <div key={mt.key} className="mb-3">
@@ -1207,7 +1212,13 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
                         if (meals.length === 0) {
                           return (
                             <div key={u.id} className="rounded-xl border-2 border-dashed border-border/50 p-2 flex items-center justify-center min-h-[60px]">
-                              <span className="text-[9px] text-muted-foreground">None</span>
+                              {!isOwn ? (
+                                <button onClick={() => sendNudge(u.id)} className="flex items-center gap-1 text-[9px] text-primary font-semibold hover:underline">
+                                  <Bell size={10} /> Nudge {u.name}
+                                </button>
+                              ) : (
+                                <span className="text-[9px] text-muted-foreground">None</span>
+                              )}
                             </div>
                           );
                         }
@@ -1242,16 +1253,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
               );
             })}
 
-            {/* Nudge buttons for users who haven't logged */}
-            {selectedOtherIds.map(otherId => {
-              if (otherUserHasLoggedToday(otherId)) return null;
-              const info = getMemberInfo(otherId);
-              return (
-                <button key={otherId} onClick={() => sendNudge(otherId)} className="flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline mb-1">
-                  <Bell size={12} /> Nudge {info.name}
-                </button>
-              );
-            })}
+            {/* Standalone nudge rows removed — nudge is now inside empty column cells */}
           </>
         )}
 
@@ -1700,7 +1702,7 @@ function SharingSelector({ groups, selectedGroupIds, onGroupIdsChange }: {
       </label>
       <div className="flex flex-wrap gap-1.5">
         <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-primary text-primary-foreground border border-primary cursor-default opacity-80">
-          🔒 Personal
+          🔒 Only Me
         </span>
         {groups.map((g) => {
           const isSelected = selectedGroupIds.includes(g.id);
