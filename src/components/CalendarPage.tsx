@@ -1124,15 +1124,19 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
                 const dots = monthDots.get(day);
 
                 return (
-                  <button key={day} onClick={() => selectDay(day)} className="h-11 flex flex-col items-center justify-center relative">
+                  <button key={day} onClick={() => {
+                    selectDay(day);
+                    // Tapping today's date = go to today
+                    if (isTodayDay) goToday();
+                  }} className="h-11 flex flex-col items-center justify-center relative">
                     <span className={`w-8 h-8 flex items-center justify-center rounded-full text-[13px] transition-all ${
                       isSelected ? "bg-primary text-primary-foreground font-semibold"
-                        : isTodayDay ? "bg-destructive text-destructive-foreground font-semibold"
+                        : isTodayDay ? "ring-2 ring-primary text-primary font-semibold"
                         : "text-foreground hover:bg-secondary"
                     }`}>
                       {day}
                     </span>
-                    {dots && !isSelected && (
+                    {dots && (
                       <div className="flex gap-[2px] absolute bottom-0">
                         {dots.slice(0, 3).map((dot, idx) => (
                             <span key={idx} className="w-[4px] h-[4px] rounded-full"
@@ -1146,15 +1150,22 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
             </motion.div>
           </AnimatePresence>
 
-          {/* Selected day event list */}
+          {/* Selected day event list or team dashboard */}
           <div className="mt-3 border-t border-border pt-3">
             <h2 className="text-[13px] font-semibold text-foreground mb-2">
               {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
             </h2>
-            {selectedDayItems.length === 0 ? (
+            {multiUserSelected ? (
+              <CalendarTeamDashboard
+                items={selectedDayItems}
+                filterUsers={calFilterUsers}
+                selectedUserIds={userFilterIds}
+                onItemTap={handleItemTap}
+              />
+            ) : selectedDayItems.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-6">No events</p>
             ) : (
-              <EventList items={selectedDayItems} groups={groups} getColorClasses={getColorClasses} onItemTap={handleItemTap} colorMap={calendarColorMap} />
+              <EventList items={selectedDayItems} groups={groups} getColorClasses={getColorClasses} onItemTap={handleItemTap} colorMap={calendarColorMap} filterUsers={calFilterUsers} />
             )}
           </div>
         </motion.div>
