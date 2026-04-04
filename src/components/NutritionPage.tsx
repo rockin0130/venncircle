@@ -1066,8 +1066,8 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
                   </button>
                 </div>
               </div>
-              {/* Macro bars */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* Macro bars — only enabled trackers */}
+              <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${Math.min(macroBarData.length, 3)}, minmax(0, 1fr))` }}>
                 {macroBarData.map(bar => {
                   const pct = bar.goal > 0 ? Math.min((bar.val / bar.goal) * 100, 100) : 0;
                   return (
@@ -1076,7 +1076,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
                       <div className="h-2 rounded-full bg-secondary overflow-hidden mt-0.5">
                         <motion.div className="h-full rounded-full" style={{ backgroundColor: bar.color }} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6 }} />
                       </div>
-                      <p className="text-[9px] text-muted-foreground mt-0.5">{Math.round(bar.val)}g / {bar.goal}g</p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">{Math.round(bar.val)}{bar.key === "calories" ? "" : "g"} / {bar.goal}{bar.key === "calories" ? " kcal" : "g"}</p>
                     </div>
                   );
                 })}
