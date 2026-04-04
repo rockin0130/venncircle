@@ -362,31 +362,8 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   // Habit sections from context
   const { habitSections, waterGoal, waterIntake } = useAppContext();
 
-  // Compute which habit sub-items actually exist right now
-  const waterEnabled = (() => {
-    const saved = localStorage.getItem("habits_show_water");
-    return saved !== null ? saved === "true" : true;
-  })();
-
-  const eligibleHabitSubIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (waterEnabled) ids.add("water");
-    const categories = ["morning", "afternoon", "evening", "other"];
-    for (const cat of categories) {
-      const hasHabits = filteredHabits.some((h) => {
-        const hCat = (h.category || "other").toLowerCase();
-        return hCat === cat || hCat === `${cat}-habits`;
-      });
-      if (hasHabits) ids.add(`habit:${cat}`);
-    }
-    return ids;
-  }, [filteredHabits, waterEnabled]);
-
-  // Effective habit sub-items: intersection of user preference and actual existence
-  const effectiveHabitSubIds = useMemo(
-    () => selectedHabitSubIds.filter((id) => eligibleHabitSubIds.has(id)),
-    [selectedHabitSubIds, eligibleHabitSubIds]
-  );
+  // Effective habit sub-items: just the habit category toggles from preferences
+  const effectiveHabitSubIds = selectedHabitSubIds;
 
   const { filters: groupFilters, otherName, hasOther, showGoogleCalendar } = useGroupContext();
   const partnerName = otherName;
