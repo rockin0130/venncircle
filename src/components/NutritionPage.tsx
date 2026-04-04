@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Apple, Plus, Sparkles, RefreshCw, ChevronLeft, ChevronRight, Check, X, Loader2, Settings, Calendar, Target, Camera, ArrowLeftRight, Pencil, Clock, Zap, Users, EyeOff, Bell } from "lucide-react";
+import { Apple, Plus, Sparkles, RefreshCw, ChevronLeft, ChevronRight, Check, X, Loader2, Settings, Calendar, Target, Camera, ArrowLeftRight, Pencil, Clock, Zap, Users, EyeOff, Bell, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Group, useAuth, GroupMember } from "@/context/AuthContext";
 import { toast } from "sonner";
@@ -10,9 +10,8 @@ import { useGroupContext } from "@/hooks/useGroupContext";
 import { useModalScrollLock } from "@/hooks/useModalScrollLock";
 import PageGroupSelector from "@/components/PageGroupSelector";
 import NutritionUserFilter, { EVERYONE_SENTINEL } from "@/components/NutritionUserFilter";
-import NutritionDateStrip from "@/components/NutritionDateStrip";
-import NutritionWeekView from "@/components/NutritionWeekView";
-import { CalendarDays, LayoutList } from "lucide-react";
+import NutritionCollapsibleDateStrip from "@/components/NutritionCollapsibleDateStrip";
+import NutritionLogPage from "@/components/NutritionLogPage";
 
 
 const fmtDate = (d: Date) =>
@@ -73,8 +72,6 @@ interface NutritionGoals {
   tracker_order: TrackerKey[];
 }
 
-type NutritionNavMode = "day" | "week";
-
 const MEAL_TYPES = [
   { key: "breakfast", label: "Breakfast", icon: "🌅" },
   { key: "lunch", label: "Lunch", icon: "☀️" },
@@ -82,12 +79,24 @@ const MEAL_TYPES = [
   { key: "snack", label: "Snacks", icon: "🍎" },
 ];
 
+const USER_COLORS = [
+  { bg: "hsl(210 100% 96%)", border: "hsl(210 80% 75%)", accent: "hsl(var(--primary))" },
+  { bg: "hsl(120 40% 93%)", border: "hsl(120 40% 70%)", accent: "hsl(142 71% 45%)" },
+  { bg: "hsl(340 60% 95%)", border: "hsl(340 60% 78%)", accent: "hsl(340 60% 55%)" },
+  { bg: "hsl(260 50% 95%)", border: "hsl(260 50% 75%)", accent: "hsl(260 50% 55%)" },
+  { bg: "hsl(30 80% 94%)", border: "hsl(30 60% 72%)", accent: "hsl(30 80% 50%)" },
+];
+
+function getUserColor(index: number) {
+  return USER_COLORS[index % USER_COLORS.length];
+}
+
 const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   const { user, activeGroup, partner, profile, groups } = useAuth();
   const { hasOther, otherName } = useGroupContext();
 
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [navMode, setNavMode] = useState<NutritionNavMode>("day");
+  const [showLogPage, setShowLogPage] = useState(false);
 
   // Per-context pill selection state
   const pillStateRef = useRef<Record<string, Set<string>>>({});
@@ -99,7 +108,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
 
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set([EVERYONE_SENTINEL]));
 
-  // Sync pill state per context
   useEffect(() => {
     const key = getContextKey();
     if (pillStateRef.current[key]) {
@@ -123,7 +131,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
 
-  // AI suggestion results
   const [aiResults, setAiResults] = useState<any[]>([]);
   const [showAiResults, setShowAiResults] = useState(false);
 
@@ -143,7 +150,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   const [aiEstimating, setAiEstimating] = useState(false);
   const [goalProtein, setGoalProtein] = useState("150");
   
-  // Inline edit state (used inside detail modal)
   const [editTitle, setEditTitle] = useState("");
   const [editProtein, setEditProtein] = useState("");
   const [editCalories, setEditCalories] = useState("");
@@ -162,16 +168,12 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   const [cameraAnalyzing, setCameraAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Add meal: group sharing selection — Personal always included
   const [addMealGroupIds, setAddMealGroupIds] = useState<string[]>([]);
   const [aiConfirmSelection, setAiConfirmSelection] = useState<{ suggestion: any; index: number } | null>(null);
 
-  // Quick Suggestions / Frequent Items
-  const [mealIdeasTab, setMealIdeasTab] = useState<"suggestions" | "frequent">("suggestions");
   const [frequentMeals, setFrequentMeals] = useState<{ title: string; protein: number; calories: number; carbs: number; fat: number; fiber: number; meal_type: string; count: number; ingredients: string[]; prep_steps: string[] }[]>([]);
   const [ideaPreview, setIdeaPreview] = useState<{ title: string; protein: number; calories: number; carbs: number; fat: number; fiber: number; meal_type: string; ingredients: string[]; prep_steps: string[] } | null>(null);
 
-  // Shopping list prompt
   const [shopPrompt, setShopPrompt] = useState<{ ingredients: string[]; mealTitle: string; mealDate: string } | null>(null);
   const [shopQueue, setShopQueue] = useState<{ ingredients: string[]; mealTitle: string; mealDate: string }[]>([]);
   const [shopChecked, setShopChecked] = useState<Record<number, boolean>>({});
@@ -209,8 +211,8 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   const groupId = isPersonalActive ? null : (activeGroup?.id || null);
   const dateStr = fmtDate(selectedDate);
   const isToday = dateStr === fmtDate(new Date());
+  const isFuture = dateStr > fmtDate(new Date());
 
-  // Nutrition groups = groups with nutrition page enabled
   const nutritionGroups = useMemo(() => groups.filter(g => g.shared_pages?.includes("nutrition")), [groups]);
 
   const applyDefaultSharingSelection = useCallback(() => {
@@ -225,7 +227,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     setAddMealGroupIds([]);
   }, []);
 
-  // Create meal: always save to Personal (group_id=null) + optionally to selected groups
   const createMealsForSharing = useCallback(async (mealPayload: {
     meal_date: string;
     meal_type: string;
@@ -242,13 +243,10 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     consumed: boolean;
   }): Promise<MealLog[]> => {
     if (!user) return [];
-
-    // Always Personal (null) + selected groups
     const targets: (string | null)[] = [null];
     for (const gid of addMealGroupIds) {
       if (gid && !targets.includes(gid)) targets.push(gid);
     }
-
     const results = await Promise.all(
       targets.map((targetGroupId) =>
         supabase
@@ -274,16 +272,13 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
           .single()
       )
     );
-
     const insertedMeals = results.flatMap((result) => {
       if (result.error || !result.data) return [];
       return [result.data as MealLog];
     });
-
     if (insertedMeals.length === 0) {
       toast.error("Couldn't save meal.");
     }
-
     return insertedMeals;
   }, [addMealGroupIds, user]);
 
@@ -291,7 +286,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     return [fmtDate(selectedDate)];
   }, [selectedDate]);
 
-  // Resolve which user IDs are currently selected
   const resolvedSelectedUserIds = useMemo(() => {
     if (!user) return new Set<string>();
     if (selectedUserIds.has(EVERYONE_SENTINEL)) {
@@ -313,6 +307,20 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   }, [resolvedSelectedUserIds, user]);
   const multipleSelected = resolvedSelectedUserIds.size > 1;
 
+  // Build ordered list of all selected users for column layout
+  const selectedUsersOrdered = useMemo(() => {
+    const users: { id: string; name: string; avatarUrl: string | null; index: number }[] = [];
+    let idx = 0;
+    if (isMySelected && user) {
+      users.push({ id: user.id, name: profile?.display_name?.split(" ")[0] || "Me", avatarUrl: profile?.avatar_url || null, index: idx++ });
+    }
+    for (const otherId of selectedOtherIds) {
+      const info = getMemberInfo(otherId);
+      users.push({ id: otherId, name: info.name, avatarUrl: info.avatarUrl || null, index: idx++ });
+    }
+    return users;
+  }, [isMySelected, user, profile, selectedOtherIds]);
+
   // Load data
   useEffect(() => {
     if (!user) return;
@@ -321,7 +329,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
       const startDate = rangeDates[0];
       const endDate = rangeDates[rangeDates.length - 1];
 
-      // Load own meals across all relevant contexts
       let ownMealsQuery = supabase.from("meal_logs").select("*")
         .eq("user_id", user.id)
         .gte("meal_date", startDate)
@@ -333,13 +340,11 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
         .lte("suggestion_date", endDate);
 
       if (isGroupView && groupId) {
-        // In group view, load own meals for this group + personal (for "Only you" indicator)
-        // We load all own meals (no group filter) so we can show the indicator
+        // load all own meals (no group filter)
       } else if (isPersonalActive) {
         ownMealsQuery = ownMealsQuery.is("group_id", null);
         ownSuggestionsQuery = ownSuggestionsQuery.is("group_id", null);
       }
-      // All view: load all own meals (no group filter)
 
       const [mealsRes, goalsRes, suggestionsRes] = await Promise.all([
         ownMealsQuery,
@@ -375,7 +380,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
       }
       if (suggestionsRes.data) setSuggestions(suggestionsRes.data as MealSuggestion[]);
 
-      // Load other users' meals
       if ((isGroupView || isAllView) && hasOther) {
         const otherIds: string[] = [];
         if (isGroupView && activeGroup) {
@@ -401,8 +405,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
           if (isGroupView && groupId) {
             otherMealsQuery = otherMealsQuery.eq("group_id", groupId);
           }
-          // All view: fetch from all groups (RLS handles it — only shared group data visible)
-          // Personal data of others is never accessible via RLS
 
           const { data: otherData } = await otherMealsQuery;
           if (otherData) setOtherUserMeals(otherData as MealLog[]);
@@ -418,14 +420,11 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     load();
   }, [user, rangeDates, groupId, hasOther, activeGroup, isGroupView, isAllView, isPersonalActive, nutritionGroups]);
 
-  // Scoped own meals for the current view
   const myMealsForView = useMemo(() => {
     if (isPersonalActive) return allMeals.filter(m => !m.group_id);
     if (isGroupView && groupId) {
-      // In group view: show meals with this group_id OR personal meals (with "Only you" indicator)
       return allMeals.filter(m => m.group_id === groupId || !m.group_id);
     }
-    // All view: all own meals, deduplicated by title+date+meal_type
     const seen = new Set<string>();
     const deduped: MealLog[] = [];
     for (const m of allMeals) {
@@ -438,13 +437,11 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     return deduped;
   }, [allMeals, isPersonalActive, isGroupView, isAllView, groupId]);
 
-  // Check if a meal is "Only you" (not shared with current group)
   const isOnlyYou = useCallback((meal: MealLog) => {
     if (!isGroupView || !groupId) return false;
     return !meal.group_id || meal.group_id !== groupId;
   }, [isGroupView, groupId]);
 
-  // Get member info for display
   const getMemberInfo = useCallback((userId: string) => {
     if (userId === user?.id) return { name: "Mine", displayName: profile?.display_name || "Me", avatarUrl: profile?.avatar_url };
     for (const g of groups) {
@@ -454,7 +451,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     return { name: "Member", displayName: "Member", avatarUrl: null };
   }, [user, profile, groups]);
 
-  // Tracker data per user
   const getTrackerTotals = useCallback((mealsForUser: MealLog[]): Record<TrackerKey, number> => {
     const consumed = mealsForUser.filter(m => m.consumed && m.meal_date === dateStr);
     return {
@@ -489,12 +485,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     applyDefaultSharingSelection();
     setAiConfirmSelection({ suggestion, index });
   }, [applyDefaultSharingSelection]);
-
-  const changeDate = (delta: number) => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + delta);
-    setSelectedDate(d);
-  };
 
   // Generate AI suggestions
   const generateSuggestions = async () => {
@@ -852,21 +842,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     }
   };
 
-  const dateLabel = selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-
-  // Set of dates that have meal data (for date strip dots)
-  const mealDatesSet = useMemo(() => {
-    const s = new Set<string>();
-    allMeals.forEach(m => { if (m.consumed) s.add(m.meal_date); });
-    otherUserMeals.forEach(m => { if (m.consumed) s.add(m.meal_date); });
-    return s;
-  }, [allMeals, otherUserMeals]);
-
-  // Check if other user has logged nutrition today
-  const otherUserHasLoggedToday = useCallback((userId: string) => {
-    return otherUserMeals.some(m => m.user_id === userId && m.meal_date === dateStr && m.consumed);
-  }, [otherUserMeals, dateStr]);
-
   // Nudge handler
   const sendNudge = async (toUserId: string) => {
     if (!user) return;
@@ -878,366 +853,467 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     if (!error) toast.success("Nudge sent!");
   };
 
-  // Render multi-user tracker card
-  const renderMultiUserTrackers = () => {
-    const userColumns: { id: string; name: string; avatarUrl: string | null; totals: Record<TrackerKey, number> }[] = [];
+  const otherUserHasLoggedToday = useCallback((userId: string) => {
+    return otherUserMeals.some(m => m.user_id === userId && m.meal_date === dateStr && m.consumed);
+  }, [otherUserMeals, dateStr]);
 
-    if (isMySelected) {
-      userColumns.push({ id: user!.id, name: profile?.display_name?.split(" ")[0] || "Me", avatarUrl: profile?.avatar_url || null, totals: myTotals });
-    }
+  // Date strip data
+  const loggedDatesSet = useMemo(() => {
+    const s = new Set<string>();
+    allMeals.forEach(m => { if (m.consumed) s.add(m.meal_date); });
+    otherUserMeals.forEach(m => { if (m.consumed) s.add(m.meal_date); });
+    return s;
+  }, [allMeals, otherUserMeals]);
 
-    for (const otherId of selectedOtherIds) {
-      const info = getMemberInfo(otherId);
-      const otherMealsToday = otherUserMeals.filter(m => m.user_id === otherId && m.meal_date === dateStr && m.consumed);
-      const totals: Record<TrackerKey, number> = {
-        protein: otherMealsToday.reduce((s, m) => s + m.protein, 0),
-        calories: otherMealsToday.reduce((s, m) => s + (m.calories || 0), 0),
-        carbs: otherMealsToday.reduce((s, m) => s + (m.carbs || 0), 0),
-        fat: otherMealsToday.reduce((s, m) => s + (m.fat || 0), 0),
-        fiber: otherMealsToday.reduce((s, m) => s + (m.fiber || 0), 0),
-      };
-      userColumns.push({ id: otherId, name: info.name, avatarUrl: info.avatarUrl || null, totals });
-    }
+  const plannedDatesSet = useMemo(() => {
+    const s = new Set<string>();
+    const todayStr = fmtDate(new Date());
+    allMeals.forEach(m => { if (!m.consumed && m.meal_date > todayStr) s.add(m.meal_date); });
+    return s;
+  }, [allMeals]);
 
-    if (userColumns.length === 0) return null;
+  const dateLabel = selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 
+  // Calorie ring data
+  const calorieGoal = goals.calorie_goal || ALL_TRACKERS.find(t => t.key === "calories")!.defaultGoal;
+  const caloriesConsumed = myTotals.calories;
+  const caloriesPct = calorieGoal > 0 ? Math.min((caloriesConsumed / calorieGoal) * 100, 100) : 0;
+  const caloriesRemaining = Math.max(0, calorieGoal - caloriesConsumed);
+
+  // Macro bars for single-user view (P, C, F)
+  const macroBarData = useMemo(() => {
+    const p = { key: "protein" as TrackerKey, label: "Protein", val: myTotals.protein, goal: goals.protein_goal || 150, color: "hsl(var(--primary))" };
+    const c = { key: "carbs" as TrackerKey, label: "Carbs", val: myTotals.carbs, goal: goals.carbs_goal || 220, color: "hsl(45 93% 47%)" };
+    const f = { key: "fat" as TrackerKey, label: "Fat", val: myTotals.fat, goal: goals.fat_goal || 70, color: "hsl(340 60% 55%)" };
+    return [p, c, f];
+  }, [myTotals, goals]);
+
+  // If showing log page, render it instead
+  if (showLogPage) {
     return (
-      <div className="mb-2 mt-1">
-        <div className="bg-card rounded-2xl p-4 shadow-card border border-border">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Daily Trackers</span>
-            {isMySelected && (
-              <button onClick={() => setShowGoalSettings(true)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-colors" title="Nutrition Goals">
-                <Target size={12} /> Goals
-              </button>
-            )}
-          </div>
+      <NutritionLogPage
+        onBack={() => setShowLogPage(false)}
+        onSelectDate={(d) => { setSelectedDate(d); setShowLogPage(false); }}
+      />
+    );
+  }
 
-          {userColumns.length > 1 ? (
-            // Multi-user side-by-side table
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr>
-                    <th className="text-left py-1 pr-2 font-semibold text-muted-foreground" />
-                    {userColumns.map(col => (
-                      <th key={col.id} className="text-center py-1 px-1 min-w-[70px]">
-                        <div className="flex flex-col items-center gap-0.5">
-                          {col.avatarUrl ? (
-                            <img src={col.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
-                          ) : (
-                            <span className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-bold text-primary">{col.name.charAt(0)}</span>
-                          )}
-                          <span className="text-[10px] font-medium text-foreground truncate max-w-[60px]">{col.name}</span>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {orderedTrackers.map((key: TrackerKey) => {
-                    const info = ALL_TRACKERS.find(t => t.key === key)!;
-                    const goal = (trackerGoals[key] as number) || info.defaultGoal;
+  // Group meals by type for display
+  const getMealsByType = (meals: MealLog[]) => {
+    const grouped: Record<string, MealLog[]> = {};
+    for (const m of meals.filter(m => m.meal_date === dateStr)) {
+      if (!grouped[m.meal_type]) grouped[m.meal_type] = [];
+      grouped[m.meal_type].push(m);
+    }
+    return grouped;
+  };
+
+  // Quick suggestion items
+  const QUICK_IDEAS = [
+    { title: "Greek Yogurt Bowl", protein: 20, calories: 250, carbs: 30, fat: 8, fiber: 3, meal_type: "breakfast", ingredients: ["200g Greek yogurt", "1/4 cup granola", "1 tbsp honey", "Mixed berries", "1 tbsp chia seeds"], prep_steps: ["Add Greek yogurt to a bowl", "Top with granola and mixed berries", "Drizzle honey and sprinkle chia seeds"] },
+    { title: "Chicken Rice Bowl", protein: 35, calories: 450, carbs: 45, fat: 12, fiber: 4, meal_type: "lunch", ingredients: ["200g chicken breast", "1 cup cooked rice", "1/2 avocado", "Mixed greens", "Soy sauce", "Sesame seeds"], prep_steps: ["Season and grill chicken breast", "Cook rice", "Slice avocado", "Assemble bowl"] },
+    { title: "Turkey Lettuce Wraps", protein: 28, calories: 280, carbs: 12, fat: 14, fiber: 3, meal_type: "lunch", ingredients: ["200g ground turkey", "Large lettuce leaves", "1/2 diced onion", "2 cloves garlic", "Soy sauce", "Sriracha"], prep_steps: ["Cook turkey with onion and garlic", "Season with soy sauce", "Spoon into lettuce leaves"] },
+    { title: "Protein Smoothie", protein: 30, calories: 320, carbs: 35, fat: 6, fiber: 5, meal_type: "snack", ingredients: ["1 scoop protein powder", "1 banana", "1 cup spinach", "1 cup almond milk", "1 tbsp peanut butter"], prep_steps: ["Add all ingredients to blender", "Blend until smooth"] },
+    { title: "Salmon & Veggies", protein: 32, calories: 380, carbs: 15, fat: 18, fiber: 6, meal_type: "dinner", ingredients: ["170g salmon fillet", "1 cup broccoli", "1/2 cup bell peppers", "Olive oil", "Lemon juice"], prep_steps: ["Preheat oven 200°C", "Season salmon", "Bake 15-18 min"] },
+    { title: "Egg White Omelette", protein: 24, calories: 200, carbs: 4, fat: 8, fiber: 1, meal_type: "breakfast", ingredients: ["6 egg whites", "Bell pepper", "Spinach", "Feta cheese"], prep_steps: ["Whisk egg whites", "Cook in non-stick pan", "Add fillings and fold"] },
+  ];
+
+  return (
+    <div className="flex flex-col min-h-full px-5">
+      {/* ─── Header ─── */}
+      <div className="flex items-center justify-between pt-6 pb-1">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Nutrition</h1>
+          <p className="text-xs text-muted-foreground">{dateLabel}</p>
+        </div>
+        <button
+          onClick={() => setShowLogPage(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-secondary text-foreground border border-border hover:bg-muted transition-colors"
+        >
+          <ClipboardList size={14} /> Log
+        </button>
+      </div>
+
+      <PageGroupSelector page="nutrition" personalLabel="Mine" hideAllPill />
+      <NutritionUserFilter selectedUserIds={selectedUserIds} onSelectionChange={handlePillChange} />
+
+      {/* ─── Date Strip ─── */}
+      <NutritionCollapsibleDateStrip
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        loggedDates={loggedDatesSet}
+        plannedDates={plannedDatesSet}
+      />
+
+      {/* Future date banner */}
+      {isFuture && (
+        <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+          <span className="text-sm">📅</span>
+          <span className="text-[11px] font-medium text-amber-700">
+            Planning ahead · {selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+          </span>
+        </div>
+      )}
+
+      {/* ─── Macro Card ─── */}
+      <div className="mb-3">
+        <div className="bg-card rounded-2xl p-4 shadow-card border border-border">
+          {multipleSelected ? (
+            // Multi-user macro card
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {isFuture ? "Planned Macros" : "Today's Macros"}
+                </span>
+                {isMySelected && (
+                  <button onClick={() => setShowGoalSettings(true)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-colors">
+                    <Target size={12} /> Goals
+                  </button>
+                )}
+              </div>
+              <div className="overflow-x-auto -mx-1">
+                <div
+                  className="grid gap-2 px-1"
+                  style={{ gridTemplateColumns: `repeat(${selectedUsersOrdered.length}, minmax(0, 1fr))` }}
+                >
+                  {selectedUsersOrdered.map(u => {
+                    const color = getUserColor(u.index);
+                    const isOwn = u.id === user?.id;
+                    const meals = isOwn ? myMealsForView : otherUserMeals;
+                    const consumed = meals.filter(m => m.user_id === u.id && m.meal_date === dateStr && m.consumed);
+                    const totals = {
+                      protein: consumed.reduce((s, m) => s + m.protein, 0),
+                      calories: consumed.reduce((s, m) => s + (m.calories || 0), 0),
+                      carbs: consumed.reduce((s, m) => s + (m.carbs || 0), 0),
+                      fat: consumed.reduce((s, m) => s + (m.fat || 0), 0),
+                    };
+                    const calGoal = calorieGoal;
+
                     return (
-                      <tr key={key} className="border-t border-border/30">
-                        <td className="py-1.5 pr-2 font-semibold text-foreground flex items-center gap-1.5">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: info.color }} />
-                          {info.label}
-                        </td>
-                        {userColumns.map(col => {
-                          const val = col.totals[key] || 0;
-                          return (
-                            <td key={col.id} className="text-center py-1.5 px-1">
-                              <span className="text-foreground font-medium">{Math.round(val)}{info.unit}</span>
-                              <span className="text-muted-foreground">/{goal}{info.unit}</span>
-                            </td>
-                          );
-                        })}
-                      </tr>
+                      <div key={u.id} className="min-w-0">
+                        {/* Header pill */}
+                        <div className="flex items-center gap-1 px-1.5 py-1 rounded-full mb-2" style={{ backgroundColor: color.bg, border: `1px solid ${color.border}` }}>
+                          {u.avatarUrl ? (
+                            <img src={u.avatarUrl} className="w-4 h-4 rounded-full object-cover flex-shrink-0" alt="" />
+                          ) : (
+                            <span className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-bold text-primary-foreground flex-shrink-0" style={{ backgroundColor: color.accent }}>{u.name.charAt(0)}</span>
+                          )}
+                          <span className="text-[9px] font-semibold truncate">{u.name}</span>
+                        </div>
+                        {/* Calories */}
+                        <p className="text-base font-bold text-foreground leading-tight">{totals.calories}</p>
+                        <p className="text-[8px] text-muted-foreground">/ {calGoal} kcal</p>
+                        {/* Mini bars */}
+                        <div className="space-y-1.5 mt-2">
+                          {[
+                            { label: "P", val: totals.protein, goal: goals.protein_goal || 150, c: "hsl(var(--primary))" },
+                            { label: "C", val: totals.carbs, goal: goals.carbs_goal || 220, c: "hsl(45 93% 47%)" },
+                            { label: "F", val: totals.fat, goal: goals.fat_goal || 70, c: "hsl(340 60% 55%)" },
+                          ].map(bar => (
+                            <div key={bar.label}>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[8px] font-semibold" style={{ color: bar.c }}>{bar.label}</span>
+                                <span className="text-[8px] text-muted-foreground">{bar.val}g</span>
+                              </div>
+                              <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min((bar.val / bar.goal) * 100, 100)}%`, backgroundColor: bar.c }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              </div>
+            </>
           ) : (
-            // Single user: progress bars
-            <div className="space-y-3">
-              {orderedTrackers.map((key: TrackerKey) => {
-                const info = ALL_TRACKERS.find(t => t.key === key)!;
-                const consumed = userColumns[0]?.totals[key] || 0;
-                const goal = (trackerGoals[key] as number) || info.defaultGoal;
-                const pct = goal > 0 ? Math.min((consumed / goal) * 100, 100) : 0;
-                return (
-                  <div key={key}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold text-foreground">{info.label}</span>
-                      <span className="text-[11px] text-muted-foreground">{Math.round(consumed)}{info.unit} / {goal}{info.unit}</span>
-                    </div>
-                    <div className="h-2.5 rounded-full bg-secondary overflow-hidden">
-                      <motion.div className="h-full rounded-full" style={{ backgroundColor: info.color }} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6, ease: "easeOut" }} />
-                    </div>
+            // Single user macro card
+            <>
+              <div className="flex items-center gap-3 mb-3">
+                {/* Calorie ring */}
+                <div className="relative flex-shrink-0" style={{ width: 72, height: 72 }}>
+                  <svg viewBox="0 0 72 72" className="w-full h-full -rotate-90">
+                    <circle cx="36" cy="36" r="30" fill="none" stroke="hsl(var(--secondary))" strokeWidth="6" />
+                    <circle cx="36" cy="36" r="30" fill="none" stroke="hsl(var(--primary))" strokeWidth="6"
+                      strokeDasharray={`${2 * Math.PI * 30}`}
+                      strokeDashoffset={`${2 * Math.PI * 30 * (1 - caloriesPct / 100)}`}
+                      strokeLinecap="round"
+                      className="transition-all duration-700"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-sm font-bold text-foreground leading-none">{Math.round(caloriesConsumed)}</span>
+                    <span className="text-[7px] text-muted-foreground">/ {calorieGoal}</span>
                   </div>
-                );
-              })}
-            </div>
-          )}
-
-          {orderedTrackers.length === 0 && (
-            <div className="flex flex-col items-center py-4 gap-2">
-              <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center"><Target size={20} className="text-muted-foreground" /></div>
-              <p className="text-sm font-medium text-foreground">No trackers selected</p>
-              <button onClick={() => setShowGoalSettings(true)} className="mt-1 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity flex items-center gap-1.5">
-                <Settings size={12} /> Customize Trackers
-              </button>
-            </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{isFuture ? "Planned Nutrition" : "Today's Nutrition"}</p>
+                  <p className="text-[11px] text-muted-foreground">{Math.round(caloriesRemaining)} kcal remaining</p>
+                  <button onClick={() => setShowGoalSettings(true)} className="mt-1.5 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-colors">
+                    <Target size={10} /> Goals
+                  </button>
+                </div>
+              </div>
+              {/* Macro bars */}
+              <div className="grid grid-cols-3 gap-2">
+                {macroBarData.map(bar => {
+                  const pct = bar.goal > 0 ? Math.min((bar.val / bar.goal) * 100, 100) : 0;
+                  return (
+                    <div key={bar.key}>
+                      <span className="text-[10px] font-semibold" style={{ color: bar.color }}>{bar.label}</span>
+                      <div className="h-2 rounded-full bg-secondary overflow-hidden mt-0.5">
+                        <motion.div className="h-full rounded-full" style={{ backgroundColor: bar.color }} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6 }} />
+                      </div>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">{Math.round(bar.val)}g / {bar.goal}g</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </div>
-    );
-  };
 
-  // Render meal cards for a user
-  const renderUserMeals = (userId: string, mealsForUser: MealLog[], label: string, isOwn: boolean) => {
-    const todayMealsForUser = mealsForUser.filter(m => m.meal_date === dateStr);
-
-    return (
-      <div className="mb-4" key={userId}>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            {label}
-          </h2>
-          {isOwn && (
-            <div className="flex items-center gap-1.5">
-              <button onClick={() => openAddMealModal("snack", dateStr)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-secondary text-foreground hover:bg-secondary/80 transition-colors">
-                <Plus size={12} /> Add
-              </button>
-              <button onClick={generateSuggestions} disabled={aiLoading} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50">
-                {aiLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                AI Suggest
-              </button>
+      {/* ─── Content ─── */}
+      <div className="flex-1 overflow-y-auto pb-24">
+        {/* Planned Meals section */}
+        {isMySelected && !multipleSelected && (
+          <>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Planned Meals</h2>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => openAddMealModal("snack", dateStr)} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-full bg-secondary text-foreground hover:bg-muted transition-colors">
+                  <Plus size={10} /> Add
+                </button>
+                <button onClick={generateSuggestions} disabled={aiLoading} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50">
+                  {aiLoading ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                  AI Suggest
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-
-        {todayMealsForUser.length > 0 ? (
-          <div className="space-y-2">
-            {todayMealsForUser.map(meal => {
-              const onlyYou = isOwn && isOnlyYou(meal);
+            {/* Meals grouped by type */}
+            {(() => {
+              const grouped = getMealsByType(myMealsForView.filter(m => m.user_id === user?.id));
+              const hasAnyMeals = Object.keys(grouped).length > 0;
+              if (!hasAnyMeals) {
+                return (
+                  <div className="bg-card rounded-xl p-4 border border-dashed border-border text-center mb-4">
+                    <p className="text-xs text-muted-foreground">No meals planned yet. Tap + Add or AI Suggest.</p>
+                  </div>
+                );
+              }
               return (
-                <div key={meal.id} className={`relative bg-card rounded-xl p-3 shadow-card border transition-colors ${meal.consumed ? "border-primary/30 bg-primary/5" : "border-border"}`}>
-                  <div className="flex items-center gap-3">
-                    {isOwn && (
-                      <button onClick={() => toggleConsumed(meal.id, !meal.consumed)} className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${meal.consumed ? "bg-primary text-primary-foreground" : "border-2 border-muted-foreground/30 hover:border-primary"}`}>
-                        {meal.consumed && <Check size={16} />}
-                      </button>
-                    )}
-                    <button onClick={() => setDetailMeal(meal)} className="flex-1 text-left min-w-0">
-                      <div className="flex items-center justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <p className={`text-sm font-medium truncate ${meal.consumed ? "line-through text-muted-foreground" : ""}`}>{meal.title}</p>
-                            {onlyYou && (
-                              <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full flex-shrink-0">
-                                <EyeOff size={8} /> Only you
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-muted-foreground capitalize flex items-center gap-1">
-                            {MEAL_TYPES.find(mt => mt.key === meal.meal_type)?.icon} {meal.meal_type}
-                            {meal.is_ai_generated && <><Sparkles size={8} className="text-primary" /> AI</>}
-                            {meal.consumed && <><Check size={8} className="text-primary" /> Consumed</>}
-                          </p>
-                        </div>
-                        <div className="text-right flex-shrink-0 ml-2">
-                          <p className="text-xs font-bold text-primary">{meal.protein}g prot</p>
-                          <p className="text-[10px] text-muted-foreground">{meal.calories} kcal{meal.carbs ? ` · ${meal.carbs}g C` : ""}{meal.fat ? ` · ${meal.fat}g F` : ""}</p>
-                        </div>
+                <div className="space-y-3 mb-4">
+                  {MEAL_TYPES.filter(mt => grouped[mt.key]?.length > 0).map(mt => (
+                    <div key={mt.key}>
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{mt.icon} {mt.label}</p>
+                      <div className="space-y-1.5">
+                        {grouped[mt.key].map(meal => {
+                          const onlyYou = isOnlyYou(meal);
+                          return (
+                            <div key={meal.id} className={`relative bg-card rounded-xl p-3 border transition-colors ${meal.consumed ? "border-primary/30 bg-primary/5" : "border-border"}`}>
+                              <div className="flex items-center gap-2.5">
+                                {/* Completion circle or planned label */}
+                                {isFuture ? (
+                                  <span className="flex items-center gap-1 text-[9px] font-semibold text-amber-600 flex-shrink-0">📅</span>
+                                ) : (
+                                  <button onClick={() => toggleConsumed(meal.id, !meal.consumed)} className={`w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${meal.consumed ? "bg-green-500 text-primary-foreground" : "border-2 border-muted-foreground/30 hover:border-primary"}`}>
+                                    {meal.consumed && <Check size={12} />}
+                                  </button>
+                                )}
+                                <button onClick={() => setDetailMeal(meal)} className="flex-1 text-left min-w-0">
+                                  <p className={`text-[13px] font-medium truncate ${meal.consumed ? "line-through text-muted-foreground" : ""}`}>{meal.title}</p>
+                                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                    <span className="text-[10px] font-bold text-primary">{meal.protein}g P</span>
+                                    <span className="text-[10px] text-muted-foreground">{meal.calories} kcal</span>
+                                    {onlyYou && (
+                                      <span className="flex items-center gap-0.5 text-[8px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">
+                                        <EyeOff size={7} /> Only you
+                                      </span>
+                                    )}
+                                  </div>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    </button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </>
+        )}
+
+        {/* Multi-user Planned Meals with columns */}
+        {multipleSelected && (
+          <>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Planned Meals</h2>
+              {isMySelected && (
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => openAddMealModal("snack", dateStr)} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-full bg-secondary text-foreground hover:bg-muted transition-colors">
+                    <Plus size={10} /> Add
+                  </button>
+                  <button onClick={generateSuggestions} disabled={aiLoading} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50">
+                    {aiLoading ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                    AI Suggest
+                  </button>
+                </div>
+              )}
+            </div>
+            {/* Column headers */}
+            <div className="overflow-x-auto mb-2">
+              <div className="grid gap-[5px]" style={{ gridTemplateColumns: `repeat(${selectedUsersOrdered.length}, minmax(0, 1fr))` }}>
+                {selectedUsersOrdered.map(u => {
+                  const color = getUserColor(u.index);
+                  return (
+                    <div key={u.id} className="flex items-center gap-1 px-1.5 py-1 rounded-full" style={{ backgroundColor: color.bg, border: `1px solid ${color.border}` }}>
+                      {u.avatarUrl ? (
+                        <img src={u.avatarUrl} className="w-4 h-4 rounded-full object-cover flex-shrink-0" alt="" />
+                      ) : (
+                        <span className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-bold text-primary-foreground flex-shrink-0" style={{ backgroundColor: color.accent }}>{u.name.charAt(0)}</span>
+                      )}
+                      <span className="text-[9px] font-semibold truncate">{u.name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Meal cards in columns by type */}
+            {MEAL_TYPES.map(mt => {
+              const hasMeals = selectedUsersOrdered.some(u => {
+                const isOwn = u.id === user?.id;
+                const meals = isOwn ? myMealsForView.filter(m => m.user_id === user?.id) : otherUserMeals.filter(m => m.user_id === u.id);
+                return meals.some(m => m.meal_date === dateStr && m.meal_type === mt.key);
+              });
+              if (!hasMeals) return null;
+
+              return (
+                <div key={mt.key} className="mb-3">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{mt.icon} {mt.label}</p>
+                  <div className="overflow-x-auto">
+                    <div className="grid gap-[5px]" style={{ gridTemplateColumns: `repeat(${selectedUsersOrdered.length}, minmax(0, 1fr))` }}>
+                      {selectedUsersOrdered.map(u => {
+                        const color = getUserColor(u.index);
+                        const isOwn = u.id === user?.id;
+                        const meals = isOwn
+                          ? myMealsForView.filter(m => m.user_id === user?.id && m.meal_date === dateStr && m.meal_type === mt.key)
+                          : otherUserMeals.filter(m => m.user_id === u.id && m.meal_date === dateStr && m.meal_type === mt.key);
+
+                        if (meals.length === 0) {
+                          return (
+                            <div key={u.id} className="rounded-xl border-2 border-dashed border-border/50 p-2 flex items-center justify-center min-h-[60px]">
+                              <span className="text-[9px] text-muted-foreground">None</span>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={u.id} className="space-y-1">
+                            {meals.map(meal => (
+                              <button
+                                key={meal.id}
+                                onClick={() => setDetailMeal(meal)}
+                                className={`w-full text-left rounded-xl p-2 border transition-colors ${meal.consumed ? "opacity-45" : ""}`}
+                                style={{ backgroundColor: color.bg, borderColor: color.border }}
+                              >
+                                {isOwn && !isFuture && (
+                                  <button onClick={(e) => { e.stopPropagation(); toggleConsumed(meal.id, !meal.consumed); }} className={`w-4 h-4 rounded-full flex items-center justify-center mb-1 transition-colors ${meal.consumed ? "bg-green-500 text-primary-foreground" : "border border-muted-foreground/30"}`}>
+                                    {meal.consumed && <Check size={8} />}
+                                  </button>
+                                )}
+                                <p className={`text-[11px] font-medium truncate ${meal.consumed ? "line-through" : ""}`}>{meal.title}</p>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <span className="text-[9px] font-bold text-primary">{meal.protein}g P</span>
+                                  <span className="text-[9px] text-muted-foreground">{meal.calories}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               );
             })}
-          </div>
-        ) : (
-          <div className="bg-card rounded-xl p-4 border border-dashed border-border text-center">
-            <p className="text-xs text-muted-foreground">
-              {isOwn ? "No meals planned yet. Use AI Suggest or tap + to add." : "No meals planned today"}
-            </p>
-          </div>
-        )}
 
-        {/* Nudge for other users who haven't logged today */}
-        {!isOwn && !otherUserHasLoggedToday(userId) && (
-          <button onClick={() => sendNudge(userId)} className="mt-2 flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline">
-            <Bell size={12} /> Nudge {getMemberInfo(userId).name}
-          </button>
-        )}
-      </div>
-    );
-  };
-
-  return (
-    <div className="flex flex-col min-h-full px-5">
-      {/* Header */}
-      <div className="flex items-center justify-between pt-6 pb-2">
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <Apple size={24} className="text-primary" /> Nutrition
-        </h1>
-        {onOpenSettings && (
-          <button onClick={onOpenSettings} className="p-2 rounded-full hover:bg-secondary">
-            <Settings size={18} className="text-muted-foreground" />
-          </button>
-        )}
-      </div>
-
-      <PageGroupSelector page="nutrition" personalLabel="Mine" hideAllPill />
-
-      {/* User filter pills — not shown on Personal */}
-      <NutritionUserFilter selectedUserIds={selectedUserIds} onSelectionChange={handlePillChange} />
-
-      {/* Nav mode toggle + Today button */}
-      <div className="flex items-center gap-2 pb-2">
-        <div className="flex-1" />
-        {!isToday && (
-          <button
-            onClick={() => setSelectedDate(new Date())}
-            className="px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-bold border border-primary/20 hover:bg-primary/20 transition-colors"
-          >
-            Today
-          </button>
-        )}
-        <button
-          onClick={() => setNavMode(navMode === "day" ? "week" : "day")}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary border border-border text-foreground hover:bg-muted transition-colors"
-        >
-          {navMode === "day" ? <><LayoutList size={12} /> Day</> : <><CalendarDays size={12} /> Week</>}
-        </button>
-      </div>
-
-      {/* Date navigation */}
-      {navMode === "day" ? (
-        <NutritionDateStrip
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-          mealDates={mealDatesSet}
-        />
-      ) : (
-        <NutritionWeekView
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-          mealDates={mealDatesSet}
-        />
-      )}
-
-      {/* Selected date label */}
-      <div className="pb-2">
-        <p className="text-xs font-semibold text-muted-foreground">
-          {isToday
-            ? `Today, ${selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-            : fmtDate(selectedDate) > fmtDate(new Date())
-              ? `Upcoming — ${selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`
-              : selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-        </p>
-      </div>
-
-      {/* Tracker progress - unified multi-user card */}
-      {renderMultiUserTrackers()}
-
-      {/* AI insight — only for own view */}
-      {isMySelected && !multipleSelected && (
-        <div className="mb-3">
-          <div className="bg-primary/5 rounded-xl px-4 py-3 border border-primary/10">
-            <div className="flex items-start gap-2">
-              <Sparkles size={14} className="text-primary mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-foreground/80">
-                {todayMyMeals.filter(m => m.consumed).length === 0
-                  ? "Plan your meals and mark them as consumed to track nutrition."
-                  : goals.protein_goal - myTotals.protein <= 0
-                    ? "🎉 You've hit your protein goal! Great job today."
-                    : `${goals.protein_goal - myTotals.protein}g of protein remaining. Keep it up!`}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto pb-24">
-          {/* My Meals */}
-          {isMySelected && renderUserMeals(user!.id, myMealsForView.filter(m => m.user_id === user?.id), multipleSelected ? "My Planned Meals" : "Planned Meals", true)}
-
-          {/* Other users' meals — read-only */}
-          {selectedOtherIds.map(otherId => {
-            const otherMealsForUser = otherUserMeals.filter(m => m.user_id === otherId);
-            const info = getMemberInfo(otherId);
-            return renderUserMeals(otherId, otherMealsForUser, `${info.name}'s Meals`, false);
-          })}
-
-          {/* Meal Ideas — only for Mine */}
-          {isMySelected && (
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Meal Ideas</h2>
-              </div>
-              <div className="flex gap-1 bg-secondary rounded-xl p-1 mb-3">
-                <button onClick={() => setMealIdeasTab("suggestions")} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${mealIdeasTab === "suggestions" ? "bg-card text-foreground shadow-card" : "text-muted-foreground"}`}>
-                  <Zap size={12} /> Quick Suggestions
+            {/* Nudge buttons for users who haven't logged */}
+            {selectedOtherIds.map(otherId => {
+              if (otherUserHasLoggedToday(otherId)) return null;
+              const info = getMemberInfo(otherId);
+              return (
+                <button key={otherId} onClick={() => sendNudge(otherId)} className="flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline mb-1">
+                  <Bell size={12} /> Nudge {info.name}
                 </button>
-                <button onClick={() => setMealIdeasTab("frequent")} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${mealIdeasTab === "frequent" ? "bg-card text-foreground shadow-card" : "text-muted-foreground"}`}>
-                  <Clock size={12} /> Frequent Items
-                </button>
-              </div>
+              );
+            })}
+          </>
+        )}
 
-              {mealIdeasTab === "suggestions" ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { title: "Greek Yogurt Bowl", protein: 20, calories: 250, carbs: 30, fat: 8, fiber: 3, meal_type: "breakfast", ingredients: ["200g Greek yogurt", "1/4 cup granola", "1 tbsp honey", "Mixed berries", "1 tbsp chia seeds"], prep_steps: ["Add Greek yogurt to a bowl", "Top with granola and mixed berries", "Drizzle honey and sprinkle chia seeds"] },
-                    { title: "Chicken Rice Bowl", protein: 35, calories: 450, carbs: 45, fat: 12, fiber: 4, meal_type: "lunch", ingredients: ["200g chicken breast", "1 cup cooked rice", "1/2 avocado", "Mixed greens", "Soy sauce", "Sesame seeds"], prep_steps: ["Season and grill chicken breast until cooked through", "Cook rice according to package directions", "Slice avocado", "Assemble bowl with rice, sliced chicken, greens, and avocado", "Drizzle with soy sauce and top with sesame seeds"] },
-                    { title: "Turkey Lettuce Wraps", protein: 28, calories: 280, carbs: 12, fat: 14, fiber: 3, meal_type: "lunch", ingredients: ["200g ground turkey", "Large lettuce leaves", "1/2 diced onion", "2 cloves garlic", "Soy sauce", "Sriracha"], prep_steps: ["Cook ground turkey with diced onion and garlic", "Season with soy sauce and sriracha", "Spoon mixture into lettuce leaves", "Serve immediately"] },
-                    { title: "Protein Smoothie", protein: 30, calories: 320, carbs: 35, fat: 6, fiber: 5, meal_type: "snack", ingredients: ["1 scoop protein powder", "1 banana", "1 cup spinach", "1 cup almond milk", "1 tbsp peanut butter", "Ice cubes"], prep_steps: ["Add all ingredients to a blender", "Blend until smooth", "Pour into a glass and serve"] },
-                    { title: "Salmon & Veggies", protein: 32, calories: 380, carbs: 15, fat: 18, fiber: 6, meal_type: "dinner", ingredients: ["170g salmon fillet", "1 cup broccoli florets", "1/2 cup bell peppers", "Olive oil", "Lemon juice", "Garlic powder"], prep_steps: ["Preheat oven to 200°C / 400°F", "Season salmon with garlic powder, olive oil, and lemon juice", "Arrange salmon and veggies on a baking sheet", "Bake for 15-18 minutes until salmon flakes easily"] },
-                    { title: "Egg White Omelette", protein: 24, calories: 200, carbs: 4, fat: 8, fiber: 1, meal_type: "breakfast", ingredients: ["6 egg whites", "1/4 cup diced bell pepper", "1/4 cup spinach", "2 tbsp feta cheese", "Salt and pepper"], prep_steps: ["Whisk egg whites with salt and pepper", "Heat a non-stick pan over medium heat", "Pour in egg whites and cook until edges set", "Add bell pepper, spinach, and feta to one half", "Fold and cook for 1 more minute"] },
-                  ].map((item, i) => (
-                    <button key={i} onClick={() => { applyDefaultSharingSelection(); setIdeaPreview(item); }} className="bg-card rounded-xl p-3 border border-border hover:border-primary/30 transition-colors text-left">
-                      <p className="text-xs font-semibold text-foreground truncate">{item.title}</p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <span className="text-[10px] font-bold text-primary">{item.protein}g P</span>
-                        <span className="text-[10px] text-muted-foreground">{item.calories} kcal</span>
-                        {item.carbs > 0 && <span className="text-[10px] text-muted-foreground">{item.carbs}g C</span>}
-                      </div>
-                      <p className="text-[9px] text-muted-foreground mt-1 line-clamp-1">{item.ingredients.slice(0, 3).join(", ")}…</p>
-                    </button>
+        {/* Single-user: other users' meals (non-column) */}
+        {!multipleSelected && selectedOtherIds.map(otherId => {
+          const otherMealsForUser = otherUserMeals.filter(m => m.user_id === otherId && m.meal_date === dateStr);
+          const info = getMemberInfo(otherId);
+          return (
+            <div key={otherId} className="mb-4">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{info.name}'s Meals</h2>
+              {otherMealsForUser.length > 0 ? (
+                <div className="space-y-1.5">
+                  {otherMealsForUser.map(meal => (
+                    <div key={meal.id} className={`bg-card rounded-xl p-3 border ${meal.consumed ? "border-primary/30 bg-primary/5" : "border-border"}`}>
+                      <button onClick={() => setDetailMeal(meal)} className="w-full text-left">
+                        <p className={`text-[13px] font-medium truncate ${meal.consumed ? "line-through text-muted-foreground" : ""}`}>{meal.title}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] font-bold text-primary">{meal.protein}g P</span>
+                          <span className="text-[10px] text-muted-foreground">{meal.calories} kcal</span>
+                        </div>
+                      </button>
+                    </div>
                   ))}
                 </div>
               ) : (
-                <div>
-                  {frequentMeals.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      {frequentMeals.map((item, i) => (
-                        <button key={i} onClick={() => { applyDefaultSharingSelection(); setIdeaPreview(item); }} className="bg-card rounded-xl p-3 border border-border hover:border-primary/30 transition-colors text-left">
-                          <p className="text-xs font-semibold text-foreground truncate">{item.title}</p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-[10px] font-bold text-primary">{item.protein}g P</span>
-                            <span className="text-[10px] text-muted-foreground">{item.calories} kcal</span>
-                          </div>
-                          {item.ingredients.length > 0 ? (
-                            <p className="text-[9px] text-muted-foreground mt-1 line-clamp-1">{item.ingredients.slice(0, 3).join(", ")}…</p>
-                          ) : (
-                            <span className="text-[9px] text-muted-foreground mt-1">Added {item.count}×</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="bg-card rounded-xl p-4 border border-dashed border-border text-center">
-                      <p className="text-xs text-muted-foreground">Add meals a few times and they'll appear here for quick re-adding.</p>
-                    </div>
-                  )}
+                <div className="bg-card rounded-xl p-4 border border-dashed border-border text-center">
+                  <p className="text-xs text-muted-foreground">No meals planned today</p>
                 </div>
               )}
+              {!otherUserHasLoggedToday(otherId) && (
+                <button onClick={() => sendNudge(otherId)} className="mt-2 flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline">
+                  <Bell size={12} /> Nudge {info.name}
+                </button>
+              )}
             </div>
-          )}
+          );
+        })}
+
+        {/* ─── Meal Ideas ─── */}
+        {isMySelected && !multipleSelected && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Meal Ideas</h2>
+              {frequentMeals.length > 0 && (
+                <button onClick={() => {}} className="text-[10px] font-semibold text-primary hover:underline">
+                  Frequent ›
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {QUICK_IDEAS.map((item, i) => (
+                <button key={i} onClick={() => { applyDefaultSharingSelection(); setIdeaPreview(item); }} className="bg-card rounded-xl p-3 border border-border hover:border-primary/30 transition-colors text-left">
+                  <p className="text-xs font-semibold text-foreground truncate">{item.title}</p>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="text-[10px] font-bold text-primary">{item.protein}g P</span>
+                    <span className="text-[10px] text-muted-foreground">{item.calories} kcal</span>
+                  </div>
+                  <p className="text-[9px] text-muted-foreground mt-1 line-clamp-1">{item.ingredients.slice(0, 3).join(", ")}…</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Hidden file input for camera */}
@@ -1324,22 +1400,16 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
               </div>
               <div className="px-5 flex-1 min-h-0 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y", overscrollBehaviorY: "contain", paddingBottom: detailEditMode ? "calc(env(safe-area-inset-bottom, 0px) + 6rem)" : "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}>
                 {detailEditMode ? (
-                  /* ── EDIT MODE ── */
                   <div className="space-y-4 pb-4">
-                    {/* Meal type selector */}
                     <div className="flex gap-1.5">
                       {MEAL_TYPES.map(mt => (
                         <button key={mt.key} onClick={() => setEditMealType(mt.key)} className={`flex-1 py-2 rounded-lg text-[10px] font-semibold transition-colors ${editMealType === mt.key ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>{mt.icon} {mt.label}</button>
                       ))}
                     </div>
-
-                    {/* Meal name */}
                     <div>
                       <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">Meal Name</label>
                       <input value={editTitle} onChange={e => setEditTitle(e.target.value)} className="w-full text-sm px-3 py-2.5 rounded-xl border border-border bg-background placeholder:text-muted-foreground" />
                     </div>
-
-                    {/* Nutrition stats */}
                     <div className="grid grid-cols-2 gap-2">
                       <div><label className="text-[10px] font-semibold text-muted-foreground mb-1 block">Protein (g)</label><input type="number" value={editProtein} onChange={e => setEditProtein(e.target.value)} className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background" /></div>
                       <div><label className="text-[10px] font-semibold text-muted-foreground mb-1 block">Calories</label><input type="number" value={editCalories} onChange={e => setEditCalories(e.target.value)} className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background" /></div>
@@ -1347,8 +1417,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
                       <div><label className="text-[10px] font-semibold text-muted-foreground mb-1 block">Fat (g)</label><input type="number" value={editFat} onChange={e => setEditFat(e.target.value)} className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background" /></div>
                       <div className="col-span-2"><label className="text-[10px] font-semibold text-muted-foreground mb-1 block">Fiber (g)</label><input type="number" value={editFiber} onChange={e => setEditFiber(e.target.value)} className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-background" /></div>
                     </div>
-
-                    {/* Ingredients */}
                     <div>
                       <h4 className="text-sm font-semibold mb-2">Ingredients</h4>
                       <div className="space-y-1.5">
@@ -1364,8 +1432,6 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
                         <Plus size={12} /> Add Ingredient
                       </button>
                     </div>
-
-                    {/* Preparation steps */}
                     <div>
                       <h4 className="text-sm font-semibold mb-2">Preparation</h4>
                       <div className="space-y-1.5">
@@ -1381,12 +1447,9 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
                         <Plus size={12} /> Add Step
                       </button>
                     </div>
-
-                    {/* spacer for sticky bottom actions */}
                     <div className="h-6" />
                   </div>
                 ) : (
-                  /* ── READ MODE ── */
                   <>
                     <div className="grid grid-cols-2 gap-2 mb-4">
                       <div className="bg-primary/10 rounded-xl px-3 py-2 text-center"><p className="text-lg font-bold text-primary">{detailMeal.protein}g</p><p className="text-[10px] text-muted-foreground">Protein</p></div>
