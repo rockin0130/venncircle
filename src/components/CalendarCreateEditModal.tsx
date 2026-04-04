@@ -161,12 +161,41 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
   const [dueDatePickerOpen, setDueDatePickerOpen] = useState(false);
 
   // ── Build context options (Personal + groups with Calendar page) ──
+  // Store DB calendar colors per context for accurate display
+  const [dbCalendarColors, setDbCalendarColors] = useState<Record<string, string>>({});
+
+  // Fetch all local calendar colors for the user
+  const fetchCalendarColors = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("calendars")
+      .select("color, group_id, is_default")
+      .eq("user_id", user.id)
+      .eq("provider", "local");
+    if (data) {
+      const colors: Record<string, string> = {};
+      for (const c of data) {
+        if (!c.group_id && c.is_default) {
+          colors["__personal__"] = c.color;
+        } else if (c.group_id) {
+          colors[c.group_id] = c.color;
+        }
+      }
+      setDbCalendarColors(colors);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (open) fetchCalendarColors();
+  }, [open, fetchCalendarColors]);
+
   const contextOptions: CalendarContextOption[] = useMemo(() => {
+    const personalColor = dbCalendarColors["__personal__"] || CALENDAR_COLORS[0].value;
     const opts: CalendarContextOption[] = [{
       id: "__personal__",
       label: "Personal",
       calendarId: null,
-      color: CALENDAR_COLORS[0].value,
+      color: personalColor,
       groupId: null,
       members: [],
     }];
@@ -175,11 +204,12 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
       for (const g of groups) {
         if (g.shared_pages?.includes("calendar")) {
           const isFamily = g.name.toLowerCase() === "family" || g.category === "home";
+          const defaultColor = isFamily ? "hsl(150 60% 42%)" : CALENDAR_COLORS[2].value;
           opts.push({
             id: g.id,
             label: `${g.emoji || ""} ${g.name}`.trim(),
             calendarId: null,
-            color: isFamily ? "hsl(150 60% 42%)" : CALENDAR_COLORS[2].value,
+            color: dbCalendarColors[g.id] || defaultColor,
             groupId: g.id,
             members: g.members || [],
           });
@@ -187,7 +217,7 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
       }
     }
     return opts;
-  }, [groups]);
+  }, [groups, dbCalendarColors]);
 
   // ── Determine the selected context's members for Assign To ──
   const selectedContextOption = useMemo(() => {
@@ -732,10 +762,10 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
                   className="w-full flex items-center justify-between"
                 >
                   <span className="text-[15px] text-foreground">Calendar</span>
-                  <div className="flex items-center gap-2">
+                   <div className="flex items-center gap-2">
                     <div
                       className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: calendarColor }}
+                      style={{ backgroundColor: selectedContextOption.color }}
                     />
                     <span className="text-[15px] text-muted-foreground">{selectedContextOption.label}</span>
                     <ChevronDown
@@ -772,7 +802,7 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
                               </div>
                               <div
                                 className="w-3 h-3 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: opt.id === "__personal__" ? calendarColor : CALENDAR_COLORS[2].value }}
+                                style={{ backgroundColor: opt.color }}
                               />
                               <span className={cn(
                                 "text-[15px] text-left truncate",
