@@ -1707,7 +1707,7 @@ function SharingSelector({ groups, selectedGroupIds, onGroupIdsChange }: {
       </label>
       <div className="flex flex-wrap gap-1.5">
         <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-primary text-primary-foreground border border-primary cursor-default opacity-80">
-          🔒 Personal
+          🔒 Only Me
         </span>
         {groups.map((g) => {
           const isSelected = selectedGroupIds.includes(g.id);
