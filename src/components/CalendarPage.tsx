@@ -1626,7 +1626,7 @@ const EventList = ({
       {allDayItems.length > 0 && (
         <div className="py-0.5">
           {allDayItems.map((item) => {
-            const color = resolveItemColor(item, groups, colorMap);
+            const color = getPersonColor(item);
             const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
             return (
               <button key={item.id} onClick={() => onItemTap?.(item)}
