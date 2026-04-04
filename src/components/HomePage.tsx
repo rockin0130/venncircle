@@ -455,27 +455,25 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   };
 
   // Home page is always "mine" aggregate — show all user's own items across all groups
-  {
-    const myResponsible = tasks.filter((t) =>
-      (t.assignee === "me" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
-    );
-    const partnerAssignedToMe = partnerTasks.filter((t) =>
-      (t.assignee === "partner" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
-    );
-    const seenKeys = new Set(myResponsible.map((t) => `${t.title}|${t.time}|${t.scheduledDay}`));
-    const uniquePartner = partnerAssignedToMe.filter((t) => !seenKeys.has(`${t.title}|${t.time}|${t.scheduledDay}`));
-    dayTasks = [...myResponsible, ...uniquePartner];
+  const myResponsible = tasks.filter((t) =>
+    (t.assignee === "me" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
+  );
+  const partnerAssignedToMe = partnerTasks.filter((t) =>
+    (t.assignee === "partner" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
+  );
+  const seenTaskKeys = new Set(myResponsible.map((t) => `${t.title}|${t.time}|${t.scheduledDay}`));
+  const uniquePartnerTasks = partnerAssignedToMe.filter((t) => !seenTaskKeys.has(`${t.title}|${t.time}|${t.scheduledDay}`));
+  const dayTasks = [...myResponsible, ...uniquePartnerTasks];
 
-    const myEvents = events.filter((e) =>
-      (e.user === "me" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
-    );
-    const partnerEventsForMe = partnerEvents.filter((e) =>
-      (e.user === "partner" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
-    );
-    const seenEventKeys = new Set(myEvents.map((e) => `${e.title}|${e.time}|${e.day}`));
-    const uniquePartnerEvents = partnerEventsForMe.filter((e) => !seenEventKeys.has(`${e.title}|${e.time}|${e.day}`));
-    visibleEvents = [...myEvents, ...uniquePartnerEvents];
-  }
+  const myEvents = events.filter((e) =>
+    (e.user === "me" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
+  );
+  const partnerEventsForMe = partnerEvents.filter((e) =>
+    (e.user === "partner" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
+  );
+  const seenEventKeys = new Set(myEvents.map((e) => `${e.title}|${e.time}|${e.day}`));
+  const uniquePartnerEventsForMe = partnerEventsForMe.filter((e) => !seenEventKeys.has(`${e.title}|${e.time}|${e.day}`));
+  const visibleEvents = [...myEvents, ...uniquePartnerEventsForMe];
 
   // Household views use unfiltered data for aggregate
   const householdMyTasks = useMemo(() =>
