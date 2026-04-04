@@ -429,6 +429,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             groupId: e.group_id || null,
             calendarId: e.calendar_id || null,
             assigneeUserIds: e.assignee_user_ids || null,
+            ownerUserId: user.id,
           })));
         }
 
