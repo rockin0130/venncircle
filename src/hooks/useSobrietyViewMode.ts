@@ -19,6 +19,13 @@ import { useMemo } from "react";
 
 export type ViewMode = "mine_aggregate" | "mine_in_group" | "single_other" | "multi_user";
 
+export interface ViewQueryPlan {
+  mode: ViewMode;
+  ownerUserIds: string[];
+  filterGroupId: string | null;
+  shouldDeduplicateByLabel: boolean;
+}
+
 interface ViewModeInput {
   /** null when "Mine" context is selected; group object otherwise */
   activeGroupId: string | null;
@@ -42,6 +49,61 @@ interface ViewModeResult {
   otherUserId: string | null;
   /** Number of columns for multi_user grid */
   columnCount: number;
+}
+
+/**
+ * Converts the resolved view mode into a reusable query plan.
+ *
+ * Reuse on any context/pill-driven page:
+ *   1. Call useSobrietyViewMode (or a shared equivalent) for the current mode.
+ *   2. Pass that result into buildViewQueryPlan.
+ *   3. Use ownerUserIds + filterGroupId to build your fetch.
+ *   4. Use shouldDeduplicateByLabel when a "Mine aggregate" view should collapse duplicates.
+ */
+export function buildViewQueryPlan(
+  viewMode: Pick<ViewModeResult, "mode" | "resolvedUserIds" | "otherUserId">,
+  userId: string | undefined,
+  activeGroupId: string | null,
+): ViewQueryPlan {
+  if (!userId) {
+    return {
+      mode: "mine_aggregate",
+      ownerUserIds: [],
+      filterGroupId: null,
+      shouldDeduplicateByLabel: true,
+    };
+  }
+
+  switch (viewMode.mode) {
+    case "mine_aggregate":
+      return {
+        mode: viewMode.mode,
+        ownerUserIds: [userId],
+        filterGroupId: null,
+        shouldDeduplicateByLabel: true,
+      };
+    case "mine_in_group":
+      return {
+        mode: viewMode.mode,
+        ownerUserIds: [userId],
+        filterGroupId: activeGroupId,
+        shouldDeduplicateByLabel: false,
+      };
+    case "single_other":
+      return {
+        mode: viewMode.mode,
+        ownerUserIds: viewMode.otherUserId ? [viewMode.otherUserId] : [],
+        filterGroupId: activeGroupId,
+        shouldDeduplicateByLabel: false,
+      };
+    case "multi_user":
+      return {
+        mode: viewMode.mode,
+        ownerUserIds: viewMode.resolvedUserIds,
+        filterGroupId: activeGroupId,
+        shouldDeduplicateByLabel: false,
+      };
+  }
 }
 
 export function useSobrietyViewMode({
