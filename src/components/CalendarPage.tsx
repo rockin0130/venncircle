@@ -666,26 +666,59 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
   // ── Month grid: dots per day ──────────────────────────
 
+  // ── Month grid: per-person dots ──────────────────────
   const monthDots = useMemo(() => {
     const dots = new Map<number, { id: string; color: string }[]>();
+    const currentUserId = user?.id || "";
+    const isEveryone = userFilterIds.has(EVERYONE_SENTINEL);
+
     for (let d = 1; d <= daysInMonth; d++) {
       const items = getItemsForDate(d, month, year);
-      if (items.length > 0) {
-        const seen = new Set<string>();
-        const dotColors: { id: string; color: string }[] = [];
-        items.forEach((it) => {
-          const color = resolveItemColor(it, groups, calendarColorMap);
-          const key = it.isDueDateTask ? "__todo" : `color-${color}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            dotColors.push({ id: key, color });
+      if (items.length === 0) continue;
+
+      const seenUsers = new Set<string>();
+      const dotColors: { id: string; color: string }[] = [];
+
+      items.forEach((it) => {
+        const raw = it.raw as any;
+        const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+        const ownerIds = new Set<string>();
+
+        if (it.assignee === "me") ownerIds.add(ownerId);
+        else if (it.assignee === "partner") {
+          if (it.groupId) {
+            const grp = groups.find(g => g.id === it.groupId);
+            grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+              .forEach((m: any) => ownerIds.add(m.user_id));
           }
+        } else if (it.assignee === "both") {
+          ownerIds.add(ownerId);
+          if (it.groupId) {
+            const grp = groups.find(g => g.id === it.groupId);
+            grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+              .forEach((m: any) => ownerIds.add(m.user_id));
+          }
+        } else {
+          ownerIds.add(ownerId);
+        }
+        if (it.type === "gcal") ownerIds.add(currentUserId);
+
+        ownerIds.forEach(uid => {
+          if (seenUsers.has(uid)) return;
+          // Only show dot if this user's pill is selected
+          if (!isEveryone && !userFilterIds.has(uid)) return;
+          const fu = calFilterUsers.find(u => u.id === uid);
+          if (!fu) return;
+          seenUsers.add(uid);
+          const memberColor = MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length];
+          dotColors.push({ id: uid, color: memberColor.dot });
         });
-        dots.set(d, dotColors);
-      }
+      });
+
+      if (dotColors.length > 0) dots.set(d, dotColors.slice(0, 3));
     }
     return dots;
-  }, [daysInMonth, month, year, getItemsForDate, groups, calendarColorMap]);
+  }, [daysInMonth, month, year, getItemsForDate, groups, user?.id, userFilterIds, calFilterUsers]);
 
   // ── Navigation ────────────────────────────────────────
 
