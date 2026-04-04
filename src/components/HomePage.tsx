@@ -987,32 +987,18 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
 
               case "scheduled":
                 return (
-                  <section key={sectionId} className="mb-6">
-                    <button
-                      onClick={() => onNavigate?.("calendar")}
-                      className="flex items-center gap-2 mb-3 group cursor-pointer hover:opacity-80 transition-opacity"
-                    >
-                      <CalendarDays size={18} className="text-primary" />
-                      <h2 className="text-lg font-semibold tracking-display">Scheduled</h2>
-                      <ChevronRightIcon size={16} className="text-muted-foreground group-hover:text-foreground transition-colors" />
-                    </button>
-                    {(allDayItems.length > 0 || allTimedItems.length > 0) ? (
-                      <div className="space-y-3">
-                        {allDayItems.map((item) => {
-                          if (item.kind === "task") return <TaskCard key={item.data.id} task={item.data} onToggle={isViewingPartner ? undefined : toggleTask} onCongrats={() => setCongratsType("task")} readOnly={isViewingPartner} />;
-                          if (item.kind === "event") return <EventCard key={item.data.id} event={item.data} onToggle={isViewingPartner ? undefined : toggleEventCompletion} onRemove={isViewingPartner ? undefined : removeEvent} onToggleVisibility={isViewingPartner ? undefined : toggleEventVisibility} onReschedule={isViewingPartner ? undefined : rescheduleEvent} onCongrats={() => setCongratsType("task")} readOnly={isViewingPartner} />;
-                          return <GCalEventCard key={`gcal-${item.data.id}`} event={item.data} onToggle={isViewingPartner ? undefined : toggleGcalCompletion} onHide={isViewingPartner ? undefined : hideGcalEvent} onDesignate={isViewingPartner ? undefined : designateGcalEvent} onCongrats={() => setCongratsType("task")} />;
-                        })}
-                        {allTimedItems.map((item) => {
-                          if (item.kind === "task") return <TaskCard key={item.data.id} task={item.data} onToggle={isViewingPartner ? undefined : toggleTask} onCongrats={() => setCongratsType("task")} readOnly={isViewingPartner} />;
-                          if (item.kind === "event") return <EventCard key={item.data.id} event={item.data} onToggle={isViewingPartner ? undefined : toggleEventCompletion} onRemove={isViewingPartner ? undefined : removeEvent} onToggleVisibility={isViewingPartner ? undefined : toggleEventVisibility} onReschedule={isViewingPartner ? undefined : rescheduleEvent} onCongrats={() => setCongratsType("task")} readOnly={isViewingPartner} />;
-                          return <GCalEventCard key={`gcal-${item.data.id}`} event={item.data} onToggle={isViewingPartner ? undefined : toggleGcalCompletion} onHide={isViewingPartner ? undefined : hideGcalEvent} onDesignate={isViewingPartner ? undefined : designateGcalEvent} onCongrats={() => setCongratsType("task")} />;
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">No scheduled items</p>
-                    )}
-                  </section>
+                  <HomeScheduledSection
+                    key={sectionId}
+                    allDayItems={allDayItems}
+                    allTimedItems={allTimedItems}
+                    isToday={isToday}
+                    isViewingPartner={isViewingPartner}
+                    onToggleTask={toggleTask}
+                    onToggleEvent={toggleEventCompletion}
+                    onToggleGcal={toggleGcalCompletion}
+                    onCongrats={() => setCongratsType("task")}
+                    onNavigate={onNavigate}
+                  />
                 );
 
               case "todo":
