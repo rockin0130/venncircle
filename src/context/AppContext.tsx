@@ -44,6 +44,7 @@ export interface ScheduledEvent {
   groupId?: string | null;
   ownerUserId?: string;
   calendarId?: string | null;
+  assigneeUserIds?: string[] | null;
 }
 
 export interface Task {
