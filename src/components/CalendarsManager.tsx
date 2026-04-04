@@ -76,7 +76,7 @@ const CalendarsManager = ({ open, onClose }: Props) => {
   // All context options: Private + each calendar-sharing group
   const contextOptions = useMemo(() => {
     const opts: { id: string; label: string; emoji: string }[] = [
-      { id: "__personal__", label: "Private", emoji: "🔒" },
+      { id: "__personal__", label: "Mine", emoji: "👤" },
     ];
     calendarGroups.forEach((g) =>
       opts.push({ id: g.id, label: g.name, emoji: g.emoji })
