@@ -216,7 +216,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => setStep("friends")}
+                  onClick={() => setStep(defaultCategory ? "pages" : "category")}
                   className="flex-1 py-3 rounded-xl border border-border text-sm font-medium hover:bg-secondary transition-all"
                 >
                   Back
