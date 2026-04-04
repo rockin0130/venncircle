@@ -31,7 +31,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
   const [addFriendOpen, setAddFriendOpen] = useState(false);
 
   const resetState = () => {
-    setStep(defaultCategory ? "friends" : "category");
+    setStep(defaultCategory ? "pages" : "category");
     setCategory(defaultCategory || "home");
     setSelectedFriends(new Set());
     setSelectedPages(new Set(defaultPage ? [defaultPage] : []));
