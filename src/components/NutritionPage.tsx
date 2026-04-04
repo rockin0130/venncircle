@@ -243,43 +243,34 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     consumed: boolean;
   }): Promise<MealLog[]> => {
     if (!user) return [];
-    const targets: (string | null)[] = [null];
-    for (const gid of addMealGroupIds) {
-      if (gid && !targets.includes(gid)) targets.push(gid);
-    }
-    const results = await Promise.all(
-      targets.map((targetGroupId) =>
-        supabase
-          .from("meal_logs")
-          .insert({
-            user_id: user.id,
-            group_id: targetGroupId,
-            meal_date: mealPayload.meal_date,
-            meal_type: mealPayload.meal_type,
-            title: mealPayload.title,
-            ingredients: mealPayload.ingredients || [],
-            prep_steps: mealPayload.prep_steps || [],
-            protein: mealPayload.protein,
-            calories: mealPayload.calories,
-            carbs: mealPayload.carbs || 0,
-            fat: mealPayload.fat || 0,
-            fiber: mealPayload.fiber || 0,
-            is_ai_generated: mealPayload.is_ai_generated,
-            ai_tags: mealPayload.ai_tags || [],
-            consumed: mealPayload.consumed,
-          })
-          .select()
-          .single()
-      )
-    );
-    const insertedMeals = results.flatMap((result) => {
-      if (result.error || !result.data) return [];
-      return [result.data as MealLog];
-    });
-    if (insertedMeals.length === 0) {
+    // Single record — use group_id of the first selected group (or null for personal-only)
+    const targetGroupId = addMealGroupIds.length > 0 ? addMealGroupIds[0] : null;
+    const { data, error } = await supabase
+      .from("meal_logs")
+      .insert({
+        user_id: user.id,
+        group_id: targetGroupId,
+        meal_date: mealPayload.meal_date,
+        meal_type: mealPayload.meal_type,
+        title: mealPayload.title,
+        ingredients: mealPayload.ingredients || [],
+        prep_steps: mealPayload.prep_steps || [],
+        protein: mealPayload.protein,
+        calories: mealPayload.calories,
+        carbs: mealPayload.carbs || 0,
+        fat: mealPayload.fat || 0,
+        fiber: mealPayload.fiber || 0,
+        is_ai_generated: mealPayload.is_ai_generated,
+        ai_tags: mealPayload.ai_tags || [],
+        consumed: mealPayload.consumed,
+      })
+      .select()
+      .single();
+    if (error || !data) {
       toast.error("Couldn't save meal.");
+      return [];
     }
-    return insertedMeals;
+    return [data as MealLog];
   }, [addMealGroupIds, user]);
 
   const rangeDates = useMemo(() => {
