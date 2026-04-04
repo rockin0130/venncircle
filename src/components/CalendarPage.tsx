@@ -232,6 +232,13 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
   const [showCalendarsManager, setShowCalendarsManager] = useState(false);
   const [userFilterIds, setUserFilterIds] = useState<Set<string>>(() => new Set(["__everyone__"]));
   const timeGridRef = useRef<HTMLDivElement>(null);
+  const calFilterUsers = useCalendarFilterUsers();
+
+  // Determine if multiple users are selected (for team dashboard)
+  const multiUserSelected = useMemo(() => {
+    if (userFilterIds.has(EVERYONE_SENTINEL)) return calFilterUsers.length > 1;
+    return userFilterIds.size > 1;
+  }, [userFilterIds, calFilterUsers]);
 
   // Reset user filter to "everyone" when context changes
   useEffect(() => {
