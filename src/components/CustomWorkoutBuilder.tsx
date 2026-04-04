@@ -190,7 +190,7 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWork
 
   const handleClose = () => { reset(); onClose(); };
 
-  const selectActivity = (label: string, emoji: string, hkType: WorkoutType) => {
+  const selectActivity = (label: string, emoji: string, hkType: HealthWorkoutType) => {
     setTitle(label);
     setActivityEmoji(emoji);
     setActivityHealthKitType(hkType);
