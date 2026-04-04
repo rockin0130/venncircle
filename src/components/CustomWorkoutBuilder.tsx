@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { X, Plus, Trash2, Search, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, MapPin, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { WorkoutType } from "@capgo/capacitor-health";
+import type { WorkoutType as HealthWorkoutType } from "@capgo/capacitor-health";
 import { Workout } from "@/context/AppContext";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,7 +48,7 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWork
   const [activityDistanceUnit, setActivityDistanceUnit] = useState<"mi" | "km">("mi");
   const [activityEmoji, setActivityEmoji] = useState("🏃");
   const [activitySearch, setActivitySearch] = useState("");
-  const [activityHealthKitType, setActivityHealthKitType] = useState<WorkoutType | null>(null);
+  const [activityHealthKitType, setActivityHealthKitType] = useState<HealthWorkoutType | null>(null);
 
   const healthKitActivityOptions = useMemo(() => getAllHealthKitWorkoutOptions(), []);
 
@@ -190,7 +190,7 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWork
 
   const handleClose = () => { reset(); onClose(); };
 
-  const selectActivity = (label: string, emoji: string, hkType: WorkoutType) => {
+  const selectActivity = (label: string, emoji: string, hkType: HealthWorkoutType) => {
     setTitle(label);
     setActivityEmoji(emoji);
     setActivityHealthKitType(hkType);
