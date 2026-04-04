@@ -477,22 +477,22 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
     visibleEvents = [...myEvents, ...uniquePartnerEvents];
   }
 
-  // For Together view: pass all items to TeamDashboard
+  // Household views use unfiltered data for aggregate
   const householdMyTasks = useMemo(() =>
-    filteredTasks.filter((t) => isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)),
-    [filteredTasks, selDay, selMonth, selYear]
+    tasks.filter((t) => isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)),
+    [tasks, selDay, selMonth, selYear]
   );
   const householdMyEvents = useMemo(() =>
-    filteredEvents.filter((e) => e.day === selDay && e.month === selMonth && e.year === selYear),
-    [filteredEvents, selDay, selMonth, selYear]
+    events.filter((e) => e.day === selDay && e.month === selMonth && e.year === selYear),
+    [events, selDay, selMonth, selYear]
   );
   const householdPartnerTasks = useMemo(() =>
-    filteredPartnerTasks.filter((t) => isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)),
-    [filteredPartnerTasks, selDay, selMonth, selYear]
+    partnerTasks.filter((t) => isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)),
+    [partnerTasks, selDay, selMonth, selYear]
   );
   const householdPartnerEvents = useMemo(() =>
-    filteredPartnerEvents.filter((e) => e.day === selDay && e.month === selMonth && e.year === selYear),
-    [filteredPartnerEvents, selDay, selMonth, selYear]
+    partnerEvents.filter((e) => e.day === selDay && e.month === selMonth && e.year === selYear),
+    [partnerEvents, selDay, selMonth, selYear]
   );
 
   const hasSpecificTime = (time?: string) => Boolean(time) && time !== "" && time !== "All day";
