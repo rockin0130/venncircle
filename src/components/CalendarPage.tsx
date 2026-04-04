@@ -46,6 +46,15 @@ const GROUP_COLOR_CLASSES = [
   { bg: "bg-yellow-500", text: "text-yellow-500", bgLight: "bg-yellow-500/15", border: "border-yellow-500/30" },
 ];
 
+// Resolve Family/home groups to green color index (2 = emerald)
+function getGroupColorIndex(groupId: string | null | undefined, groups: Group[]): number {
+  if (!groupId) return 0;
+  const grp = groups.find((g) => g.id === groupId);
+  if (grp && (grp.name.toLowerCase() === "family" || grp.category === "home")) return 2; // emerald/green
+  const idx = groups.findIndex((g) => g.id === groupId);
+  return idx >= 0 ? idx % GROUP_COLOR_CLASSES.length : 0;
+}
+
 type ViewMode = "month" | "list" | "day" | "3day";
 const VIEW_LABELS: Record<ViewMode, string> = { month: "Month", list: "List", day: "Day", "3day": "3 Day" };
 
@@ -103,11 +112,6 @@ function dateWithMinutes(baseDate: Date, minutes: number) {
   return dt;
 }
 
-function getGroupColorIndex(groupId: string | null | undefined, groups: Group[]): number {
-  if (!groupId) return 0;
-  const idx = groups.findIndex((g) => g.id === groupId);
-  return idx >= 0 ? idx % GROUP_COLOR_CLASSES.length : 0;
-}
 
 function dateToKey(d: number, m: number, y: number) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -685,6 +689,23 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     });
   };
 
+  // Direct edit on tap: skip detail modal for non-gcal items
+  const handleItemTap = useCallback((item: CalItem) => {
+    if (item.type === "gcal") {
+      // Google Calendar events can't be edited, show detail
+      setSelectedItem(item);
+      return;
+    }
+    // Go directly to edit form
+    setEditingItem({
+      id: item.id,
+      type: item.type,
+      raw: item.raw as ScheduledEvent | Task,
+      isDueDateTask: item.isDueDateTask,
+      done: item.done,
+    });
+  }, []);
+
   // Scroll time grid to 8am
   useEffect(() => {
     if ((viewMode === "day" || viewMode === "3day") && timeGridRef.current) {
@@ -1083,7 +1104,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
             {selectedDayItems.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-6">No events</p>
             ) : (
-              <EventList items={selectedDayItems} groups={groups} getColorClasses={getColorClasses} onItemTap={setSelectedItem} colorMap={calendarColorMap} />
+              <EventList items={selectedDayItems} groups={groups} getColorClasses={getColorClasses} onItemTap={handleItemTap} colorMap={calendarColorMap} />
             )}
           </div>
         </motion.div>
@@ -1143,7 +1164,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
                       {items.length === 0 ? (
                         <p className="text-xs text-muted-foreground py-1">No events</p>
                       ) : (
-                        <EventList items={items} groups={groups} getColorClasses={getColorClasses} onItemTap={setSelectedItem} compact colorMap={calendarColorMap} />
+                        <EventList items={items} groups={groups} getColorClasses={getColorClasses} onItemTap={handleItemTap} compact colorMap={calendarColorMap} />
                       )}
                     </div>
                   </div>
@@ -1177,7 +1198,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
               getItemsForDate={getItemsForDate}
               groups={groups}
               timeGridRef={timeGridRef}
-              onItemTap={setSelectedItem}
+              onItemTap={handleItemTap}
               hideColumnHeaders
               colorMap={calendarColorMap}
             />
@@ -1209,7 +1230,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
               getItemsForDate={getItemsForDate}
               groups={groups}
               timeGridRef={timeGridRef}
-              onItemTap={setSelectedItem}
+              onItemTap={handleItemTap}
               colorMap={calendarColorMap}
             />
           </motion.div>

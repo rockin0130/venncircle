@@ -72,13 +72,16 @@ const PageGroupSelector = ({ page, isHomePage, personalLabel = "Personal", perso
         {/* Group chips filtered for this page */}
         {pageGroups.map((group) => {
           const isActive = activeGroup?.id === group.id && !(activeGroup as any)?._personal;
+          const isFamily = group.name.toLowerCase() === "family" || group.category === "home";
           return (
             <button
               key={group.id}
               onClick={() => setActiveGroup(group)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0 border ${
                 isActive
-                  ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                  ? isFamily
+                    ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                    : "border-primary bg-primary text-primary-foreground shadow-sm"
                   : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
               }`}
             >
