@@ -18,6 +18,7 @@ import LauncherPage from "@/components/LauncherPage";
 import AuthPage from "@/components/AuthPage";
 import ProfileSetupPage from "@/components/ProfileSetupPage";
 import SharedInterestsPage from "@/components/SharedInterestsPage";
+import GroupHubPage from "@/components/GroupHubPage";
 import ProfilePage from "@/components/ProfilePage";
 import AppDrawer from "@/components/AppDrawer";
 import DrawerMenuButton from "@/components/DrawerMenuButton";
