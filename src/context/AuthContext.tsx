@@ -575,7 +575,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (result?.error) return { error: result.error };
     // Immediately clear activeGroup if it was the one we just left
     if (activeGroup?.id === groupId) {
-      setActiveGroup(null);
+      setActiveGroup({ _personal: true, id: "__personal__", name: "Mine", type: "personal", emoji: "👤", invite_code: "", created_by: "", shared_pages: [], members: [] } as any);
     }
     await fetchGroups();
     return { success: true };
