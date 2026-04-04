@@ -5,6 +5,8 @@ import {
 } from "lucide-react";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
 import { useAuth, Group, GroupMember } from "@/context/AuthContext";
+import CalendarTeamDashboard from "@/components/CalendarTeamDashboard";
+import { useCalendarFilterUsers, MEMBER_COLORS, EVERYONE_SENTINEL, FilterUser } from "@/components/CalendarUserFilter";
 
 import PageGroupSelector from "@/components/PageGroupSelector";
 import { useGroupContext } from "@/hooks/useGroupContext";
@@ -55,8 +57,8 @@ function getGroupColorIndex(groupId: string | null | undefined, groups: Group[])
   return idx >= 0 ? idx % GROUP_COLOR_CLASSES.length : 0;
 }
 
-type ViewMode = "month" | "list" | "day" | "3day";
-const VIEW_LABELS: Record<ViewMode, string> = { month: "Month", list: "List", day: "Day", "3day": "3 Day" };
+type ViewMode = "month" | "list" | "day" | "3day" | "week";
+const VIEW_LABELS: Record<ViewMode, string> = { month: "M", list: "List", day: "D", "3day": "3D", week: "W" };
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -230,6 +232,13 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
   const [showCalendarsManager, setShowCalendarsManager] = useState(false);
   const [userFilterIds, setUserFilterIds] = useState<Set<string>>(() => new Set(["__everyone__"]));
   const timeGridRef = useRef<HTMLDivElement>(null);
+  const calFilterUsers = useCalendarFilterUsers();
+
+  // Determine if multiple users are selected (for team dashboard)
+  const multiUserSelected = useMemo(() => {
+    if (userFilterIds.has(EVERYONE_SENTINEL)) return calFilterUsers.length > 1;
+    return userFilterIds.size > 1;
+  }, [userFilterIds, calFilterUsers]);
 
   // Reset user filter to "everyone" when context changes
   useEffect(() => {
@@ -657,26 +666,59 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
   // ── Month grid: dots per day ──────────────────────────
 
+  // ── Month grid: per-person dots ──────────────────────
   const monthDots = useMemo(() => {
     const dots = new Map<number, { id: string; color: string }[]>();
+    const currentUserId = user?.id || "";
+    const isEveryone = userFilterIds.has(EVERYONE_SENTINEL);
+
     for (let d = 1; d <= daysInMonth; d++) {
       const items = getItemsForDate(d, month, year);
-      if (items.length > 0) {
-        const seen = new Set<string>();
-        const dotColors: { id: string; color: string }[] = [];
-        items.forEach((it) => {
-          const color = resolveItemColor(it, groups, calendarColorMap);
-          const key = it.isDueDateTask ? "__todo" : `color-${color}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            dotColors.push({ id: key, color });
+      if (items.length === 0) continue;
+
+      const seenUsers = new Set<string>();
+      const dotColors: { id: string; color: string }[] = [];
+
+      items.forEach((it) => {
+        const raw = it.raw as any;
+        const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+        const ownerIds = new Set<string>();
+
+        if (it.assignee === "me") ownerIds.add(ownerId);
+        else if (it.assignee === "partner") {
+          if (it.groupId) {
+            const grp = groups.find(g => g.id === it.groupId);
+            grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+              .forEach((m: any) => ownerIds.add(m.user_id));
           }
+        } else if (it.assignee === "both") {
+          ownerIds.add(ownerId);
+          if (it.groupId) {
+            const grp = groups.find(g => g.id === it.groupId);
+            grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+              .forEach((m: any) => ownerIds.add(m.user_id));
+          }
+        } else {
+          ownerIds.add(ownerId);
+        }
+        if (it.type === "gcal") ownerIds.add(currentUserId);
+
+        ownerIds.forEach(uid => {
+          if (seenUsers.has(uid)) return;
+          // Only show dot if this user's pill is selected
+          if (!isEveryone && !userFilterIds.has(uid)) return;
+          const fu = calFilterUsers.find(u => u.id === uid);
+          if (!fu) return;
+          seenUsers.add(uid);
+          const memberColor = MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length];
+          dotColors.push({ id: uid, color: memberColor.dot });
         });
-        dots.set(d, dotColors);
-      }
+      });
+
+      if (dotColors.length > 0) dots.set(d, dotColors.slice(0, 3));
     }
     return dots;
-  }, [daysInMonth, month, year, getItemsForDate, groups, calendarColorMap]);
+  }, [daysInMonth, month, year, getItemsForDate, groups, user?.id, userFilterIds, calFilterUsers]);
 
   // ── Navigation ────────────────────────────────────────
 
@@ -938,6 +980,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
       {/* ── Header ──────────────────────────────────────── */}
       <header className="pt-10 pb-2">
         <div className="flex items-center justify-between">
+          {/* Left: Month Year */}
           {viewMode === "list" ? (
             <button onClick={goToday} className="flex items-center gap-2 hover:bg-secondary rounded-lg px-2 py-1 transition-colors">
               <h1 className="text-xl font-bold text-foreground">{listVisibleMonth}</h1>
@@ -946,7 +989,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
             <Popover>
               <PopoverTrigger asChild>
                 <button className="flex items-center gap-2 hover:bg-secondary rounded-lg px-2 py-1 transition-colors">
-                  <h1 className="text-xl font-bold text-foreground">
+                  <h1 className="text-xl font-semibold text-foreground">
                     {selectedDate.toLocaleString("default", { month: "long" })}
                   </h1>
                   <span className="text-xl font-light text-muted-foreground">{selYear}</span>
@@ -971,9 +1014,9 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
           ) : (
             <Popover>
               <PopoverTrigger asChild>
-                <button className="flex items-center gap-2 hover:bg-secondary rounded-lg px-2 py-1 transition-colors">
-                  <h1 className="text-xl font-bold text-foreground">{monthName}</h1>
-                  <span className="text-xl font-light text-muted-foreground">{year}</span>
+                <button className="flex items-center gap-1.5 hover:bg-secondary rounded-lg px-2 py-1 transition-colors">
+                  <h1 className="text-xl font-semibold text-foreground">{monthName}</h1>
+                  <span className="text-lg font-light text-muted-foreground">{year}</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -993,46 +1036,39 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
               </PopoverContent>
             </Popover>
           )}
-          <div className="flex items-center gap-0.5">
-            
-            <button onClick={goToday} className="h-7 px-2 text-[11px] font-semibold text-primary hover:bg-primary/10 rounded-full transition-colors">
-              Today
-            </button>
-            <button onClick={() => setShowSearch(true)} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-secondary text-muted-foreground">
-              <Search size={16} />
-            </button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="h-7 px-2 flex items-center gap-0.5 text-[11px] font-medium text-primary hover:bg-primary/10 rounded-full">
-                  <CalendarIcon size={13} />
-                  <span>{VIEW_LABELS[viewMode]}</span>
+          {/* Right: D/W/M segmented control + search + add */}
+          <div className="flex items-center gap-1.5">
+            {/* D / W / M pill toggle */}
+            <div className="flex bg-secondary rounded-full p-0.5">
+              {(["day", "3day", "month"] as ViewMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={cn(
+                    "px-2 py-0.5 text-[10px] font-semibold rounded-full transition-all",
+                    viewMode === mode
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {mode === "day" ? "D" : mode === "3day" ? "W" : "M"}
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[120px]">
-                {(["month", "list", "day", "3day"] as ViewMode[]).map((mode) => (
-                  <DropdownMenuItem
-                    key={mode}
-                    onClick={() => setViewMode(mode)}
-                    className={viewMode === mode ? "bg-accent font-semibold" : ""}
-                  >
-                    {VIEW_LABELS[mode]}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              ))}
+            </div>
+
+            <button onClick={() => setShowSearch(true)} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-secondary text-muted-foreground">
+              <Search size={15} />
+            </button>
 
             <button onClick={openAddForm} className="w-7 h-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground">
               <Plus size={14} />
             </button>
 
             {onOpenSettings && (
-              <>
-                <div className="w-px h-4 bg-border mx-0.5" />
-                <button onClick={onOpenSettings} className="w-7 h-7 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                  <Settings size={16} />
-                </button>
-              </>
+              <button onClick={onOpenSettings} className="w-7 h-7 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                <Settings size={15} />
+              </button>
             )}
           </div>
         </div>
@@ -1088,15 +1124,19 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
                 const dots = monthDots.get(day);
 
                 return (
-                  <button key={day} onClick={() => selectDay(day)} className="h-11 flex flex-col items-center justify-center relative">
+                  <button key={day} onClick={() => {
+                    selectDay(day);
+                    // Tapping today's date = go to today
+                    if (isTodayDay) goToday();
+                  }} className="h-11 flex flex-col items-center justify-center relative">
                     <span className={`w-8 h-8 flex items-center justify-center rounded-full text-[13px] transition-all ${
                       isSelected ? "bg-primary text-primary-foreground font-semibold"
-                        : isTodayDay ? "bg-destructive text-destructive-foreground font-semibold"
+                        : isTodayDay ? "ring-2 ring-primary text-primary font-semibold"
                         : "text-foreground hover:bg-secondary"
                     }`}>
                       {day}
                     </span>
-                    {dots && !isSelected && (
+                    {dots && (
                       <div className="flex gap-[2px] absolute bottom-0">
                         {dots.slice(0, 3).map((dot, idx) => (
                             <span key={idx} className="w-[4px] h-[4px] rounded-full"
@@ -1110,15 +1150,22 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
             </motion.div>
           </AnimatePresence>
 
-          {/* Selected day event list */}
+          {/* Selected day event list or team dashboard */}
           <div className="mt-3 border-t border-border pt-3">
             <h2 className="text-[13px] font-semibold text-foreground mb-2">
               {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
             </h2>
-            {selectedDayItems.length === 0 ? (
+            {multiUserSelected ? (
+              <CalendarTeamDashboard
+                items={selectedDayItems}
+                filterUsers={calFilterUsers}
+                selectedUserIds={userFilterIds}
+                onItemTap={handleItemTap}
+              />
+            ) : selectedDayItems.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-6">No events</p>
             ) : (
-              <EventList items={selectedDayItems} groups={groups} getColorClasses={getColorClasses} onItemTap={handleItemTap} colorMap={calendarColorMap} />
+              <EventList items={selectedDayItems} groups={groups} getColorClasses={getColorClasses} onItemTap={handleItemTap} colorMap={calendarColorMap} filterUsers={calFilterUsers} />
             )}
           </div>
         </motion.div>
@@ -1514,7 +1561,7 @@ const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName }: {
 };
 
 const EventList = ({
-  items, groups, getColorClasses, onItemTap, compact, colorMap,
+  items, groups, getColorClasses, onItemTap, compact, colorMap, filterUsers,
 }: {
   items: CalItem[];
   groups: Group[];
@@ -1522,6 +1569,7 @@ const EventList = ({
   onItemTap?: (item: CalItem) => void;
   compact?: boolean;
   colorMap?: { byId: Map<string, string>; byProvider: Map<string, string> };
+  filterUsers?: FilterUser[];
 }) => {
   const { activeGroup, user, profile } = useAuth();
   const currentUserId = user?.id || "";
@@ -1529,6 +1577,27 @@ const EventList = ({
   const todoItems = items.filter((i) => i.isDueDateTask);
   const allDayItems = items.filter((i) => i.allDay && !i.isDueDateTask);
   const timedItems = items.filter((i) => !i.allDay);
+
+  // Resolve person color for left border
+  const getPersonColor = (item: CalItem): string => {
+    if (!filterUsers || filterUsers.length === 0) return resolveItemColor(item, groups, colorMap);
+    const raw = item.raw as any;
+    const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+    if (item.assignee === "both") {
+      // Shared event → use shared purple color
+      return "#8B5CF6";
+    }
+    const targetId = item.assignee === "partner" ? undefined : ownerId;
+    if (item.type === "gcal") {
+      const fu = filterUsers.find(u => u.id === currentUserId);
+      return fu ? MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot : resolveItemColor(item, groups, colorMap);
+    }
+    if (targetId) {
+      const fu = filterUsers.find(u => u.id === targetId);
+      if (fu) return MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot;
+    }
+    return resolveItemColor(item, groups, colorMap);
+  };
 
   return (
     <div className={compact ? "space-y-0.5" : "divide-y divide-border"}>
@@ -1557,7 +1626,7 @@ const EventList = ({
       {allDayItems.length > 0 && (
         <div className="py-0.5">
           {allDayItems.map((item) => {
-            const color = resolveItemColor(item, groups, colorMap);
+            const color = getPersonColor(item);
             const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
             return (
               <button key={item.id} onClick={() => onItemTap?.(item)}
@@ -1582,7 +1651,7 @@ const EventList = ({
       )}
 
       {timedItems.map((item) => {
-        const color = resolveItemColor(item, groups, colorMap);
+        const color = getPersonColor(item);
         const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
         const displayTime = item.type === "gcal" && item.time
           ? new Date(item.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
@@ -1591,14 +1660,17 @@ const EventList = ({
 
         return (
           <button key={item.id} onClick={() => onItemTap?.(item)}
-            className="w-full flex items-center gap-2.5 py-2 px-1 text-left hover:bg-secondary/50 rounded-lg transition-colors active:bg-secondary">
-            <span className="w-[3px] h-5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-            <span className="text-[11px] text-muted-foreground w-16 flex-shrink-0 tabular-nums">
-              {displayTime}{displayEndTime && displayEndTime !== displayTime ? `–${displayEndTime}` : ""}
-            </span>
-            <span className={`text-[13px] font-medium flex-1 truncate ${item.done ? "line-through opacity-40" : "text-foreground"}`}>
-              {item.title}
-            </span>
+            className="w-full flex items-center gap-2.5 py-2.5 px-3 text-left rounded-xl border border-border bg-card shadow-sm mb-1 transition-colors hover:bg-secondary/30 active:bg-secondary/50"
+            style={{ borderLeftWidth: "3px", borderLeftColor: color }}
+          >
+            <div className="flex-1 min-w-0">
+              <span className={`text-[13px] font-medium block truncate ${item.done ? "line-through opacity-40" : "text-foreground"}`}>
+                {item.title}
+              </span>
+              <span className="text-[11px] text-muted-foreground tabular-nums">
+                {displayTime}{displayEndTime && displayEndTime !== displayTime ? ` – ${displayEndTime}` : ""}
+              </span>
+            </div>
             {item.type === "gcal" && <GoogleBadge />}
             {group && (
               <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
