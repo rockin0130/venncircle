@@ -1083,7 +1083,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
             {selectedDayItems.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-6">No events</p>
             ) : (
-              <EventList items={selectedDayItems} groups={groups} getColorClasses={getColorClasses} onItemTap={setSelectedItem} colorMap={calendarColorMap} />
+              <EventList items={selectedDayItems} groups={groups} getColorClasses={getColorClasses} onItemTap={handleItemTap} colorMap={calendarColorMap} />
             )}
           </div>
         </motion.div>
