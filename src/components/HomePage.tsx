@@ -8,10 +8,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import GroupBadge from "@/components/GroupBadge";
 import ItemActionMenu from "@/components/ItemActionMenu";
-import PageGroupSelector from "@/components/PageGroupSelector";
 import UserBadge from "@/components/UserBadge";
 import TaskActionMenu from "@/components/TaskActionMenu";
-import TeamDashboard from "@/components/TeamDashboard";
 import AddItemModal from "@/components/AddItemModal";
 import CongratsPopup from "@/components/CongratsPopup";
 import HomeSectionCustomizer, { loadSectionPrefs, saveSectionPrefs, buildAllSections } from "@/components/HomeSectionCustomizer";
@@ -38,8 +36,9 @@ interface ClarificationState {
 }
 
 const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLauncher?: () => void; onOpenSettings?: () => void; onNavigate?: (page: string) => void }) => {
-  const { profile, partner, groups, activeGroup, setActiveGroup, user } = useAuth();
-  const [filter, setFilter] = useState<Filter>("mine");
+  const { profile, partner, groups, user } = useAuth();
+  // Home page is ALWAYS the logged-in user's aggregate view — never influenced by global group selection
+  const filter: Filter = "mine";
   const [input, setInput] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -55,23 +54,23 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   const [selectedSpecialDayIds, setSelectedSpecialDayIds] = useState<string[]>([]);
   const [selectedHabitSubIds, setSelectedHabitSubIds] = useState<string[]>([]);
   const {
-    habits, filteredHabits, toggleHabit, addHabit, removeHabit, events, filteredEvents, tasks, filteredTasks, toggleTask, toggleEventCompletion, addTask, addEvent, removeEvent, removeTask, updateTask, rescheduleEvent,
-    partnerHabits, partnerEvents, partnerTasks, filteredPartnerHabits, filteredPartnerEvents, filteredPartnerTasks, googleCalendarEvents, hideGcalEvent, toggleGcalCompletion, toggleEventVisibility, designateGcalEvent,
+    habits, toggleHabit, addHabit, removeHabit, events, tasks, toggleTask, toggleEventCompletion, addTask, addEvent, removeEvent, removeTask, updateTask, rescheduleEvent,
+    partnerHabits, partnerEvents, partnerTasks, googleCalendarEvents, hideGcalEvent, toggleGcalCompletion, toggleEventVisibility, designateGcalEvent,
   } = useAppContext();
 
   const voiceModeRef = useRef(voiceMode);
   const aiRequestInFlightRef = useRef(false);
   useEffect(() => { voiceModeRef.current = voiceMode; }, [voiceMode]);
 
-  // Load section preferences
+  // Load section preferences — always use null (aggregate/personal view)
   useEffect(() => {
-    const prefs = loadSectionPrefs(activeGroup?.id ?? null);
+    const prefs = loadSectionPrefs(null);
     setSectionOrder(prefs.order);
     setSectionVisible(prefs.visible);
     setSelectedSobrietyIds(prefs.selectedSobrietyIds);
     setSelectedSpecialDayIds(prefs.selectedSpecialDayIds);
     setSelectedHabitSubIds(prefs.selectedHabitSubIds);
-  }, [activeGroup?.id]);
+  }, []);
 
   const handleSaveSections = (
     order: string[],
@@ -85,7 +84,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
     setSelectedSobrietyIds(sobrietyIds);
     setSelectedSpecialDayIds(specialDayIds);
     setSelectedHabitSubIds(habitSubIds);
-    saveSectionPrefs(activeGroup?.id ?? null, order, visible, sobrietyIds, specialDayIds, habitSubIds);
+    saveSectionPrefs(null, order, visible, sobrietyIds, specialDayIds, habitSubIds);
   };
 
   const { listening, start: startListening, stop: stopListening, isSupported: speechSupported } = useSpeechToText({
@@ -365,74 +364,14 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   // Effective habit sub-items: just the habit category toggles from preferences
   const effectiveHabitSubIds = selectedHabitSubIds;
 
-  const { filters: groupFilters, otherName, hasOther, showGoogleCalendar } = useGroupContext();
-  const partnerName = otherName;
+  const { showGoogleCalendar } = useGroupContext();
 
-  // Determine if "Personal" sentinel is active
-  const isPersonalActive = (activeGroup as any)?._personal === true;
-  const isAllActive = activeGroup === null && !isPersonalActive;
-
-  // Build "All view" member filter pills from all home/family groups
-  const allViewMembers = useMemo(() => {
-    if (!isAllActive || !user) return [];
-    const homeGroups = groups.filter((g) => g.category === "home" && g.shared_pages?.includes("calendar"));
-    const memberMap = new Map<string, string>();
-    for (const g of homeGroups) {
-      for (const m of g.members) {
-        if (m.user_id !== user.id && m.status === "active" && !memberMap.has(m.user_id)) {
-          memberMap.set(m.user_id, m.display_name || "Member");
-        }
-      }
-    }
-    return Array.from(memberMap.entries()).map(([uid, name]) => ({ id: uid, label: name }));
-  }, [isAllActive, user, groups]);
-
-  const [allViewSelectedIds, setAllViewSelectedIds] = useState<Set<string>>(() => new Set(["everyone"]));
-
-  // Reset all-view pills when switching away from All
-  useEffect(() => {
-    if (isAllActive) {
-      setAllViewSelectedIds(new Set(["everyone"]));
-    }
-  }, [isAllActive]);
-
-  const toggleAllViewPill = (id: string) => {
-    setAllViewSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (id === "everyone") {
-        // Toggle everyone = select all or deselect all
-        if (next.has("everyone")) {
-          next.clear();
-          next.add("mine");
-        } else {
-          next.clear();
-          next.add("everyone");
-        }
-        return next;
-      }
-      next.delete("everyone");
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      // If all individual pills selected, switch to everyone
-      if (next.size === 0) next.add("everyone");
-      return next;
-    });
-  };
-
-  // Helper: check if current filter is a specific member filter
-  const isSpecificMemberFilter = filter.startsWith("member:");
-  const selectedMemberUserId = isSpecificMemberFilter ? filter.replace("member:", "") : null;
-  // Find the display name for the selected member
-  const selectedMemberName = useMemo(() => {
-    if (!selectedMemberUserId) return partnerName;
-    const f = groupFilters.find((gf) => gf.id === filter);
-    return f?.label || partnerName;
-  }, [selectedMemberUserId, groupFilters, filter, partnerName]);
+  // Home page is always the aggregate "mine" view — no group/member filtering
+  const isViewingPartner = false;
 
   // Morning habits: show own when "mine", partner's when "partner" — use first habit section
-  const myMorningHabits = filteredHabits.filter((h) => h.category === "morning");
-  const partnerMorningHabits = filteredPartnerHabits.filter((h) => h.category === "morning");
-  const displayMorningHabits = (filter === "partner" || isSpecificMemberFilter) ? partnerMorningHabits : myMorningHabits;
+  const myMorningHabits = habits.filter((h) => h.category === "morning");
+  const displayMorningHabits = myMorningHabits;
 
   const handleToggleHabit = useCallback((id: string) => {
     const habit = myMorningHabits.find((h) => h.id === id);
@@ -454,80 +393,43 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
     return day === selDay && month === selMonth && year === selYear;
   };
 
-  // INDIVIDUAL VIEW: show items assigned to me (or specific member) PLUS jointly assigned items
-  let dayTasks: Task[];
-  let visibleEvents: ScheduledEvent[];
+  // Home page is always "mine" aggregate — show all user's own items across all groups
+  const myResponsible = tasks.filter((t) =>
+    (t.assignee === "me" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
+  );
+  const partnerAssignedToMe = partnerTasks.filter((t) =>
+    (t.assignee === "partner" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
+  );
+  const seenTaskKeys = new Set(myResponsible.map((t) => `${t.title}|${t.time}|${t.scheduledDay}`));
+  const uniquePartnerTasks = partnerAssignedToMe.filter((t) => !seenTaskKeys.has(`${t.title}|${t.time}|${t.scheduledDay}`));
+  const dayTasks = [...myResponsible, ...uniquePartnerTasks];
 
-  if (filter === "mine") {
-    const myResponsible = filteredTasks.filter((t) =>
-      (t.assignee === "me" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
-    );
-    const partnerAssignedToMe = filteredPartnerTasks.filter((t) =>
-      (t.assignee === "partner" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
-    );
-    const seenKeys = new Set(myResponsible.map((t) => `${t.title}|${t.time}|${t.scheduledDay}`));
-    const uniquePartner = partnerAssignedToMe.filter((t) => !seenKeys.has(`${t.title}|${t.time}|${t.scheduledDay}`));
-    dayTasks = [...myResponsible, ...uniquePartner];
+  const myEvents = events.filter((e) =>
+    (e.user === "me" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
+  );
+  const partnerEventsForMe = partnerEvents.filter((e) =>
+    (e.user === "partner" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
+  );
+  const seenEventKeys = new Set(myEvents.map((e) => `${e.title}|${e.time}|${e.day}`));
+  const uniquePartnerEventsForMe = partnerEventsForMe.filter((e) => !seenEventKeys.has(`${e.title}|${e.time}|${e.day}`));
+  const visibleEvents = [...myEvents, ...uniquePartnerEventsForMe];
 
-    const myEvents = filteredEvents.filter((e) =>
-      (e.user === "me" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
-    );
-    const partnerEventsForMe = filteredPartnerEvents.filter((e) =>
-      (e.user === "partner" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
-    );
-    const seenEventKeys = new Set(myEvents.map((e) => `${e.title}|${e.time}|${e.day}`));
-    const uniquePartnerEvents = partnerEventsForMe.filter((e) => !seenEventKeys.has(`${e.title}|${e.time}|${e.day}`));
-    visibleEvents = [...myEvents, ...uniquePartnerEvents];
-  } else if (filter === "partner" || isSpecificMemberFilter) {
-    // For "partner" (2-member) or "member:{userId}" (3+ member): show that member's data
-    const memberTasks = selectedMemberUserId
-      ? filteredPartnerTasks.filter((t) => t.ownerUserId === selectedMemberUserId)
-      : filteredPartnerTasks;
-    const memberEvents = selectedMemberUserId
-      ? filteredPartnerEvents.filter((e) => e.ownerUserId === selectedMemberUserId)
-      : filteredPartnerEvents;
-
-    const partnerOwn = memberTasks.filter((t) =>
-      (t.assignee === "me" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
-    );
-    const myAssignedToPartner = filteredTasks.filter((t) =>
-      (t.assignee === "partner" || t.assignee === "both") && isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)
-    );
-    const seenKeys = new Set(partnerOwn.map((t) => `${t.title}|${t.time}|${t.scheduledDay}`));
-    const uniqueMy = myAssignedToPartner.filter((t) => !seenKeys.has(`${t.title}|${t.time}|${t.scheduledDay}`));
-    dayTasks = [...partnerOwn, ...uniqueMy];
-
-    const partnerOwnEvents = memberEvents.filter((e) =>
-      (e.user === "me" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
-    );
-    const myEventsForPartner = filteredEvents.filter((e) =>
-      (e.user === "partner" || e.user === "both") && e.day === selDay && e.month === selMonth && e.year === selYear
-    );
-    const seenEventKeys = new Set(partnerOwnEvents.map((e) => `${e.title}|${e.time}|${e.day}`));
-    const uniqueMyEvents = myEventsForPartner.filter((e) => !seenEventKeys.has(`${e.title}|${e.time}|${e.day}`));
-    visibleEvents = [...partnerOwnEvents, ...uniqueMyEvents];
-  } else {
-    // "household" / shared: collect ALL items for TeamDashboard (handled separately in render)
-    dayTasks = [];
-    visibleEvents = [];
-  }
-
-  // For Together view: pass all items to TeamDashboard
+  // Household views use unfiltered data for aggregate
   const householdMyTasks = useMemo(() =>
-    filteredTasks.filter((t) => isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)),
-    [filteredTasks, selDay, selMonth, selYear]
+    tasks.filter((t) => isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)),
+    [tasks, selDay, selMonth, selYear]
   );
   const householdMyEvents = useMemo(() =>
-    filteredEvents.filter((e) => e.day === selDay && e.month === selMonth && e.year === selYear),
-    [filteredEvents, selDay, selMonth, selYear]
+    events.filter((e) => e.day === selDay && e.month === selMonth && e.year === selYear),
+    [events, selDay, selMonth, selYear]
   );
   const householdPartnerTasks = useMemo(() =>
-    filteredPartnerTasks.filter((t) => isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)),
-    [filteredPartnerTasks, selDay, selMonth, selYear]
+    partnerTasks.filter((t) => isSelectedDate(t.scheduledDay, t.scheduledMonth, t.scheduledYear)),
+    [partnerTasks, selDay, selMonth, selYear]
   );
   const householdPartnerEvents = useMemo(() =>
-    filteredPartnerEvents.filter((e) => e.day === selDay && e.month === selMonth && e.year === selYear),
-    [filteredPartnerEvents, selDay, selMonth, selYear]
+    partnerEvents.filter((e) => e.day === selDay && e.month === selMonth && e.year === selYear),
+    [partnerEvents, selDay, selMonth, selYear]
   );
 
   const hasSpecificTime = (time?: string) => Boolean(time) && time !== "" && time !== "All day";
@@ -564,7 +466,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
     if (startDate !== selDateStr) return false;
     const assignee = ge.assignee || "me";
     if (filter === "mine") return assignee === "me" || assignee === "both";
-    if (filter === "partner" || isSpecificMemberFilter) return assignee === "partner" || assignee === "both";
+    return assignee === "me" || assignee === "both";
     return true; // household shows all
   }) : [];
 
@@ -628,7 +530,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Determine if we can toggle items (only own items)
-  const isViewingPartner = filter === "partner" || isSpecificMemberFilter;
+  
 
   // Notification badge count (simple: incomplete habits after 6pm + upcoming events)
   const notificationCount = useMemo(() => {
@@ -829,42 +731,11 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
       </AnimatePresence>
 
 
-      {filter === "household" ? (
-        <TeamDashboard
-          myTasks={householdMyTasks}
-          myEvents={householdMyEvents}
-          partnerTasks={householdPartnerTasks}
-          partnerEvents={householdPartnerEvents}
-          gcalEvents={gcalEventsForDay}
-          toggleTask={toggleTask}
-          toggleEventCompletion={toggleEventCompletion}
-          toggleGcalCompletion={toggleGcalCompletion}
-          removeEvent={removeEvent}
-          removeTask={removeTask}
-          toggleEventVisibility={toggleEventVisibility}
-          rescheduleEvent={rescheduleEvent}
-          hideGcalEvent={hideGcalEvent}
-          designateGcalEvent={designateGcalEvent}
-          onCongrats={() => setCongratsType("task")}
-        />
-      ) : (
+      {(
         <>
           {sectionOrder.filter((id) => {
-            if (!sectionVisible.has(id)) return false;
-            // Personal view: show all sections (no shared_pages filter)
-            if (isPersonalActive) return true;
-            // If a real group is selected, only show sections for pages the group shares
-            if (activeGroup?.shared_pages && !isPersonalActive) {
-              const sp = activeGroup.shared_pages;
-              if (id === "scheduled" || id === "todo") return sp.includes("calendar");
-              if (id === "water") return sp.includes("habits");
-              if (id === "nutrition") return sp.includes("nutrition");
-              if (id === "workout") return sp.includes("workout");
-              if (id === "sobriety") return sp.includes("sobriety");
-              if (id === "special-days") return sp.includes("special_days");
-              if (id === "shopping") return sp.includes("shopping");
-            }
-            return true;
+            // Home page always shows all toggled-on sections — no group shared_pages filtering
+            return sectionVisible.has(id);
           }).map((sectionId) => {
             switch (sectionId) {
               case "scheduled":
@@ -882,7 +753,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                     onNavigate={onNavigate}
                     enabledHabitCategories={effectiveHabitSubIds.filter(id => id.startsWith("habit:")).map(id => id.replace("habit:", ""))}
                     selectedDate={selectedDate}
-                    isViewingMemberName={isViewingPartner ? selectedMemberName : undefined}
+                    isViewingMemberName={undefined}
                   />
                 );
 
@@ -896,7 +767,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                     readOnly={isViewingPartner}
                     addTask={addTask}
                     selectedDate={selectedDate}
-                    memberFilters={groupFilters}
+                    memberFilters={[]}
                   />
                 );
 
@@ -968,7 +839,6 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
 };
 
 const TaskCard = ({ task, onToggle, onCongrats, readOnly }: { task: Task; onToggle?: (id: string) => void; onCongrats: () => void; readOnly?: boolean }) => {
-  const { activeGroup } = useAuth();
   const handleToggle = () => {
     if (readOnly || !onToggle) return;
     if (!task.done) {
