@@ -181,7 +181,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     events, filteredEvents, removeEvent, rescheduleEvent,
     tasks, filteredTasks, toggleTask, removeTask,
     googleCalendarEvents, hideGcalEvent, toggleGcalCompletion, toggleEventVisibility, designateGcalEvent,
-    toggleEventCompletion,
+    toggleEventCompletion, partnerEvents,
   } = useAppContext();
   const { user, activeGroup, setActiveGroup, groups } = useAuth();
   const { showGoogleCalendar } = useGroupContext();
