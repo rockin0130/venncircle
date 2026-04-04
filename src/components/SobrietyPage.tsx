@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, GroupMember } from "@/context/AuthContext";
 import { format, differenceInDays, subDays, parseISO, startOfDay, addDays } from "date-fns";
-import { Plus, Trophy, Flame, Calendar, DollarSign, ChevronDown, ChevronUp, Sparkles, Bell, EyeOff } from "lucide-react";
+import { Plus, Trophy, Flame, Calendar, DollarSign, ChevronDown, ChevronUp, Bell, EyeOff, Lock, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PageGroupSelector from "@/components/PageGroupSelector";
@@ -21,6 +21,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 
+// ── Types ──
 interface SobrietyCategory {
   id: string;
   label: string;
@@ -41,6 +42,7 @@ interface SobrietyCheckin {
   user_id: string;
 }
 
+// ── Constants ──
 const PRESET_CATEGORIES = [
   { label: "Alcohol", icon: "🍺" },
   { label: "Smoking", icon: "🚬" },
@@ -48,42 +50,34 @@ const PRESET_CATEGORIES = [
   { label: "Social Media", icon: "📱" },
 ];
 
-const MOTIVATIONAL_QUOTES = [
-  "Every day is a new beginning. Take a deep breath and start again.",
-  "You are stronger than you think. Keep going.",
-  "Progress, not perfection, is what matters.",
-  "One day at a time. You've got this.",
-  "The secret of getting ahead is getting started.",
-  "Believe you can and you're halfway there.",
-  "Your future self will thank you for today.",
-  "Small steps every day lead to big changes.",
-  "You don't have to be perfect to be amazing.",
-  "Courage doesn't always roar. Sometimes it's the quiet voice saying 'I'll try again tomorrow.'",
-  "You are not your past. You are your potential.",
-  "Tough times never last, but tough people do.",
-  "Every moment is a fresh start.",
-  "Be proud of how far you've come.",
-  "Recovery is not a race. Take it one step at a time.",
-];
-
 const MILESTONES = [1, 3, 7, 14, 21, 30, 60, 90, 100, 180, 365, 500, 730, 1000];
-
-function getDailyQuote(): string {
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-  return MOTIVATIONAL_QUOTES[dayOfYear % MOTIVATIONAL_QUOTES.length];
-}
 
 function getNextMilestone(streak: number): number | null {
   return MILESTONES.find(m => m > streak) ?? null;
 }
 
-function getReachedMilestones(streak: number): number[] {
-  return MILESTONES.filter(m => m <= streak);
-}
-
-/** Normalize a string for duplicate detection: lowercase, remove spaces/hyphens/punctuation, trim */
 function normalizeLabel(label: string): string {
   return label.toLowerCase().replace(/[\s\-_.,!?'":;()]/g, "").trim();
+}
+
+// ── Dynamic user color palette ──
+const USER_COLORS = [
+  { bg: "hsl(210 90% 95%)", border: "hsl(210 70% 78%)", accent: "hsl(210 80% 55%)", pill: "hsl(210 90% 95%)", pillText: "hsl(210 60% 40%)" },
+  { bg: "hsl(130 50% 93%)", border: "hsl(130 40% 72%)", accent: "hsl(130 50% 45%)", pill: "hsl(130 50% 93%)", pillText: "hsl(130 40% 30%)" },
+  { bg: "hsl(340 60% 95%)", border: "hsl(340 50% 78%)", accent: "hsl(340 60% 55%)", pill: "hsl(340 60% 95%)", pillText: "hsl(340 45% 35%)" },
+  { bg: "hsl(270 50% 95%)", border: "hsl(270 40% 78%)", accent: "hsl(270 50% 55%)", pill: "hsl(270 50% 95%)", pillText: "hsl(270 40% 35%)" },
+  { bg: "hsl(40 70% 93%)", border: "hsl(40 55% 72%)", accent: "hsl(40 65% 50%)", pill: "hsl(40 70% 93%)", pillText: "hsl(40 50% 30%)" },
+  { bg: "hsl(180 50% 93%)", border: "hsl(180 40% 72%)", accent: "hsl(180 50% 45%)", pill: "hsl(180 50% 93%)", pillText: "hsl(180 40% 30%)" },
+];
+const getUserColor = (index: number) => USER_COLORS[index % USER_COLORS.length];
+
+// ── Types for display ──
+interface DisplayUser {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  initial: string;
+  colorIndex: number;
 }
 
 interface SobrietyPageProps {
@@ -107,6 +101,9 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
   const [celebratingMilestone, setCelebratingMilestone] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Pre-fill for Add to Mine
+  const [prefillLabel, setPrefillLabel] = useState("");
+
   // Undo check-in dialog
   const [undoCheckinCat, setUndoCheckinCat] = useState<SobrietyCategory | null>(null);
 
@@ -117,13 +114,6 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
     pendingIcon: string;
     pendingMoney: number;
   } | null>(null);
-
-  // Add partner tracker modal
-  const [addingPartnerTracker, setAddingPartnerTracker] = useState<SobrietyCategory | null>(null);
-  const [addTrackerName, setAddTrackerName] = useState("");
-  const [addTrackerGroupIds, setAddTrackerGroupIds] = useState<Set<string>>(new Set());
-  const [addTrackerMoney, setAddTrackerMoney] = useState("");
-  const [addTrackerPriorDays, setAddTrackerPriorDays] = useState("");
 
   // Context-specific pill selection state
   const pillStateRef = useRef<Map<string, Set<string>>>(new Map());
@@ -155,6 +145,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
 
   const isPersonalActive = (activeGroup as any)?._personal === true;
   const isAllView = activeGroup === null && !isPersonalActive;
+  const isGroupView = !!activeGroup && !isPersonalActive;
   const groupId = isPersonalActive ? null : (activeGroup?.id ?? null);
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -163,14 +154,9 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
     [groups]
   );
 
-  const getSharedGroupIds = useCallback((otherUserId: string) => {
-    return sobrietyGroups
-      .filter(g => g.members.some(m => m.user_id === otherUserId && m.status === "active"))
-      .map(g => g.id);
-  }, [sobrietyGroups]);
-
   const [nudgeCooldowns, setNudgeCooldowns] = useState<Set<string>>(new Set());
 
+  // ── Data fetching (unchanged logic) ──
   const fetchData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -232,7 +218,6 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
       }
     }
 
-    // Deduplicate by id
     const seen = new Set<string>();
     allCats = allCats.filter(c => {
       if (seen.has(c.id)) return false;
@@ -257,6 +242,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // ── Resolved users ──
   const effectiveSelectedUserIds = useMemo(() => {
     if (selectedUserIds.has(EVERYONE_SENTINEL)) return null;
     return selectedUserIds;
@@ -276,25 +262,68 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
     return (cat.shared_group_ids || []).includes(groupId);
   }, [groupId]);
 
-  const categoriesByUser = useMemo(() => {
-    const map = new Map<string, SobrietyCategory[]>();
-    filteredCategories.forEach(c => {
-      const existing = map.get(c.user_id) || [];
-      existing.push(c);
-      map.set(c.user_id, existing);
-    });
-    return map;
-  }, [filteredCategories]);
-
   const getUserName = useCallback((userId: string) => {
     if (userId === user?.id) return profile?.display_name || "Me";
     for (const g of groups) {
-      const member = g.members.find(m => m.user_id === userId);
+      const member = g.members.find((m: GroupMember) => m.user_id === userId);
       if (member) return member.display_name || "Member";
     }
     return "Member";
   }, [user, profile, groups]);
 
+  const getUserAvatarUrl = useCallback((userId: string) => {
+    if (userId === user?.id) return profile?.avatar_url || null;
+    for (const g of groups) {
+      const member = g.members.find((m: GroupMember) => m.user_id === userId);
+      if (member) return member.avatar_url || null;
+    }
+    return null;
+  }, [user, profile, groups]);
+
+  // Build ordered list of selected users
+  const selectedUsersOrdered = useMemo((): DisplayUser[] => {
+    const result: DisplayUser[] = [];
+    let idx = 0;
+    if (!user) return result;
+
+    const resolvedIds = new Set<string>();
+    if (effectiveSelectedUserIds === null) {
+      resolvedIds.add(user.id);
+      if (isGroupView && activeGroup) {
+        activeGroup.members.filter((m: GroupMember) => m.status === "active").forEach((m: GroupMember) => resolvedIds.add(m.user_id));
+      } else if (isAllView) {
+        sobrietyGroups.forEach(g => g.members.filter((m: GroupMember) => m.status === "active").forEach((m: GroupMember) => resolvedIds.add(m.user_id)));
+      }
+    } else {
+      effectiveSelectedUserIds.forEach(id => resolvedIds.add(id));
+    }
+
+    if (resolvedIds.has(user.id)) {
+      result.push({
+        id: user.id,
+        name: profile?.display_name?.split(" ")[0] || "Me",
+        avatarUrl: profile?.avatar_url || null,
+        initial: (profile?.display_name || "M")[0].toUpperCase(),
+        colorIndex: idx++,
+      });
+    }
+    for (const uid of resolvedIds) {
+      if (uid === user.id) continue;
+      const name = getUserName(uid);
+      result.push({
+        id: uid,
+        name: name.split(" ")[0],
+        avatarUrl: getUserAvatarUrl(uid),
+        initial: name[0]?.toUpperCase() || "?",
+        colorIndex: idx++,
+      });
+    }
+    return result;
+  }, [effectiveSelectedUserIds, user, profile, activeGroup, isGroupView, isAllView, sobrietyGroups, getUserName, getUserAvatarUrl]);
+
+  const multipleSelected = selectedUsersOrdered.length > 1;
+
+  // ── Streak & check-in helpers (unchanged logic) ──
   const getStreakInfo = useCallback((cat: SobrietyCategory) => {
     const catCheckins = checkins
       .filter(c => c.category_id === cat.id && c.stayed_on_track)
@@ -360,6 +389,24 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
     return missed;
   }, [checkins, today]);
 
+  const isCheckedIn = useCallback((catId: string, date: string) => {
+    return checkins.some(c => c.category_id === catId && c.check_date === date);
+  }, [checkins]);
+
+  const getHeatmapData = useCallback((cat: SobrietyCategory) => {
+    const info = getStreakInfo(cat);
+    const days: { date: string; status: "green" | "red" | "gray" }[] = [];
+    for (let i = 90; i >= 0; i--) {
+      const d = subDays(new Date(), i);
+      const dateStr = format(d, "yyyy-MM-dd");
+      const val = info.checkinMap.get(dateStr);
+      if (val === true) days.push({ date: dateStr, status: "green" });
+      else if (val === false) days.push({ date: dateStr, status: "red" });
+      else days.push({ date: dateStr, status: "gray" });
+    }
+    return days;
+  }, [getStreakInfo]);
+
   // Initialize add group selector when drawer opens
   useEffect(() => {
     if (showAddDrawer) {
@@ -377,11 +424,10 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
     return categories.find(c => c.user_id === user.id && normalizeLabel(c.label) === normalized);
   }, [categories, user]);
 
+  // ── Handlers (all unchanged logic) ──
   const handleAddCategory = async (label: string, icon: string, money?: number) => {
     if (!user) return;
-
     const shared: string[] = Array.from(addGroupIds);
-
     const { error } = await supabase.from("sobriety_categories").insert({
       user_id: user.id,
       label,
@@ -391,19 +437,17 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
       money_per_day: money ?? (parseFloat(moneyPerDay) || 0),
       shared_group_ids: shared,
     } as any);
-
     if (error) { toast.error("Failed to add category"); return; }
-
     toast.success(`Now tracking: ${label}`);
     setShowAddDrawer(false);
     setCustomLabel("");
     setCustomIcon("🚫");
     setMoneyPerDay("");
     setPresetMoneyPerDay({});
+    setPrefillLabel("");
     fetchData();
   };
 
-  /** Try to add a category, checking for duplicates first */
   const tryAddCategory = (label: string, icon: string, money?: number) => {
     const existing = findDuplicateTracker(label);
     if (existing) {
@@ -420,20 +464,16 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
 
   const handleCheckin = async (onTrack: boolean) => {
     if (!user || !checkinCategory || checkinDates.length === 0) return;
-
     const rows = checkinDates.map(d => ({
       user_id: user.id,
       category_id: checkinCategory.id,
       check_date: d,
       stayed_on_track: onTrack,
     }));
-
     const { error } = await supabase.from("sobriety_checkins").upsert(
       rows as any[], { onConflict: "category_id,check_date" }
     );
-
     if (error) { toast.error("Failed to check in"); return; }
-
     if (onTrack) {
       if (checkinDates.length === 1 && checkinDates[0] === today) {
         const info = getStreakInfo(checkinCategory);
@@ -450,7 +490,6 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
     } else {
       toast("It's okay. Every day is a fresh start. 💙");
     }
-
     setShowCheckinDialog(false);
     setCheckinCategory(null);
     setCheckinDates([]);
@@ -485,7 +524,6 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
     fetchData();
   };
 
-  // Undo check-in handler
   const handleUndoCheckin = async () => {
     if (!user || !undoCheckinCat) return;
     const { error } = await supabase
@@ -526,11 +564,10 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
     const rows: any[] = [];
     for (let i = 1; i <= days; i++) {
       const d = subDays(startDate, i);
-      const dateStr = format(d, "yyyy-MM-dd");
       rows.push({
         user_id: user.id,
         category_id: cat.id,
-        check_date: dateStr,
+        check_date: format(d, "yyyy-MM-dd"),
         stayed_on_track: true,
       });
     }
@@ -544,7 +581,6 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
     fetchData();
   };
 
-  // Inline sharing toggle for a tracker card
   const handleToggleSharing = async (cat: SobrietyCategory, gid: string) => {
     const current = cat.shared_group_ids || [];
     const newIds = current.includes(gid)
@@ -554,30 +590,11 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
       .update({ shared_group_ids: newIds } as any)
       .eq("id", cat.id);
     if (error) { toast.error("Failed to update sharing"); return; }
-    // Update local state immediately
     setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, shared_group_ids: newIds } : c));
   };
 
-  const isCheckedIn = useCallback((catId: string, date: string) => {
-    return checkins.some(c => c.category_id === catId && c.check_date === date);
-  }, [checkins]);
-
-  const getHeatmapData = useCallback((cat: SobrietyCategory) => {
-    const info = getStreakInfo(cat);
-    const days: { date: string; status: "green" | "red" | "gray" }[] = [];
-    for (let i = 90; i >= 0; i--) {
-      const d = subDays(new Date(), i);
-      const dateStr = format(d, "yyyy-MM-dd");
-      const val = info.checkinMap.get(dateStr);
-      if (val === true) days.push({ date: dateStr, status: "green" });
-      else if (val === false) days.push({ date: dateStr, status: "red" });
-      else days.push({ date: dateStr, status: "gray" });
-    }
-    return days;
-  }, [getStreakInfo]);
-
   // Nudge handler
-  const sendNudge = async (toUserId: string) => {
+  const sendNudge = async (toUserId: string, catId?: string) => {
     if (!user) return;
     const name = getUserName(toUserId);
     const { error } = await supabase.from("nudges").insert({
@@ -586,23 +603,17 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
       message: `${profile?.display_name || "Someone"} nudged you to check in on your sobriety tracker! 💪`,
     } as any);
     if (error) { toast.error("Failed to nudge"); return; }
-    toast.success(`${name} has been nudged! 💪`);
-    setNudgeCooldowns(prev => new Set([...prev, toUserId]));
+    toast.success(`${name.split(" ")[0]} has been nudged! 💪`);
+    const cooldownKey = catId ? `${toUserId}_${catId}` : toUserId;
+    setNudgeCooldowns(prev => new Set([...prev, cooldownKey]));
     setTimeout(() => {
       setNudgeCooldowns(prev => {
         const next = new Set(prev);
-        next.delete(toUserId);
+        next.delete(cooldownKey);
         return next;
       });
     }, 10000);
   };
-
-  const userNeedsNudge = useCallback((userId: string) => {
-    if (userId === user?.id) return false;
-    const userCats = categories.filter(c => c.user_id === userId);
-    if (userCats.length === 0) return false;
-    return userCats.some(c => !isCheckedIn(c.id, today));
-  }, [categories, user, isCheckedIn, today]);
 
   // Incoming nudge detection
   useEffect(() => {
@@ -627,112 +638,14 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
     checkNudges();
   }, [user]);
 
-  const userOrder = useMemo(() => {
-    const order: string[] = [];
-    if (!user) return order;
-    const meSelected = effectiveSelectedUserIds === null || effectiveSelectedUserIds.has(user.id);
-    if (meSelected && categoriesByUser.has(user.id)) order.push(user.id);
-    for (const [uid] of categoriesByUser) {
-      if (uid !== user.id && !order.includes(uid)) order.push(uid);
-    }
-    return order;
-  }, [user, effectiveSelectedUserIds, categoriesByUser]);
-
-  const showSections = !isPersonalActive && userOrder.length > 0 &&
-    (effectiveSelectedUserIds === null ? categories.some(c => c.user_id !== user?.id) : effectiveSelectedUserIds.size > 1 || !effectiveSelectedUserIds.has(user?.id || ""));
-
-  // Add partner tracker handlers
-  const openAddPartnerTracker = (cat: SobrietyCategory) => {
-    setAddingPartnerTracker(cat);
-    setAddTrackerName(cat.label);
-    setAddTrackerMoney(String(cat.money_per_day || ""));
-    setAddTrackerPriorDays("");
-    const initial = new Set<string>();
-    if (groupId) initial.add(groupId);
-    setAddTrackerGroupIds(initial);
+  // ── Add to Mine: opens add drawer with pre-fill ──
+  const openAddToMine = (cat: SobrietyCategory) => {
+    setPrefillLabel(cat.label);
+    setCustomLabel(cat.label);
+    setCustomIcon(cat.icon);
+    setMoneyPerDay(String(cat.money_per_day || ""));
+    setShowAddDrawer(true);
   };
-
-  const handleAddPartnerTracker = async () => {
-    if (!user || !addingPartnerTracker) return;
-    const name = addTrackerName.trim();
-    if (!name) return;
-
-    // Duplicate check for partner tracker too
-    const existing = findDuplicateTracker(name);
-    if (existing) {
-      setDuplicateWarning({
-        existingName: existing.label,
-        pendingLabel: name,
-        pendingIcon: addingPartnerTracker.icon,
-        pendingMoney: parseFloat(addTrackerMoney) || 0,
-      });
-      return;
-    }
-
-    await doAddPartnerTracker();
-  };
-
-  const doAddPartnerTracker = async () => {
-    if (!user || !addingPartnerTracker) return;
-    const name = addTrackerName.trim();
-    if (!name) return;
-
-    const shared: string[] = Array.from(addTrackerGroupIds);
-    const money = parseFloat(addTrackerMoney) || 0;
-    const priorDays = parseInt(addTrackerPriorDays) || 0;
-    const startDate = priorDays > 0
-      ? format(subDays(new Date(), priorDays), "yyyy-MM-dd")
-      : today;
-
-    const { data: inserted, error } = await supabase.from("sobriety_categories").insert({
-      user_id: user.id,
-      label: name,
-      icon: addingPartnerTracker.icon,
-      group_id: null,
-      start_date: startDate,
-      money_per_day: money,
-      shared_group_ids: shared,
-    } as any).select().single();
-
-    if (error || !inserted) { toast.error("Failed to add tracker"); return; }
-
-    if (priorDays > 0) {
-      const rows: any[] = [];
-      for (let i = 0; i < priorDays; i++) {
-        const d = subDays(new Date(), i);
-        rows.push({
-          user_id: user.id,
-          category_id: (inserted as any).id,
-          check_date: format(d, "yyyy-MM-dd"),
-          stayed_on_track: true,
-        });
-      }
-      await supabase.from("sobriety_checkins").upsert(rows, { onConflict: "category_id,check_date" });
-    }
-
-    toast.success("Tracker added!");
-    setAddingPartnerTracker(null);
-    fetchData();
-  };
-
-  // Card tap handler — only partner cards open modal now; own cards expand/collapse
-  const handleCardTap = (cat: SobrietyCategory) => {
-    const isMe = cat.user_id === user?.id;
-    if (!isMe) {
-      openAddPartnerTracker(cat);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="p-4">
-        <h1 className="text-xl font-bold text-foreground mb-6">Sobriety</h1>
-        <div className="flex items-center justify-center py-20">
-          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      </div>
-    );
-  }
 
   const toggleAddGroup = (gid: string) => {
     setAddGroupIds(prev => {
@@ -743,81 +656,319 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
     });
   };
 
-  const renderUserSection = (userId: string) => {
-    const isMe = userId === user?.id;
-    const readOnly = !isMe;
-    const userCats = categoriesByUser.get(userId) || [];
-    const name = getUserName(userId);
-    const showNudge = readOnly && userNeedsNudge(userId);
+  // ── Derived data for multi-user column layout ──
+  // Get all unique tracker types (normalized labels) across all visible categories
+  const trackerTypes = useMemo(() => {
+    const types: { label: string; icon: string; normalizedKey: string }[] = [];
+    const seen = new Set<string>();
+    for (const cat of filteredCategories) {
+      const key = normalizeLabel(cat.label);
+      if (!seen.has(key)) {
+        seen.add(key);
+        types.push({ label: cat.label, icon: cat.icon, normalizedKey: key });
+      }
+    }
+    return types;
+  }, [filteredCategories]);
+
+  // Check if logged-in user has a tracker of a given normalized type
+  const myTrackerLabels = useMemo(() => {
+    if (!user) return new Set<string>();
+    return new Set(categories.filter(c => c.user_id === user.id).map(c => normalizeLabel(c.label)));
+  }, [categories, user]);
+
+  // ── Money saved summary ──
+  const totalMoneySaved = useMemo(() => {
+    const catsWithMoney = filteredCategories.filter(c => (c.money_per_day || 0) > 0);
+    if (catsWithMoney.length === 0) return { total: 0, count: 0 };
+    const total = catsWithMoney.reduce((sum, cat) => sum + getStreakInfo(cat).moneySaved, 0);
+    return { total, count: catsWithMoney.length };
+  }, [filteredCategories, getStreakInfo]);
+
+  // ── Rendering ──
+  if (loading) {
+    return (
+      <div className="p-4">
+        <h1 className="text-2xl font-bold text-foreground mb-6">Sobriety</h1>
+        <div className="flex items-center justify-center py-20">
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Single-user tracker card ──
+  const renderSingleUserCard = (cat: SobrietyCategory) => {
+    const info = getStreakInfo(cat);
+    const checkedToday = isCheckedIn(cat.id, today);
+    const nextMile = getNextMilestone(info.currentStreak);
+    const isExpanded = expandedCard === cat.id;
+    const showOnlyYou = !isPersonalActive && !isAllView && !!groupId && !isSharedWithCurrentGroup(cat);
+    const missedDays = getMissedDays(cat);
 
     return (
-      <section key={userId} className="mb-5">
-        {showSections && (
-          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-            <span className={`w-2.5 h-2.5 rounded-full ${isMe ? "bg-[hsl(var(--user-a))]" : "bg-[hsl(var(--user-b))]"}`} />
-            {isMe ? (profile?.display_name || "Me") : name}
-            <span className="text-muted-foreground text-xs">({userCats.length})</span>
-          </h3>
-        )}
-        {userCats.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-4">No sobriety trackers</p>
+      <motion.div
+        key={cat.id}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-card border border-border rounded-2xl overflow-hidden"
+      >
+        {/* Main card content */}
+        <button
+          onClick={() => setExpandedCard(isExpanded ? null : cat.id)}
+          className="w-full p-3 text-left"
+        >
+          {/* Top row */}
+          <div className="flex items-center gap-3">
+            <span className="text-xl">{cat.icon}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-[11px] text-muted-foreground">{cat.label}-free</p>
+                {showOnlyYou && (
+                  <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground bg-secondary/80 px-1 py-0.5 rounded">
+                    <EyeOff size={8} /> Only you
+                  </span>
+                )}
+              </div>
+              <span className="text-2xl font-bold text-foreground tabular-nums">{info.currentStreak} <span className="text-sm font-medium text-muted-foreground">days</span></span>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              {info.moneySaved > 0 && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[hsl(var(--habit-green))]/15 text-[hsl(var(--habit-green))]">${info.moneySaved.toFixed(0)} saved</span>
+              )}
+              {nextMile && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/15 text-accent">🏆 Next: {nextMile}d</span>
+              )}
+            </div>
+          </div>
+
+          {/* Progress bar toward next milestone */}
+          {nextMile && (
+            <div className="mt-2">
+              <div className="flex items-center justify-between text-[9px] text-muted-foreground mb-0.5">
+                <span>0</span>
+                <span>Next milestone: {nextMile} days</span>
+                <span>{nextMile}</span>
+              </div>
+              <div className="h-1 bg-secondary rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full bg-primary"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min((info.currentStreak / nextMile) * 100, 100)}%` }}
+                  transition={{ duration: 0.8, delay: 0.1 }}
+                />
+              </div>
+            </div>
+          )}
+        </button>
+
+        {/* Check-in status bar */}
+        {checkedToday ? (
+          <button
+            onClick={() => setUndoCheckinCat(cat)}
+            className="w-full px-3 py-2 bg-[hsl(var(--habit-green))]/10 text-[hsl(var(--habit-green))] text-xs font-semibold text-center"
+          >
+            ✅ Checked in today
+          </button>
         ) : (
-          <div className="space-y-3">
-            {userCats.map((cat, idx) => (
-              <SobrietyCategoryCard
-                key={cat.id}
-                cat={cat}
-                idx={idx}
-                getStreakInfo={getStreakInfo}
-                getHeatmapData={getHeatmapData}
-                getMissedDays={getMissedDays}
-                isCheckedIn={isCheckedIn}
-                today={today}
-                expandedCard={expandedCard}
-                setExpandedCard={setExpandedCard}
-                onBatchCheckin={handleBatchCheckin}
-                handleResetStreak={handleResetStreak}
-                handleDeleteCategory={handleDeleteCategory}
-                readOnly={readOnly}
-                onUpdateMoneyPerDay={handleUpdateMoneyPerDay}
-                onAddPriorDays={handleAddPriorDays}
-                showOnlyYou={isMe && !isPersonalActive && !isAllView && !!groupId && !isSharedWithCurrentGroup(cat)}
-                onCardTap={handleCardTap}
-                sobrietyGroups={sobrietyGroups}
-                onToggleSharing={handleToggleSharing}
-                isPersonalActive={isPersonalActive}
-                isAllView={isAllView}
-                onUndoCheckin={setUndoCheckinCat}
-              />
-            ))}
+          <button
+            onClick={() => {
+              setCheckinCategory(cat);
+              setCheckinDates([today]);
+              setCheckinIsMissed(false);
+              setShowCheckinDialog(true);
+            }}
+            className="w-full px-3 py-2 bg-primary/5 text-primary text-xs font-semibold text-center hover:bg-primary/10 transition-colors"
+          >
+            Check in today
+          </button>
+        )}
+
+        {/* Expanded detail */}
+        <AnimatePresence>
+          {isExpanded && (
+            <ExpandedCardContent
+              cat={cat}
+              info={info}
+              missedDays={missedDays}
+              getHeatmapData={getHeatmapData}
+              onBatchCheckin={handleBatchCheckin}
+              onResetStreak={handleResetStreak}
+              onDeleteCategory={handleDeleteCategory}
+              onUpdateMoneyPerDay={handleUpdateMoneyPerDay}
+              onAddPriorDays={handleAddPriorDays}
+              sobrietyGroups={sobrietyGroups}
+              onToggleSharing={handleToggleSharing}
+              isPersonalActive={isPersonalActive}
+              isAllView={isAllView}
+            />
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  };
+
+  // ── Multi-user column card ──
+  const renderColumnCard = (trackerKey: string, displayUser: DisplayUser) => {
+    const color = getUserColor(displayUser.colorIndex);
+    const isMe = displayUser.id === user?.id;
+    const userCat = filteredCategories.find(c => c.user_id === displayUser.id && normalizeLabel(c.label) === trackerKey);
+
+    if (!userCat) {
+      // User doesn't have this tracker
+      if (!isMe) {
+        // Other user doesn't have it
+        return (
+          <div
+            className="rounded-xl border-2 border-dashed border-border/40 p-3 flex items-center justify-center min-h-[80px]"
+          >
+            <span className="text-[10px] text-muted-foreground">Not tracking</span>
+          </div>
+        );
+      }
+      // I don't have it but it shows in the grid because another user does
+      return (
+        <div
+          className="rounded-xl border-2 border-dashed border-border/40 p-3 flex items-center justify-center min-h-[80px]"
+        >
+          <span className="text-[10px] text-muted-foreground">Not tracking</span>
+        </div>
+      );
+    }
+
+    const info = getStreakInfo(userCat);
+    const checkedToday = isCheckedIn(userCat.id, today);
+    const nextMile = getNextMilestone(info.currentStreak);
+    const cooldownKey = `${displayUser.id}_${userCat.id}`;
+
+    if (isMe) {
+      // Own tracker — interactive
+      return (
+        <div
+          className="rounded-xl p-2.5 min-h-[80px]"
+          style={{ backgroundColor: color.bg, borderWidth: 1, borderColor: color.border, borderStyle: "solid" }}
+        >
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-sm">{userCat.icon}</span>
+            <span className="text-lg font-bold text-foreground tabular-nums">{info.currentStreak}<span className="text-[10px] font-normal text-muted-foreground ml-0.5">d</span></span>
+          </div>
+          {nextMile && (
+            <div className="h-1 bg-secondary/60 rounded-full overflow-hidden mb-1.5">
+              <div className="h-full rounded-full" style={{ backgroundColor: color.accent, width: `${Math.min((info.currentStreak / nextMile) * 100, 100)}%` }} />
+            </div>
+          )}
+          {checkedToday ? (
+            <button
+              onClick={() => setUndoCheckinCat(userCat)}
+              className="w-full text-[10px] font-semibold text-[hsl(var(--habit-green))] text-center py-1 rounded-lg bg-[hsl(var(--habit-green))]/10"
+            >
+              ✅ Done
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setCheckinCategory(userCat);
+                setCheckinDates([today]);
+                setCheckinIsMissed(false);
+                setShowCheckinDialog(true);
+              }}
+              className="w-full text-[10px] font-semibold text-primary text-center py-1 rounded-lg bg-primary/10 hover:bg-primary/15 transition-colors"
+            >
+              Check in
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    // Other user's tracker — read-only
+    const iHaveThis = myTrackerLabels.has(trackerKey);
+
+    return (
+      <div
+        className="rounded-xl p-2.5 min-h-[80px]"
+        style={{ backgroundColor: color.bg, borderWidth: 1, borderColor: color.border, borderStyle: "solid" }}
+      >
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="text-sm">{userCat.icon}</span>
+          <span className="text-lg font-bold text-foreground tabular-nums">{info.currentStreak}<span className="text-[10px] font-normal text-muted-foreground ml-0.5">d</span></span>
+        </div>
+        {nextMile && (
+          <div className="h-1 bg-secondary/60 rounded-full overflow-hidden mb-1.5">
+            <div className="h-full rounded-full" style={{ backgroundColor: color.accent, width: `${Math.min((info.currentStreak / nextMile) * 100, 100)}%` }} />
           </div>
         )}
-        {showNudge && (
+        {checkedToday ? (
+          <div className="text-[10px] font-semibold text-[hsl(var(--habit-green))]/70 text-center py-1">
+            ✅ Done
+          </div>
+        ) : (
           <button
-            onClick={() => sendNudge(userId)}
-            disabled={nudgeCooldowns.has(userId)}
-            className={`mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
-              nudgeCooldowns.has(userId)
+            onClick={() => sendNudge(displayUser.id, userCat.id)}
+            disabled={nudgeCooldowns.has(cooldownKey)}
+            className={`w-full text-[10px] font-semibold text-center py-1 rounded-lg transition-all border ${
+              nudgeCooldowns.has(cooldownKey)
                 ? "border-border bg-secondary/50 text-muted-foreground opacity-50 cursor-not-allowed"
                 : "border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
             }`}
           >
-            <Bell size={12} />
-            🔔 Nudge {name.split(" ")[0]}
+            🔔 Nudge {displayUser.name}
           </button>
         )}
-      </section>
+        {/* Add to Mine button */}
+        {!iHaveThis && (
+          <button
+            onClick={() => openAddToMine(userCat)}
+            className="w-full text-[10px] font-medium text-primary text-center py-1 mt-1 rounded-lg border border-primary/20 hover:bg-primary/5 transition-colors"
+          >
+            + Add to Mine
+          </button>
+        )}
+      </div>
     );
   };
+
+  // ── Column header ──
+  const renderColumnHeaders = () => (
+    <div
+      className="grid gap-[5px] mb-1"
+      style={{ gridTemplateColumns: `repeat(${selectedUsersOrdered.length}, minmax(0, 1fr))` }}
+    >
+      {selectedUsersOrdered.map((u) => {
+        const color = getUserColor(u.colorIndex);
+        return (
+          <div
+            key={u.id}
+            className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold justify-center"
+            style={{ backgroundColor: color.pill, color: color.pillText }}
+          >
+            <div
+              className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0"
+              style={{ backgroundColor: color.accent }}
+            >
+              {u.initial}
+            </div>
+            <span className="truncate">{u.name}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // ── Already-added presets for the add drawer ──
+  const myExistingLabels = useMemo(() => {
+    if (!user) return new Set<string>();
+    return new Set(categories.filter(c => c.user_id === user.id).map(c => normalizeLabel(c.label)));
+  }, [categories, user]);
 
   return (
     <div className="p-4 pb-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-foreground">Sobriety</h1>
+        <h1 className="text-2xl font-bold text-foreground">Sobriety</h1>
         <button
-          onClick={() => setShowAddDrawer(true)}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          onClick={() => { setPrefillLabel(""); setShowAddDrawer(true); }}
+          className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm hover:bg-primary/90 transition-colors"
         >
           <Plus size={18} />
         </button>
@@ -825,47 +976,31 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
 
       <PageGroupSelector page="sobriety" personalLabel="Mine" hideAllPill />
 
-      {/* Pill User Filter */}
       <SobrietyUserFilter
         selectedUserIds={selectedUserIds}
         onSelectionChange={handlePillChange}
       />
 
-      {/* Motivational Quote */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-card border border-border rounded-2xl p-4 mb-4"
-      >
-        <div className="flex items-start gap-2">
-          <Sparkles size={16} className="text-accent mt-0.5 shrink-0" />
-          <p className="text-sm text-muted-foreground italic leading-relaxed">{getDailyQuote()}</p>
-        </div>
-      </motion.div>
+      {/* Money Saved Summary */}
+      {totalMoneySaved.count > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-card border border-border rounded-2xl p-3 mb-3 flex items-center gap-3"
+        >
+          <div className="w-[30px] h-[30px] rounded-lg bg-accent/15 flex items-center justify-center shrink-0">
+            <DollarSign size={16} className="text-accent" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-base font-bold text-foreground tabular-nums leading-tight">${totalMoneySaved.total.toFixed(0)} saved</p>
+            <p className="text-[10px] text-muted-foreground">
+              {multipleSelected ? "Combined across all trackers" : `Across ${totalMoneySaved.count} tracker${totalMoneySaved.count > 1 ? "s" : ""} this week`}
+            </p>
+          </div>
+        </motion.div>
+      )}
 
-      {/* Aggregate Money Saved */}
-      {(() => {
-        const catsWithMoney = filteredCategories.filter(c => (c.money_per_day || 0) > 0);
-        if (catsWithMoney.length === 0) return null;
-        const totalSaved = catsWithMoney.reduce((sum, cat) => sum + getStreakInfo(cat).moneySaved, 0);
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="bg-card border border-border rounded-2xl p-3 mb-4 flex items-center gap-3"
-          >
-            <div className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center shrink-0">
-              <DollarSign size={18} className="text-accent" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg font-bold text-foreground tabular-nums leading-tight">${totalSaved.toFixed(0)}</p>
-              <p className="text-[10px] text-muted-foreground">Saved across {catsWithMoney.length} tracker{catsWithMoney.length > 1 ? "s" : ""}</p>
-            </div>
-          </motion.div>
-        );
-      })()}
-
+      {/* Empty state */}
       {filteredCategories.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -878,66 +1013,59 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
             Track what you're abstaining from and celebrate every day of progress.
           </p>
           <Button onClick={() => setShowAddDrawer(true)} className="rounded-full px-6">
-            <Plus size={16} className="mr-1" /> Add Category
+            <Plus size={16} className="mr-1" /> Add Tracker
           </Button>
         </motion.div>
       )}
 
-      {/* Render sections per user */}
+      {/* Content */}
       {filteredCategories.length > 0 && (
-        showSections ? (
-          <div className="space-y-2">
-            {userOrder.map(uid => renderUserSection(uid))}
+        multipleSelected ? (
+          // ── Multi-user column layout ──
+          <div className="space-y-4">
+            {trackerTypes.map(({ label, icon, normalizedKey }) => (
+              <div key={normalizedKey}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 px-0.5">
+                  {icon} {label}
+                </p>
+                {renderColumnHeaders()}
+                <div
+                  className={`grid gap-[5px] ${selectedUsersOrdered.length > 3 ? "overflow-x-auto" : ""}`}
+                  style={{ gridTemplateColumns: `repeat(${selectedUsersOrdered.length}, minmax(${selectedUsersOrdered.length > 3 ? "120px" : "0"}, 1fr))` }}
+                >
+                  {selectedUsersOrdered.map(u => (
+                    <div key={u.id}>
+                      {renderColumnCard(normalizedKey, u)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
+          // ── Single-user card list ──
           <div className="space-y-3">
-            {filteredCategories.map((cat, idx) => (
-              <SobrietyCategoryCard
-                key={cat.id}
-                cat={cat}
-                idx={idx}
-                getStreakInfo={getStreakInfo}
-                getHeatmapData={getHeatmapData}
-                getMissedDays={getMissedDays}
-                isCheckedIn={isCheckedIn}
-                today={today}
-                expandedCard={expandedCard}
-                setExpandedCard={setExpandedCard}
-                onBatchCheckin={handleBatchCheckin}
-                handleResetStreak={handleResetStreak}
-                handleDeleteCategory={handleDeleteCategory}
-                readOnly={false}
-                onUpdateMoneyPerDay={handleUpdateMoneyPerDay}
-                onAddPriorDays={handleAddPriorDays}
-                showOnlyYou={!isPersonalActive && !isAllView && !!groupId && !isSharedWithCurrentGroup(cat)}
-                onCardTap={handleCardTap}
-                sobrietyGroups={sobrietyGroups}
-                onToggleSharing={handleToggleSharing}
-                isPersonalActive={isPersonalActive}
-                isAllView={isAllView}
-                onUndoCheckin={setUndoCheckinCat}
-              />
-            ))}
+            {filteredCategories.map(cat => renderSingleUserCard(cat))}
           </div>
         )
       )}
 
-      {/* Add Category Drawer */}
+      {/* ── Add Tracker Bottom Sheet ── */}
       <Drawer open={showAddDrawer} onOpenChange={setShowAddDrawer}>
-        <DrawerContent className="max-h-[85dvh]">
+        <DrawerContent className="max-h-[80dvh]">
           <DrawerHeader className="pb-2">
-            <DrawerTitle className="text-base">What are you abstaining from?</DrawerTitle>
-            <DrawerDescription className="text-xs">Choose a category or create your own.</DrawerDescription>
+            <DrawerTitle className="text-base">Add a tracker</DrawerTitle>
+            <DrawerDescription className="text-xs">What are you abstaining from?</DrawerDescription>
           </DrawerHeader>
           <ScrollArea className="max-h-[60dvh] px-4 pb-6">
             <div className="space-y-2">
               {/* Add to section */}
               {sobrietyGroups.length > 0 && (
-                <div className="border border-border rounded-xl p-3 mb-3">
-                  <p className="text-xs font-medium text-foreground mb-2">Add to</p>
+                <div className="mb-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Add to</p>
                   <div className="flex flex-wrap gap-1.5">
-                    <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border border-primary/40 bg-primary/12 text-foreground opacity-80 cursor-not-allowed">
-                      🏠 Personal
+                    <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border border-primary/40 bg-primary/10 text-foreground cursor-default">
+                      <Lock size={10} /> 🏠 Personal
                     </span>
                     {sobrietyGroups.map(g => {
                       const selected = addGroupIds.has(g.id);
@@ -945,10 +1073,10 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
                         <button
                           key={g.id}
                           onClick={() => toggleAddGroup(g.id)}
-                          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border ${
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-all border ${
                             selected
-                              ? "border-primary/40 bg-primary/12 text-foreground"
-                              : "border-transparent bg-secondary/50 text-muted-foreground"
+                              ? "border-primary/40 bg-primary/10 text-foreground"
+                              : "border-border bg-secondary/50 text-muted-foreground hover:border-primary/20"
                           }`}
                         >
                           {g.emoji} {g.name}
@@ -959,41 +1087,34 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
                 </div>
               )}
 
+              {/* Preset categories */}
               {PRESET_CATEGORIES.map(preset => {
-                const alreadyAdded = categories.some(c => c.label === preset.label && c.user_id === user?.id);
+                const alreadyAdded = myExistingLabels.has(normalizeLabel(preset.label));
                 return (
-                  <div
-                    key={preset.label}
-                    className={`rounded-xl border transition-all ${
-                      alreadyAdded
-                        ? "bg-secondary/50 border-border opacity-50"
-                        : "bg-card border-border"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 p-3">
-                      <span className="text-xl">{preset.icon}</span>
-                      <span className="text-sm font-medium text-foreground flex-1">{preset.label}</span>
-                      {alreadyAdded && <span className="text-[10px] text-muted-foreground">Added</span>}
-                    </div>
-                    {!alreadyAdded && (
-                      <div className="px-3 pb-3 flex items-center gap-2">
-                        <Input
-                          placeholder="$/day saved (optional)"
-                          value={presetMoneyPerDay[preset.label] || ""}
-                          onChange={e => setPresetMoneyPerDay(p => ({ ...p, [preset.label]: e.target.value }))}
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          className="text-xs h-8 flex-1"
-                        />
-                        <Button
-                          onClick={() => tryAddCategory(preset.label, preset.icon, parseFloat(presetMoneyPerDay[preset.label] || "0") || 0)}
-                          size="sm"
-                          className="h-8 px-4 rounded-lg text-xs"
-                        >
-                          Add
-                        </Button>
-                      </div>
+                  <div key={preset.label} className="flex items-center gap-3 py-2 px-1 border-b border-border/30 last:border-none">
+                    <span className="text-lg">{preset.icon}</span>
+                    <span className="text-sm font-medium text-foreground flex-1">{preset.label}</span>
+                    <Input
+                      placeholder="$/day"
+                      value={presetMoneyPerDay[preset.label] || ""}
+                      onChange={e => setPresetMoneyPerDay(prev => ({ ...prev, [preset.label]: e.target.value }))}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="text-[11px] h-7 w-16 text-right"
+                    />
+                    {alreadyAdded ? (
+                      <span className="text-[11px] font-semibold text-[hsl(var(--habit-green))] flex items-center gap-0.5 px-2">
+                        <Check size={12} /> Added
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="h-7 px-3 rounded-lg text-[11px]"
+                        onClick={() => tryAddCategory(preset.label, preset.icon, parseFloat(presetMoneyPerDay[preset.label] || "0"))}
+                      >
+                        Add
+                      </Button>
                     )}
                   </div>
                 );
@@ -1080,7 +1201,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
         </DialogContent>
       </Dialog>
 
-      {/* Undo Check-in Confirmation Dialog */}
+      {/* Undo Check-in Confirmation */}
       <AlertDialog open={!!undoCheckinCat} onOpenChange={(open) => { if (!open) setUndoCheckinCat(null); }}>
         <AlertDialogContent className="max-w-[340px] rounded-2xl">
           <AlertDialogHeader>
@@ -1101,7 +1222,7 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Duplicate Tracker Warning Dialog */}
+      {/* Duplicate Tracker Warning */}
       <AlertDialog open={!!duplicateWarning} onOpenChange={(open) => { if (!open) setDuplicateWarning(null); }}>
         <AlertDialogContent className="max-w-[340px] rounded-2xl">
           <AlertDialogHeader>
@@ -1126,94 +1247,6 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Add Partner Tracker Modal */}
-      <Drawer open={!!addingPartnerTracker} onOpenChange={(open) => { if (!open) setAddingPartnerTracker(null); }}>
-        <DrawerContent className="max-h-[85dvh]">
-          <DrawerHeader className="pb-2">
-            <DrawerTitle className="text-base">{addingPartnerTracker?.icon} Add to My Trackers</DrawerTitle>
-            <DrawerDescription className="text-xs">Create your own version of this tracker</DrawerDescription>
-          </DrawerHeader>
-          <ScrollArea className="max-h-[60dvh] px-4 pb-6">
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-medium text-foreground mb-1.5">Tracker name</p>
-                <Input
-                  value={addTrackerName}
-                  onChange={e => setAddTrackerName(e.target.value)}
-                  className="text-sm h-9"
-                />
-              </div>
-
-              <div>
-                <p className="text-xs font-medium text-foreground mb-1.5">Add to</p>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border border-primary/40 bg-primary/12 text-foreground opacity-80 cursor-not-allowed">
-                    🏠 Personal
-                  </span>
-                  {sobrietyGroups.map(g => {
-                    const selected = addTrackerGroupIds.has(g.id);
-                    return (
-                      <button
-                        key={g.id}
-                        onClick={() => {
-                          setAddTrackerGroupIds(prev => {
-                            const next = new Set(prev);
-                            if (next.has(g.id)) next.delete(g.id);
-                            else next.add(g.id);
-                            return next;
-                          });
-                        }}
-                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border ${
-                          selected
-                            ? "border-primary/40 bg-primary/12 text-foreground"
-                            : "border-transparent bg-secondary/50 text-muted-foreground"
-                        }`}
-                      >
-                        {g.emoji} {g.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-medium text-foreground mb-1.5">Money saved per day (optional)</p>
-                <Input
-                  value={addTrackerMoney}
-                  onChange={e => setAddTrackerMoney(e.target.value)}
-                  placeholder="e.g. 10"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className="text-sm h-9"
-                />
-              </div>
-
-              <div>
-                <p className="text-xs font-medium text-foreground mb-1.5">Prior sober days (optional)</p>
-                <Input
-                  value={addTrackerPriorDays}
-                  onChange={e => setAddTrackerPriorDays(e.target.value)}
-                  placeholder="e.g. 7"
-                  type="number"
-                  min="0"
-                  className="text-sm h-9"
-                />
-                <p className="text-[10px] text-muted-foreground mt-1">Days you were already sober before adding this tracker</p>
-              </div>
-
-              <Button
-                onClick={handleAddPartnerTracker}
-                disabled={!addTrackerName.trim()}
-                className="w-full rounded-xl"
-              >
-                Add Tracker
-              </Button>
-            </div>
-          </ScrollArea>
-        </DrawerContent>
-      </Drawer>
 
       {/* Milestone Celebration */}
       <AnimatePresence>
@@ -1251,57 +1284,36 @@ const SobrietyPage = ({ onOpenSettings }: SobrietyPageProps = {}) => {
   );
 };
 
-// Category Card Component
-function SobrietyCategoryCard({
-  cat, idx, getStreakInfo, getHeatmapData, getMissedDays, isCheckedIn,
-  today, expandedCard, setExpandedCard, onBatchCheckin,
-  handleResetStreak, handleDeleteCategory, readOnly, ownerLabel,
-  onUpdateMoneyPerDay, onAddPriorDays, showOnlyYou, onCardTap,
+// ── Expanded Card Content (for single-user view) ──
+function ExpandedCardContent({
+  cat, info, missedDays, getHeatmapData,
+  onBatchCheckin, onResetStreak, onDeleteCategory,
+  onUpdateMoneyPerDay, onAddPriorDays,
   sobrietyGroups, onToggleSharing, isPersonalActive, isAllView,
-  onUndoCheckin,
 }: {
   cat: SobrietyCategory;
-  idx: number;
-  getStreakInfo: (cat: SobrietyCategory) => any;
+  info: any;
+  missedDays: string[];
   getHeatmapData: (cat: SobrietyCategory) => any;
-  getMissedDays: (cat: SobrietyCategory) => string[];
-  isCheckedIn: (catId: string, date: string) => boolean;
-  today: string;
-  expandedCard: string | null;
-  setExpandedCard: (id: string | null) => void;
   onBatchCheckin: (cat: SobrietyCategory, dates: string[], onTrack: boolean) => void;
-  handleResetStreak: (cat: SobrietyCategory) => void;
-  handleDeleteCategory: (id: string) => void;
-  readOnly?: boolean;
-  ownerLabel?: string;
-  onUpdateMoneyPerDay?: (catId: string, value: number) => void;
-  onAddPriorDays?: (cat: SobrietyCategory, days: number) => void;
-  showOnlyYou?: boolean;
-  onCardTap?: (cat: SobrietyCategory) => void;
+  onResetStreak: (cat: SobrietyCategory) => void;
+  onDeleteCategory: (id: string) => void;
+  onUpdateMoneyPerDay: (catId: string, value: number) => void;
+  onAddPriorDays: (cat: SobrietyCategory, days: number) => void;
   sobrietyGroups: any[];
   onToggleSharing: (cat: SobrietyCategory, gid: string) => void;
   isPersonalActive: boolean;
   isAllView: boolean;
-  onUndoCheckin: (cat: SobrietyCategory) => void;
 }) {
   const [editingMoney, setEditingMoney] = useState(false);
   const [moneyValue, setMoneyValue] = useState(String(cat.money_per_day || ""));
   const [showPriorDays, setShowPriorDays] = useState(false);
   const [priorDaysCount, setPriorDaysCount] = useState("3");
   const [selectedMissed, setSelectedMissed] = useState<Set<string>>(new Set());
-  const [showTodayCheckin, setShowTodayCheckin] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const info = getStreakInfo(cat);
-  const isExpanded = expandedCard === cat.id;
-  const checkedToday = isCheckedIn(cat.id, today);
-  const nextMilestone = getNextMilestone(info.currentStreak);
-  const milestones = getReachedMilestones(info.currentStreak);
-  const latestMilestone = milestones.length > 0 ? milestones[milestones.length - 1] : null;
-  const missedDays = getMissedDays(cat);
-
-  // Show inline sharing pills only on expanded, own cards, not in Personal or All view
-  const showSharingPills = !readOnly && isExpanded && !isPersonalActive && !isAllView && sobrietyGroups.length > 0;
+  const milestones = MILESTONES.filter(m => m <= info.currentStreak);
+  const showSharingPills = !isPersonalActive && !isAllView && sobrietyGroups.length > 0;
 
   const toggleMissedDay = (d: string) => {
     setSelectedMissed(prev => {
@@ -1313,452 +1325,274 @@ function SobrietyCategoryCard({
 
   return (
     <motion.div
-      key={cat.id}
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: idx * 0.05 }}
-      className="bg-card border border-border rounded-2xl overflow-hidden"
+      initial={{ height: 0, opacity: 0 }}
+      animate={{ height: "auto", opacity: 1 }}
+      exit={{ height: 0, opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      className="overflow-hidden"
     >
-      {/* Hero */}
-      <button
-        onClick={() => setExpandedCard(isExpanded ? null : cat.id)}
-        className="w-full p-4 text-left"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">{cat.icon}</span>
-            <div>
+      <div className="px-4 pb-4 space-y-3 border-t border-border/30 pt-3">
+        {/* Inline sharing pills */}
+        {showSharingPills && (
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground mb-1.5">Shared with</p>
+            <div className="flex flex-wrap gap-1.5">
+              {sobrietyGroups.map(g => {
+                const isShared = (cat.shared_group_ids || []).includes(g.id);
+                return (
+                  <button
+                    key={g.id}
+                    onClick={(e) => { e.stopPropagation(); onToggleSharing(cat, g.id); }}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border ${
+                      isShared
+                        ? "border-primary/40 bg-primary/10 text-foreground"
+                        : "border-transparent bg-secondary/50 text-muted-foreground hover:border-primary/20"
+                    }`}
+                  >
+                    {g.emoji} {g.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-secondary/50 rounded-xl p-3 text-center">
+            <Flame size={16} className="mx-auto text-destructive mb-1" />
+            <p className="text-lg font-bold text-foreground tabular-nums">{info.longestStreak}</p>
+            <p className="text-[10px] text-muted-foreground">Longest Streak</p>
+          </div>
+          <div className="bg-secondary/50 rounded-xl p-3 text-center">
+            <Calendar size={16} className="mx-auto text-primary mb-1" />
+            <p className="text-lg font-bold text-foreground tabular-nums">{info.totalSober}</p>
+            <p className="text-[10px] text-muted-foreground">Checked-In Days</p>
+          </div>
+          {cat.money_per_day > 0 && (
+            <div className="bg-secondary/50 rounded-xl p-3 text-center col-span-2">
+              <DollarSign size={16} className="mx-auto text-accent mb-1" />
+              <p className="text-lg font-bold text-foreground tabular-nums">${info.moneySaved.toFixed(0)}</p>
+              <p className="text-[10px] text-muted-foreground">Money Saved</p>
+            </div>
+          )}
+
+          <div className="col-span-2">
+            {editingMoney ? (
               <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">{cat.label}-free</p>
-                {ownerLabel && (
-                  <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">{ownerLabel}</span>
-                )}
-                {showOnlyYou && (
-                  <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground bg-secondary/80 px-1.5 py-0.5 rounded">
-                    <EyeOff size={10} />
-                    Only you
-                  </span>
-                )}
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="$/day"
+                  value={moneyValue}
+                  onChange={e => setMoneyValue(e.target.value)}
+                  className="text-sm h-8 flex-1"
+                  autoFocus
+                />
+                <Button
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    onUpdateMoneyPerDay(cat.id, parseFloat(moneyValue) || 0);
+                    setEditingMoney(false);
+                  }}
+                >
+                  Save
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-xs"
+                  onClick={() => { setEditingMoney(false); setMoneyValue(String(cat.money_per_day || "")); }}
+                >
+                  Cancel
+                </Button>
               </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-bold text-foreground tabular-nums">{info.currentStreak}</span>
-                <span className="text-sm text-muted-foreground">days</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {latestMilestone && (
-              <span className="bg-accent/15 text-accent text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                🏆 {latestMilestone}d
-              </span>
+            ) : (
+              <button
+                onClick={() => setEditingMoney(true)}
+                className="text-[11px] text-primary font-medium hover:underline flex items-center gap-1"
+              >
+                <DollarSign size={12} />
+                {cat.money_per_day > 0 ? `Edit money saved ($${cat.money_per_day}/day)` : "Add money saved per day"}
+              </button>
             )}
-            {isExpanded ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
           </div>
         </div>
 
-        {nextMilestone && (
-          <div className="mt-3">
-            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
-              <span>Next: {nextMilestone} days</span>
-              <span>{nextMilestone - info.currentStreak} to go</span>
-            </div>
-            <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-primary rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min((info.currentStreak / nextMilestone) * 100, 100)}%` }}
-                transition={{ duration: 0.8, delay: 0.2 }}
-              />
-            </div>
-          </div>
-        )}
-      </button>
-
-      {/* Check-in buttons */}
-      {!readOnly && !checkedToday && (
-        <div className="px-4 pb-3">
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowTodayCheckin(true);
-            }}
-            variant="outline"
-            className="w-full rounded-xl text-sm h-9 border-primary/30 text-primary hover:bg-primary/5"
-          >
-            Check in today
-          </Button>
-        </div>
-      )}
-
-      {/* Today check-in inline dialog */}
-      <AnimatePresence>
-        {showTodayCheckin && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="px-4 pb-3 overflow-hidden"
-          >
-            <div className="bg-secondary/50 rounded-xl p-3 text-center space-y-2">
-              <p className="text-xs font-medium text-foreground">
-                Did you stay on track with {cat.label} today?
-              </p>
-              <div className="grid grid-cols-2 gap-2">
+        {/* Add Prior Sober Days */}
+        <div>
+          {showPriorDays ? (
+            <div className="bg-secondary/50 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-medium text-foreground">Add prior sober days</p>
+              <p className="text-[10px] text-muted-foreground">Were you sober before creating this card? Add those days here.</p>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={priorDaysCount}
+                  onChange={e => setPriorDaysCount(e.target.value)}
+                  placeholder="Days"
+                  className="text-sm h-8 w-20"
+                />
+                <span className="text-xs text-muted-foreground">days before start</span>
+              </div>
+              <div className="flex gap-2">
                 <Button
                   size="sm"
-                  className="rounded-lg h-9 text-sm bg-[hsl(var(--habit-green))] hover:bg-[hsl(var(--habit-green))]/90 text-white"
-                  onClick={(e) => { e.stopPropagation(); onBatchCheckin(cat, [today], true); setShowTodayCheckin(false); }}
+                  className="h-8 text-xs rounded-lg"
+                  onClick={() => {
+                    const count = parseInt(priorDaysCount) || 0;
+                    if (count > 0) {
+                      onAddPriorDays(cat, count);
+                      setShowPriorDays(false);
+                    }
+                  }}
                 >
-                  ✅ Yes!
+                  Add {priorDaysCount || 0} days
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-lg h-9 text-sm border-destructive/30 text-destructive"
-                  onClick={(e) => { e.stopPropagation(); onBatchCheckin(cat, [today], false); setShowTodayCheckin(false); }}
-                >
-                  Not today
+                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setShowPriorDays(false)}>
+                  Cancel
                 </Button>
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Checked in today — tappable to undo */}
-      {checkedToday && !readOnly && (
-        <div className="px-4 pb-3">
-          <button
-            onClick={(e) => { e.stopPropagation(); onUndoCheckin(cat); }}
-            className="w-full text-center text-xs text-muted-foreground py-1.5 bg-secondary/50 rounded-xl hover:bg-secondary/70 transition-colors cursor-pointer"
-          >
-            ✅ Checked in today
-          </button>
+          ) : (
+            <button
+              onClick={() => setShowPriorDays(true)}
+              className="text-[11px] text-primary font-medium hover:underline flex items-center gap-1"
+            >
+              <Calendar size={12} />
+              Add prior sober days
+            </button>
+          )}
         </div>
-      )}
-      {checkedToday && readOnly && (
-        <div className="px-4 pb-3">
-          <div className="text-center text-xs text-muted-foreground py-1.5 bg-secondary/50 rounded-xl">
-            ✅ Checked in today
+
+        {/* Missed Days */}
+        {missedDays.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-foreground mb-2">Missed Days</p>
+            <div className="flex flex-wrap gap-1.5">
+              {missedDays.slice(0, 14).map(d => {
+                const isSelected = selectedMissed.has(d);
+                return (
+                  <button
+                    key={d}
+                    onClick={(e) => { e.stopPropagation(); toggleMissedDay(d); }}
+                    className={`text-[10px] font-medium px-2 py-1 rounded-lg transition-colors border ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-secondary hover:bg-primary/10 hover:text-primary border-border"
+                    }`}
+                  >
+                    {format(parseISO(d), "MMM d")}
+                  </button>
+                );
+              })}
+              {missedDays.length > 14 && (
+                <span className="text-[10px] text-muted-foreground self-center">+{missedDays.length - 14} more</span>
+              )}
+            </div>
+            {selectedMissed.size > 0 && (
+              <div className="mt-2 flex gap-2">
+                <Button
+                  size="sm"
+                  className="h-8 text-xs rounded-lg flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onBatchCheckin(cat, Array.from(selectedMissed), true);
+                    setSelectedMissed(new Set());
+                  }}
+                >
+                  ✅ Check in {selectedMissed.size} day{selectedMissed.size > 1 ? "s" : ""}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-xs"
+                  onClick={(e) => { e.stopPropagation(); setSelectedMissed(new Set()); }}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Heatmap */}
+        <div>
+          <p className="text-xs font-medium text-foreground mb-2">Last 13 Weeks</p>
+          <HeatmapGrid data={getHeatmapData(cat)} />
+        </div>
+
+        {/* Milestones */}
+        {milestones.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-foreground mb-2">Milestones</p>
+            <div className="flex flex-wrap gap-1.5">
+              {milestones.map(m => (
+                <span key={m} className="bg-accent/15 text-accent text-[10px] font-semibold px-2 py-1 rounded-full">
+                  🏆 {m} days
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Start date + actions */}
+        <div className="flex items-center justify-between pt-1">
+          <p className="text-[10px] text-muted-foreground">
+            Started {format(parseISO(cat.start_date), "MMM d, yyyy")}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onResetStreak(cat)}
+              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Reset
+            </button>
+            {!showDeleteConfirm ? (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="text-[10px] text-destructive hover:text-destructive/80 transition-colors"
+              >
+                Remove
+              </button>
+            ) : (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => onDeleteCategory(cat.id)}
+                  className="text-[10px] text-destructive font-semibold hover:text-destructive/80"
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         </div>
-      )}
-
-      {/* Read-only: Add to My Trackers button */}
-      {readOnly && (
-        <div className="px-4 pb-3">
-          <Button
-            onClick={(e) => { e.stopPropagation(); onCardTap?.(cat); }}
-            variant="outline"
-            size="sm"
-            className="w-full rounded-xl text-xs h-8 border-primary/30 text-primary hover:bg-primary/5"
-          >
-            <Plus size={14} className="mr-1" /> Add to My Trackers
-          </Button>
-        </div>
-      )}
-
-      {/* Missed days retroactive check-in */}
-      {!readOnly && missedDays.length > 0 && (
-        <div className="px-4 pb-3">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setExpandedCard(isExpanded ? null : cat.id);
-            }}
-            className="text-[11px] text-primary font-medium hover:underline"
-          >
-            {missedDays.length} missed day{missedDays.length > 1 ? "s" : ""} — tap to check in
-          </button>
-        </div>
-      )}
-
-      {/* Expanded Details */}
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="px-4 pb-4 space-y-4 border-t border-border pt-3">
-              {/* Inline Sharing Pills — replaces the old "Edit sharing" link */}
-              {showSharingPills && (
-                <div>
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">Shared with</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border border-primary/40 bg-primary/12 text-foreground opacity-80 cursor-not-allowed">
-                      🏠 Personal
-                    </span>
-                    {sobrietyGroups.map(g => {
-                      const isShared = (cat.shared_group_ids || []).includes(g.id);
-                      return (
-                        <button
-                          key={g.id}
-                          onClick={(e) => { e.stopPropagation(); onToggleSharing(cat, g.id); }}
-                          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border ${
-                            isShared
-                              ? "border-primary/40 bg-primary/12 text-foreground"
-                              : "border-transparent bg-secondary/50 text-muted-foreground hover:border-primary/20"
-                          }`}
-                        >
-                          {g.emoji} {g.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-secondary/50 rounded-xl p-3 text-center">
-                  <Flame size={16} className="mx-auto text-destructive mb-1" />
-                  <p className="text-lg font-bold text-foreground tabular-nums">{info.longestStreak}</p>
-                  <p className="text-[10px] text-muted-foreground">Longest Streak</p>
-                </div>
-                <div className="bg-secondary/50 rounded-xl p-3 text-center">
-                  <Calendar size={16} className="mx-auto text-primary mb-1" />
-                  <p className="text-lg font-bold text-foreground tabular-nums">{info.totalSober}</p>
-                  <p className="text-[10px] text-muted-foreground">Checked-In Days</p>
-                </div>
-                {cat.money_per_day > 0 && (
-                  <div className="bg-secondary/50 rounded-xl p-3 text-center col-span-2">
-                    <DollarSign size={16} className="mx-auto text-accent mb-1" />
-                    <p className="text-lg font-bold text-foreground tabular-nums">
-                      ${info.moneySaved.toFixed(0)}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">Money Saved</p>
-                  </div>
-                )}
-
-                {!readOnly && (
-                  <div className="col-span-2">
-                    {editingMoney ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="$/day"
-                          value={moneyValue}
-                          onChange={e => setMoneyValue(e.target.value)}
-                          className="text-sm h-8 flex-1"
-                          autoFocus
-                        />
-                        <Button
-                          size="sm"
-                          className="h-8 text-xs"
-                          onClick={() => {
-                            onUpdateMoneyPerDay?.(cat.id, parseFloat(moneyValue) || 0);
-                            setEditingMoney(false);
-                          }}
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 text-xs"
-                          onClick={() => { setEditingMoney(false); setMoneyValue(String(cat.money_per_day || "")); }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setEditingMoney(true)}
-                        className="text-[11px] text-primary font-medium hover:underline flex items-center gap-1"
-                      >
-                        <DollarSign size={12} />
-                        {cat.money_per_day > 0 ? `Edit money saved ($${cat.money_per_day}/day)` : "Add money saved per day"}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Add Prior Sober Days */}
-              {!readOnly && (
-                <div>
-                  {showPriorDays ? (
-                    <div className="bg-secondary/50 rounded-xl p-3 space-y-2">
-                      <p className="text-xs font-medium text-foreground">Add prior sober days</p>
-                      <p className="text-[10px] text-muted-foreground">Were you sober before creating this card? Add those days here.</p>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          min="1"
-                          max="365"
-                          value={priorDaysCount}
-                          onChange={e => setPriorDaysCount(e.target.value)}
-                          placeholder="Days"
-                          className="text-sm h-8 w-20"
-                        />
-                        <span className="text-xs text-muted-foreground">days before start</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          className="h-8 text-xs rounded-lg"
-                          onClick={() => {
-                            const count = parseInt(priorDaysCount) || 0;
-                            if (count > 0) {
-                              onAddPriorDays?.(cat, count);
-                              setShowPriorDays(false);
-                            }
-                          }}
-                        >
-                          Add {priorDaysCount || 0} days
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setShowPriorDays(false)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowPriorDays(true)}
-                      className="text-[11px] text-primary font-medium hover:underline flex items-center gap-1"
-                    >
-                      <Calendar size={12} />
-                      Add prior sober days
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Retroactive check-in for missed days */}
-              {!readOnly && missedDays.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-foreground mb-2">Missed Days</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {missedDays.slice(0, 14).map(d => {
-                      const isSelected = selectedMissed.has(d);
-                      return (
-                        <button
-                          key={d}
-                          onClick={(e) => { e.stopPropagation(); toggleMissedDay(d); }}
-                          className={`text-[10px] font-medium px-2 py-1 rounded-lg transition-colors border ${
-                            isSelected
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-secondary hover:bg-primary/10 hover:text-primary border-border"
-                          }`}
-                        >
-                          {format(parseISO(d), "MMM d")}
-                        </button>
-                      );
-                    })}
-                    {missedDays.length > 14 && (
-                      <span className="text-[10px] text-muted-foreground self-center">+{missedDays.length - 14} more</span>
-                    )}
-                  </div>
-                  {selectedMissed.size > 0 && (
-                    <div className="mt-2 flex gap-2">
-                      <Button
-                        size="sm"
-                        className="h-8 text-xs rounded-lg flex-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onBatchCheckin(cat, Array.from(selectedMissed), true);
-                          setSelectedMissed(new Set());
-                        }}
-                      >
-                        ✅ Check in {selectedMissed.size} day{selectedMissed.size > 1 ? "s" : ""}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 text-xs"
-                        onClick={(e) => { e.stopPropagation(); setSelectedMissed(new Set()); }}
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Heatmap */}
-              <div>
-                <p className="text-xs font-medium text-foreground mb-2">Last 13 Weeks</p>
-                <HeatmapGrid data={getHeatmapData(cat)} />
-              </div>
-
-              {/* Milestones */}
-              {milestones.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-foreground mb-2">Milestones</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {milestones.map(m => (
-                      <span key={m} className="bg-accent/15 text-accent text-[10px] font-semibold px-2 py-1 rounded-full">
-                        🏆 {m} days
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Start date + actions */}
-              <div className="flex items-center justify-between pt-1">
-                <p className="text-[10px] text-muted-foreground">
-                  Started {format(parseISO(cat.start_date), "MMM d, yyyy")}
-                </p>
-                {!readOnly && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleResetStreak(cat)}
-                      className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Reset
-                    </button>
-                    {!showDeleteConfirm ? (
-                      <button
-                        onClick={() => setShowDeleteConfirm(true)}
-                        className="text-[10px] text-destructive hover:text-destructive/80 transition-colors"
-                      >
-                        Remove
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleDeleteCategory(cat.id)}
-                          className="text-[10px] text-destructive font-semibold hover:text-destructive/80"
-                        >
-                          Confirm
-                        </button>
-                        <button
-                          onClick={() => setShowDeleteConfirm(false)}
-                          className="text-[10px] text-muted-foreground hover:text-foreground"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </div>
     </motion.div>
   );
 }
 
-// GitHub-style heatmap grid component
+// ── Heatmap Grid ──
 function HeatmapGrid({ data }: { data: { date: string; status: "green" | "red" | "gray" }[] }) {
   const weeks: typeof data[] = [];
   let week: typeof data = [];
-  
+
   const firstDate = data[0]?.date ? parseISO(data[0].date) : new Date();
   const startDay = firstDate.getDay();
   for (let i = 0; i < startDay; i++) {
     week.push({ date: "", status: "gray" });
   }
-  
+
   for (const d of data) {
     week.push(d);
     if (week.length === 7) {
