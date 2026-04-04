@@ -748,7 +748,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
         )}
       </header>
 
-      <PageGroupSelector page="calendar" isHomePage />
+      <PageGroupSelector page="calendar" isHomePage personalLabel="Mine" hideAllPill />
 
       {/* All view: member filter pills */}
       {isAllActive && allViewMembers.length > 0 && (
