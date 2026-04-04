@@ -1177,7 +1177,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
               getItemsForDate={getItemsForDate}
               groups={groups}
               timeGridRef={timeGridRef}
-              onItemTap={setSelectedItem}
+              onItemTap={handleItemTap}
               hideColumnHeaders
               colorMap={calendarColorMap}
             />
