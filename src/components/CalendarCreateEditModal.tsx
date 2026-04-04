@@ -364,13 +364,37 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
         setTodoTag(tk.tag || "Personal");
         setTodoPriorNotice(tk.priorNoticeDays ?? 0);
         setDescription((tk as any).description || "");
-        setSelectedAssignees([tk.assignee || "me"]);
-
         // Set context based on task's group
         const tkGroupId = (tk as any).groupId;
         const editCtx = tkGroupId || "__personal__";
         setSelectedContextId(editCtx);
         loadCalendarForContext(editCtx);
+
+        // Expand assignee for tasks too
+        const tkAssignee = tk.assignee || "me";
+        if (tkAssignee === "both" && tkGroupId) {
+          const grp = groups?.find(g => g.id === tkGroupId);
+          if (grp) {
+            const memberIds = grp.members
+              ?.filter((m: any) => m.user_id !== user?.id && m.status === "active")
+              .map((m: any) => m.user_id) || [];
+            setSelectedAssignees(["me", ...memberIds]);
+          } else {
+            setSelectedAssignees(["me"]);
+          }
+        } else if (tkAssignee === "partner" && tkGroupId) {
+          const grp = groups?.find(g => g.id === tkGroupId);
+          if (grp) {
+            const otherIds = grp.members
+              ?.filter((m: any) => m.user_id !== user?.id && m.status === "active")
+              .map((m: any) => m.user_id) || [];
+            setSelectedAssignees(otherIds.length > 0 ? otherIds : ["me"]);
+          } else {
+            setSelectedAssignees(["me"]);
+          }
+        } else {
+          setSelectedAssignees(["me"]);
+        }
 
         if (tk.dueDate) {
           const [y, m, d] = tk.dueDate.split("-").map(Number);
