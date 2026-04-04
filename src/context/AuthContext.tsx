@@ -117,7 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [partner, setPartner] = useState<PartnerProfile | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [pendingGroupInvites, setPendingGroupInvites] = useState<PendingGroupInvite[]>([]);
-  const [activeGroup, setActiveGroup] = useState<Group | null>(null);
+  const [activeGroup, setActiveGroup] = useState<Group | null>({ _personal: true, id: "__personal__", name: "Mine", type: "personal", emoji: "👤", invite_code: "", created_by: "", shared_pages: [], members: [] } as any);
   const [loading, setLoading] = useState(true);
 
   const getGroupsCacheKey = (userId: string) => `groups_cache_${userId}`;
