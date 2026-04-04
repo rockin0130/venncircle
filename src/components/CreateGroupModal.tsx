@@ -20,7 +20,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
   const { createGroup, inviteToGroup } = useAuth();
   const { activeFriends } = useFriendships();
 
-  const [step, setStep] = useState<Step>(defaultCategory ? "friends" : "category");
+  const [step, setStep] = useState<Step>(defaultCategory ? "pages" : "category");
   const [category, setCategory] = useState<"home" | "interest">(defaultCategory || "home");
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
   const [selectedPages, setSelectedPages] = useState<Set<ShareablePage>>(
@@ -31,7 +31,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
   const [addFriendOpen, setAddFriendOpen] = useState(false);
 
   const resetState = () => {
-    setStep(defaultCategory ? "friends" : "category");
+    setStep(defaultCategory ? "pages" : "category");
     setCategory(defaultCategory || "home");
     setSelectedFriends(new Set());
     setSelectedPages(new Set(defaultPage ? [defaultPage] : []));
@@ -104,7 +104,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
   const canProceedFromFriends = selectedFriends.size > 0;
   const canProceedFromPages = selectedPages.size > 0;
 
-  const allSteps: Step[] = defaultCategory ? ["friends", "pages", "name"] : ["category", "friends", "pages", "name"];
+  const allSteps: Step[] = defaultCategory ? ["pages", "name"] : ["category", "pages", "name"];
   const stepIdx = allSteps.indexOf(step);
 
   return (
@@ -142,7 +142,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
               <p className="text-xs text-muted-foreground">What kind of group is this?</p>
               <div className="space-y-2">
                 <button
-                  onClick={() => { setCategory("home"); setStep("friends"); }}
+                  onClick={() => { setCategory("home"); setSelectedFriends(new Set()); setStep("pages"); }}
                   className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all text-left ${
                     category === "home" ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-secondary/50"
                   }`}
@@ -151,12 +151,12 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
                     <Home size={20} className="text-primary" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold">Home Group</p>
-                    <p className="text-xs text-muted-foreground">Close family & friends — your inner circle</p>
+                    <p className="text-sm font-semibold">Create Alone</p>
+                    <p className="text-xs text-muted-foreground">Start a personal group — invite friends later</p>
                   </div>
                 </button>
                 <button
-                  onClick={() => { setCategory("interest"); setStep("friends"); }}
+                  onClick={() => { setCategory("interest"); setSelectedFriends(new Set()); setStep("pages"); }}
                   className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all text-left ${
                     category === "interest" ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-secondary/50"
                   }`}
@@ -168,85 +168,6 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
                     <p className="text-sm font-semibold">Shared Interest</p>
                     <p className="text-xs text-muted-foreground">Topic-based group — workout, nutrition, etc.</p>
                   </div>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Step: Choose friends */}
-          {step === "friends" && (
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">Select friends to include in this group.</p>
-
-              {activeFriends.length === 0 ? (
-                <div className="text-center py-6">
-                  <p className="text-sm text-muted-foreground mb-3">No friends yet</p>
-                  <button
-                    onClick={() => setAddFriendOpen(true)}
-                    className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
-                  >
-                    <UserPlus size={14} className="inline mr-1.5" />
-                    Add Friend
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {activeFriends.map((f) => {
-                    const friend = f.friend;
-                    if (!friend) return null;
-                    const selected = selectedFriends.has(friend.id);
-                    return (
-                      <button
-                        key={friend.id}
-                        onClick={() => toggleFriend(friend.id)}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                          selected
-                            ? "border-primary bg-primary/5"
-                            : "border-border bg-card hover:bg-secondary/50"
-                        }`}
-                      >
-                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0 overflow-hidden">
-                          {friend.avatar_url ? (
-                            <img src={friend.avatar_url} alt="" className="w-full h-full object-cover rounded-full" />
-                          ) : (
-                            friend.display_name?.charAt(0)?.toUpperCase() || "?"
-                          )}
-                        </div>
-                        <span className="flex-1 text-sm font-medium truncate">{friend.display_name}</span>
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                          selected ? "border-primary bg-primary" : "border-muted-foreground/30"
-                        }`}>
-                          {selected && <Check size={12} className="text-primary-foreground" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-
-                  <button
-                    onClick={() => setAddFriendOpen(true)}
-                    className="w-full flex items-center gap-2 p-3 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all"
-                  >
-                    <UserPlus size={14} />
-                    Add Friend
-                  </button>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                {!defaultCategory && (
-                  <button
-                    onClick={() => setStep("category")}
-                    className="flex-1 py-3 rounded-xl border border-border text-sm font-medium hover:bg-secondary transition-all"
-                  >
-                    Back
-                  </button>
-                )}
-                <button
-                  onClick={() => setStep("pages")}
-                  disabled={!canProceedFromFriends}
-                  className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 transition-all"
-                >
-                  Continue
                 </button>
               </div>
             </div>
@@ -295,7 +216,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => setStep("friends")}
+                  onClick={() => setStep(defaultCategory ? "pages" : "category")}
                   className="flex-1 py-3 rounded-xl border border-border text-sm font-medium hover:bg-secondary transition-all"
                 >
                   Back
@@ -329,10 +250,6 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {category === "home" ? <Home size={12} /> : <Compass size={12} />}
                   <span>{category === "home" ? "Home Group" : "Shared Interest"}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Users size={12} />
-                  <span>{selectedFriends.size} friend{selectedFriends.size !== 1 ? "s" : ""} selected</span>
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {Array.from(selectedPages).map((p) => (
