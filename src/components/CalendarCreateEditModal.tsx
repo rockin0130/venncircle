@@ -332,30 +332,38 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
         setSelectedContextId(editCtx);
         loadCalendarForContext(editCtx);
 
-        // Expand assignee to member IDs for proper pill highlighting
-        const evAssignee = ev.user || "me";
-        if (evAssignee === "both" && evGroupId) {
-          const grp = groups?.find(g => g.id === evGroupId);
-          if (grp) {
-            const memberIds = grp.members
-              ?.filter((m: any) => m.user_id !== user?.id && m.status === "active")
-              .map((m: any) => m.user_id) || [];
-            setSelectedAssignees(["me", ...memberIds]);
-          } else {
-            setSelectedAssignees(["me"]);
-          }
-        } else if (evAssignee === "partner" && evGroupId) {
-          const grp = groups?.find(g => g.id === evGroupId);
-          if (grp) {
-            const otherIds = grp.members
-              ?.filter((m: any) => m.user_id !== user?.id && m.status === "active")
-              .map((m: any) => m.user_id) || [];
-            setSelectedAssignees(otherIds.length > 0 ? otherIds : ["me"]);
-          } else {
-            setSelectedAssignees(["me"]);
-          }
+        // Restore assignees from assigneeUserIds if available, otherwise fall back to legacy expansion
+        const evAssigneeUserIds = (ev as any).assigneeUserIds as string[] | null | undefined;
+        if (evAssigneeUserIds && evAssigneeUserIds.length > 0) {
+          // Convert real user IDs to pill values: own ID → "me", others stay as user IDs
+          const pillValues = evAssigneeUserIds.map((uid: string) => uid === user?.id ? "me" : uid);
+          setSelectedAssignees(pillValues);
         } else {
-          setSelectedAssignees(["me"]);
+          // Legacy fallback: expand from assignee string
+          const evAssignee = ev.user || "me";
+          if (evAssignee === "both" && evGroupId) {
+            const grp = groups?.find(g => g.id === evGroupId);
+            if (grp) {
+              const memberIds = grp.members
+                ?.filter((m: any) => m.user_id !== user?.id && m.status === "active")
+                .map((m: any) => m.user_id) || [];
+              setSelectedAssignees(["me", ...memberIds]);
+            } else {
+              setSelectedAssignees(["me"]);
+            }
+          } else if (evAssignee === "partner" && evGroupId) {
+            const grp = groups?.find(g => g.id === evGroupId);
+            if (grp) {
+              const otherIds = grp.members
+                ?.filter((m: any) => m.user_id !== user?.id && m.status === "active")
+                .map((m: any) => m.user_id) || [];
+              setSelectedAssignees(otherIds.length > 0 ? otherIds : ["me"]);
+            } else {
+              setSelectedAssignees(["me"]);
+            }
+          } else {
+            setSelectedAssignees(["me"]);
+          }
         }
       } else {
         const tk = editItem.raw as Task;
