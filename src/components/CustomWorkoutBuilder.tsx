@@ -48,7 +48,7 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWork
   const [activityDistanceUnit, setActivityDistanceUnit] = useState<"mi" | "km">("mi");
   const [activityEmoji, setActivityEmoji] = useState("🏃");
   const [activitySearch, setActivitySearch] = useState("");
-  const [activityHealthKitType, setActivityHealthKitType] = useState<WorkoutType | null>(null);
+  const [activityHealthKitType, setActivityHealthKitType] = useState<HealthWorkoutType | null>(null);
 
   const healthKitActivityOptions = useMemo(() => getAllHealthKitWorkoutOptions(), []);
 
