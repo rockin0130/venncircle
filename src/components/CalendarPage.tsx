@@ -181,7 +181,7 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
     events, filteredEvents, removeEvent, rescheduleEvent,
     tasks, filteredTasks, toggleTask, removeTask,
     googleCalendarEvents, hideGcalEvent, toggleGcalCompletion, toggleEventVisibility, designateGcalEvent,
-    toggleEventCompletion,
+    toggleEventCompletion, partnerEvents,
   } = useAppContext();
   const { user, activeGroup, setActiveGroup, groups } = useAuth();
   const { showGoogleCalendar } = useGroupContext();
@@ -190,15 +190,34 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
 
   const isPrivateMode = !!(activeGroup as any)?._personal;
 
-  // In "Mine" mode on Calendar, show ALL of the logged-in user's own events across all contexts
+  // In "Mine" mode on Calendar, show ALL events assigned to the logged-in user across all contexts
+  const isUserAssigned = useCallback((event: ScheduledEvent) => {
+    const userId = user?.id;
+    if (!userId) return false;
+    // If assigneeUserIds is set, check if user is in the list
+    if (event.assigneeUserIds && event.assigneeUserIds.length > 0) {
+      return event.assigneeUserIds.includes(userId);
+    }
+    // Legacy: no assigneeUserIds set — show if user is the creator
+    return event.ownerUserId === userId || (!event.ownerUserId && true);
+  }, [user?.id]);
+
   const calFilteredEvents = useMemo(() => {
     if (!isPrivateMode) return filteredEvents;
-    return events.filter((e) => e.ownerUserId === user?.id);
-  }, [isPrivateMode, filteredEvents, events, user?.id]);
+    // Combine own events + partner/group events where user is assigned
+    const allEvents = [...events, ...partnerEvents];
+    // Deduplicate by id
+    const seen = new Set<string>();
+    return allEvents.filter((e) => {
+      if (seen.has(e.id)) return false;
+      seen.add(e.id);
+      return isUserAssigned(e);
+    });
+  }, [isPrivateMode, filteredEvents, events, partnerEvents, isUserAssigned]);
 
   const calFilteredTasks = useMemo(() => {
     if (!isPrivateMode) return filteredTasks;
-    return tasks.filter((t) => t.ownerUserId === user?.id);
+    return tasks.filter((t) => t.ownerUserId === user?.id || (!t.ownerUserId && true));
   }, [isPrivateMode, filteredTasks, tasks, user?.id]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());

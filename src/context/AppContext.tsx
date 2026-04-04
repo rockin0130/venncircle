@@ -44,6 +44,7 @@ export interface ScheduledEvent {
   groupId?: string | null;
   ownerUserId?: string;
   calendarId?: string | null;
+  assigneeUserIds?: string[] | null;
 }
 
 export interface Task {
@@ -427,6 +428,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             hiddenFromPartner: e.hidden_from_partner || false,
             groupId: e.group_id || null,
             calendarId: e.calendar_id || null,
+            assigneeUserIds: e.assignee_user_ids || null,
+            ownerUserId: user.id,
           })));
         }
 
@@ -749,6 +752,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               hiddenFromPartner: e.hidden_from_partner || false,
               groupId: e.group_id || null,
               ownerUserId: otherUserId,
+              assigneeUserIds: e.assignee_user_ids || null,
             })));
           }
 
@@ -847,6 +851,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       hiddenFromPartner: row.hidden_from_partner || false,
       groupId: row.group_id || null,
       user: row.assignee as "me" | "partner" | "both",
+      assigneeUserIds: row.assignee_user_ids || null,
+      calendarId: row.calendar_id || null,
+      ownerUserId: row.user_id,
     });
 
     const applyWorkoutUpdate = (row: any) => ({
@@ -1136,6 +1143,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         end_time: event.endTime ?? (isAllDay ? "" : (event.time || "")),
         all_day: isAllDay,
         assignee: event.user,
+        assignee_user_ids: event.assigneeUserIds || null,
         done: false,
         completed_at: null,
         completed_by: null,
@@ -1161,6 +1169,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         endTime: event.endTime ?? (isAllDay ? "" : (event.time || "")),
         allDay: isAllDay,
         calendarId: (data as any).calendar_id || event.calendarId || null,
+        ownerUserId: user.id,
+        assigneeUserIds: (data as any).assignee_user_ids || event.assigneeUserIds || null,
       }]);
     }
   };
@@ -1170,7 +1180,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await supabase.from("events").delete().eq("id", id);
   };
 
-  const updateEvent = async (id: string, updates: Partial<Pick<ScheduledEvent, "title" | "time" | "endTime" | "day" | "month" | "year" | "endDay" | "endMonth" | "endYear" | "allDay" | "description" | "user" | "calendarId">>) => {
+  const updateEvent = async (id: string, updates: Partial<Pick<ScheduledEvent, "title" | "time" | "endTime" | "day" | "month" | "year" | "endDay" | "endMonth" | "endYear" | "allDay" | "description" | "user" | "calendarId" | "assigneeUserIds">>) => {
     setEvents((e) => e.map((item) => item.id === id ? { ...item, ...updates } : item));
     const dbUpdates: any = {};
     if (updates.title !== undefined) dbUpdates.title = updates.title;
@@ -1186,6 +1196,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (updates.description !== undefined) dbUpdates.description = updates.description;
     if (updates.user !== undefined) dbUpdates.assignee = updates.user;
     if (updates.calendarId !== undefined) dbUpdates.calendar_id = updates.calendarId;
+    if (updates.assigneeUserIds !== undefined) dbUpdates.assignee_user_ids = updates.assigneeUserIds;
     await supabase.from("events").update(dbUpdates).eq("id", id);
   };
 
