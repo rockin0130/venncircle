@@ -104,7 +104,7 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
   const canProceedFromFriends = selectedFriends.size > 0;
   const canProceedFromPages = selectedPages.size > 0;
 
-  const allSteps: Step[] = defaultCategory ? ["friends", "pages", "name"] : ["category", "friends", "pages", "name"];
+  const allSteps: Step[] = defaultCategory ? ["pages", "name"] : ["category", "pages", "name"];
   const stepIdx = allSteps.indexOf(step);
 
   return (
