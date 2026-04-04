@@ -493,6 +493,12 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
     return "me";
   };
 
+  // Compute the real user IDs array from selectedAssignees
+  const computeAssigneeUserIds = (): string[] => {
+    if (isPersonalContext || !user?.id) return [user?.id || ""];
+    return selectedAssignees.map(a => a === "me" ? user.id : a);
+  };
+
   // ── Save handlers ──
   const handleSaveEvent = () => {
     if (!title.trim()) return;
@@ -509,6 +515,7 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
       description,
       user: computeAssignee(),
       calendarId: selectedCalendarId || null,
+      assigneeUserIds: computeAssigneeUserIds(),
     };
 
     if (isEditing && editItem?.type === "event") {
