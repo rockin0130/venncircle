@@ -251,10 +251,6 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated, def
                   {category === "home" ? <Home size={12} /> : <Compass size={12} />}
                   <span>{category === "home" ? "Home Group" : "Shared Interest"}</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Users size={12} />
-                  <span>{selectedFriends.size} friend{selectedFriends.size !== 1 ? "s" : ""} selected</span>
-                </div>
                 <div className="flex flex-wrap gap-1">
                   {Array.from(selectedPages).map((p) => (
                     <span key={p} className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
