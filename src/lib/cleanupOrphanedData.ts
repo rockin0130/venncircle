@@ -59,6 +59,8 @@ export async function cleanupOrphanedData(userId: string) {
     cleanups.push(cleanShoppingLists(userId, isValidGroup, hasFeature));
     // Calendars
     cleanups.push(cleanTable("calendars", userId, "calendar", isValidGroup, hasFeature));
+    // Study sessions
+    cleanups.push(cleanTable("study_sessions", userId, "study", isValidGroup, hasFeature));
 
     // 4. Clean shared_group_ids arrays (remove references to non-existent groups)
     cleanups.push(cleanSharedGroupIds("habits", userId, validGroupIds, groupPageMap, "habits"));
