@@ -548,274 +548,253 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
         )}
       </AnimatePresence>
 
-      {/* My Calendars */}
+      {/* 50/50 Split: My Groups + Recent Activity */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="mt-6 flex-1 pb-8"
+        className="mt-6 flex-1 flex flex-col pb-4"
       >
-        {/* My Groups header */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-            My Groups
-          </p>
-          {onCreateGroup && (
-            <button
-              onClick={onCreateGroup}
-              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-            >
-              <Plus size={12} />
-              Add Group
-            </button>
-          )}
-        </div>
-
+        {/* My Groups Section */}
         <div
-          ref={listRef}
-          className="space-y-3"
-          onPointerMove={handleCardPointerMove}
-          onPointerLeave={() => clearLP()}
-          onPointerCancel={() => { clearLP(); setDragIdx(null); setDragOverIdx(null); }}
+          className="flex flex-col overflow-hidden transition-all duration-300"
+          style={{
+            flex: groupsExpanded ? "3 1 0%" : activityExpanded ? "1 1 0%" : "1 1 0%",
+            minHeight: 0,
+          }}
         >
-          {editMode && (
-            <div className="flex justify-center mb-1">
-              <button
-                onClick={() => setEditMode(false)}
-                className="text-[10px] font-semibold text-primary px-3 py-0.5 rounded-full bg-primary/10"
-              >
-                Done
-              </button>
-            </div>
-          )}
-          {visualCalendarGroups.map((group, index) => {
-            const activeMembers = group.members.filter((m) => m.status === 'active' && m.user_id !== profile?.id);
-            const pendingMembers = group.members.filter((m) => m.status === 'pending_invited');
-            const memberNames = activeMembers.map((m) => m.display_name || "Member").join(", ");
-            const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
-            const currentCoverUrl = localCoverMap[group.id] || group.cover_image_url || null;
-            const hasCover = !!currentCoverUrl;
-            const isUploading = uploadingGroupId === group.id;
-            const isDragging = editMode && dragIdx !== null && orderedVisibleGroups[dragIdx]?.id === group.id;
-
-            return (
-              <div
-                key={group.id}
-                ref={(el) => { cardRefs.current[index] = el; }}
-                onPointerDown={(e) => { e.preventDefault(); handleCardPointerDown(index); }}
-                onPointerUp={() => handleCardPointerUp(group)}
-                className={`relative overflow-hidden rounded-2xl shadow-sm border border-border/60 select-none touch-none ${editMode ? "animate-nav-wiggle" : ""} ${isDragging ? "opacity-60 scale-[1.02]" : ""}`}
-                style={editMode ? { animationDelay: `${index * 0.05}s` } : undefined}
-              >
-                <div className="w-full flex items-center gap-0 text-left group relative">
-                  <div className={`flex-1 min-w-0 p-4 pr-2 bg-gradient-to-r ${gradient} min-h-[80px] flex flex-col justify-center`}>
-                    <div className="w-10 h-10 rounded-xl overflow-hidden border border-border/40 flex items-center justify-center text-xl mb-2 shadow-sm flex-shrink-0">
-                      {hasCover ? (
-                        <img src={currentCoverUrl!} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-card/80 backdrop-blur-sm flex items-center justify-center">
-                          {group.emoji}
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-[15px] font-semibold truncate text-foreground leading-tight">
-                      {group.name}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                      {memberNames || "Just you"} · {activeMembers.length + 1} member{activeMembers.length !== 0 ? "s" : ""}
-                      {pendingMembers.length > 0 && (
-                        <span className="text-muted-foreground/60"> · {pendingMembers.length} pending</span>
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="relative w-[130px] h-[96px] flex-shrink-0 overflow-hidden">
-                    {hasCover ? (
-                      <img
-                        src={currentCoverUrl!}
-                        alt={`${group.name} cover`}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
-                        <span className="text-4xl opacity-30">{group.emoji}</span>
-                      </div>
-                    )}
-                    <div className={`absolute inset-y-0 left-0 w-8 bg-gradient-to-r ${gradient.split(" ")[0].replace("from-", "from-")} to-transparent`} />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                      <ChevronRight size={16} className="text-muted-foreground/60 group-hover:text-primary transition-colors" />
-                    </div>
-                  </div>
-                </div>
-
-                {!editMode && (
-                  <button
-                    onClick={(e) => triggerFileInput(group.id, e)}
-                    className="absolute bottom-2 right-8 w-7 h-7 rounded-full bg-card/50 backdrop-blur-md border border-border/30 flex items-center justify-center text-muted-foreground/60 hover:text-foreground/80 hover:bg-card/70 transition-all z-10"
-                    aria-label="Upload cover photo"
-                  >
-                    {isUploading ? (
-                      <Loader2 size={11} className="animate-spin" />
-                    ) : (
-                      <Camera size={11} />
-                    )}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Pending group invites */}
-          {pendingGroupInvites.map((invite) => (
-            <div
-              key={invite.group_id}
-              className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3"
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-lg flex-shrink-0">
-                  {invite.group_emoji}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">{invite.group_name}</p>
-                  {invite.invited_by_name && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Invited by {invite.invited_by_name}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {invite.shared_pages.filter((p) => SHAREABLE_PAGES.includes(p)).map((page) => (
-                      <span key={page} className="text-[10px] font-medium bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">
-                        {PAGE_ICONS[page]} {PAGE_LABELS[page]}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2 ml-[52px]">
-                <button
-                  onClick={async () => {
-                    const r = await acceptGroupInvite(invite.group_id);
-                    if (r.error) toast({ title: "Error", description: r.error, variant: "destructive" });
-                    else toast({ title: `Joined "${invite.group_name}"!` });
-                  }}
-                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-all active:scale-[0.97]"
-                >
-                  Accept
-                </button>
-                <button
-                  onClick={async () => {
-                    const r = await declineGroupInvite(invite.group_id);
-                    if (r.error) toast({ title: "Error", description: r.error, variant: "destructive" });
-                  }}
-                  className="px-4 py-2 rounded-xl bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-all border border-border"
-                >
-                  Decline
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {visualCalendarGroups.length === 0 && pendingGroupInvites.length === 0 && (
-            <div className="text-center py-8">
-              <Users size={28} className="mx-auto text-muted-foreground/40 mb-2" />
-              <p className="text-sm font-medium text-muted-foreground mb-1">No groups yet</p>
-              <p className="text-xs text-muted-foreground/70 mb-4 max-w-[220px] mx-auto">Create a group to start sharing calendars and pages.</p>
+          <div className="flex items-center justify-between mb-3 flex-shrink-0">
+            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">My Groups</p>
+            <div className="flex items-center gap-2">
               {onCreateGroup && (
-                <button
-                  onClick={onCreateGroup}
-                  className="px-4 py-2.5 rounded-xl bg-secondary text-foreground text-sm font-semibold border border-border"
-                >
-                  Add Group
+                <button onClick={onCreateGroup} className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors">
+                  <Plus size={12} />Add Group
                 </button>
               )}
+              <button
+                onClick={() => { setGroupsExpanded(!groupsExpanded); setActivityExpanded(false); }}
+                className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all"
+              >
+                {groupsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
             </div>
-          )}
+          </div>
+
+          <div
+            ref={listRef}
+            className="space-y-3 overflow-y-auto flex-1 scrollbar-none"
+            onPointerMove={handleCardPointerMove}
+            onPointerLeave={() => clearLP()}
+            onPointerCancel={() => { clearLP(); setDragIdx(null); setDragOverIdx(null); }}
+          >
+            {editMode && (
+              <div className="flex justify-center mb-1">
+                <button onClick={() => setEditMode(false)} className="text-[10px] font-semibold text-primary px-3 py-0.5 rounded-full bg-primary/10">Done</button>
+              </div>
+            )}
+            {visualCalendarGroups.map((group, index) => {
+              const activeMembers = group.members.filter((m) => m.status === 'active' && m.user_id !== profile?.id);
+              const pendingMembers = group.members.filter((m) => m.status === 'pending_invited');
+              const memberNames = activeMembers.map((m) => m.display_name || "Member").join(", ");
+              const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
+              const currentCoverUrl = localCoverMap[group.id] || group.cover_image_url || null;
+              const hasCover = !!currentCoverUrl;
+              const isUploading = uploadingGroupId === group.id;
+              const isDragging = editMode && dragIdx !== null && orderedVisibleGroups[dragIdx]?.id === group.id;
+              const isAdmin = group.created_by === user?.id;
+              const validPages = (group.shared_pages || []).filter((p: string) => (SHAREABLE_PAGES as readonly string[]).includes(p as ShareablePage)) as ShareablePage[];
+
+              return (
+                <div
+                  key={group.id}
+                  ref={(el) => { cardRefs.current[index] = el; }}
+                  onPointerDown={(e) => { e.preventDefault(); handleCardPointerDown(index); }}
+                  onPointerUp={() => handleCardPointerUp(group)}
+                  className={`relative overflow-hidden rounded-2xl shadow-sm border border-border/60 select-none touch-none ${editMode ? "animate-nav-wiggle" : ""} ${isDragging ? "opacity-60 scale-[1.02]" : ""}`}
+                  style={editMode ? { animationDelay: `${index * 0.05}s` } : undefined}
+                >
+                  {/* Photo Strip — 52px */}
+                  <div className="relative w-full" style={{ height: 52 }}>
+                    {hasCover ? (
+                      <>
+                        <img src={currentCoverUrl!} alt="" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.05), rgba(0,0,0,0.25))" }} />
+                      </>
+                    ) : (
+                      <div
+                        className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center gap-1.5`}
+                        onClick={(e) => { if (isAdmin && !editMode) { e.stopPropagation(); triggerFileInput(group.id, e); } }}
+                      >
+                        {isUploading ? (
+                          <Loader2 size={12} className="animate-spin text-muted-foreground/40" />
+                        ) : (
+                          <>
+                            <Camera size={11} className="text-muted-foreground/40" />
+                            <span className="text-[9px] text-muted-foreground/40 font-medium">Add photo</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {/* Edit button on photo strip for admin */}
+                    {!editMode && hasCover && isAdmin && (
+                      <button
+                        onClick={(e) => triggerFileInput(group.id, e)}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center z-10"
+                        style={{ background: "rgba(255,255,255,0.25)", backdropFilter: "blur(6px)" }}
+                      >
+                        {isUploading ? <Loader2 size={9} className="animate-spin text-white" /> : <Camera size={9} className="text-white" />}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="p-3 bg-card">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[14px] font-semibold truncate text-foreground leading-tight">{group.name}</p>
+                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                          {memberNames || "Just you"} · {activeMembers.length + 1} member{activeMembers.length !== 0 ? "s" : ""}
+                          {pendingMembers.length > 0 && <span className="text-muted-foreground/60"> · {pendingMembers.length} pending</span>}
+                        </p>
+                      </div>
+                      <ChevronRight size={16} className="text-muted-foreground/40 flex-shrink-0" />
+                    </div>
+                    {/* Interest pills */}
+                    {validPages.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {validPages.slice(0, 4).map((page) => (
+                          <span key={page} className="text-[9px] font-medium bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">
+                            {PAGE_ICONS[page]} {PAGE_LABELS[page]}
+                          </span>
+                        ))}
+                        {validPages.length > 4 && (
+                          <span className="text-[9px] font-medium bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">+{validPages.length - 4}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Pending group invites */}
+            {pendingGroupInvites.map((invite) => (
+              <div key={invite.group_id} className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-lg flex-shrink-0">{invite.group_emoji}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{invite.group_name}</p>
+                    {invite.invited_by_name && <p className="text-xs text-muted-foreground mt-0.5">Invited by {invite.invited_by_name}</p>}
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {invite.shared_pages.filter((p) => SHAREABLE_PAGES.includes(p)).map((page) => (
+                        <span key={page} className="text-[10px] font-medium bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">{PAGE_ICONS[page]} {PAGE_LABELS[page]}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 ml-[52px]">
+                  <button onClick={async () => { const r = await acceptGroupInvite(invite.group_id); if (r.error) toast({ title: "Error", description: r.error, variant: "destructive" }); else toast({ title: `Joined "${invite.group_name}"!` }); }} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-all active:scale-[0.97]">Accept</button>
+                  <button onClick={async () => { const r = await declineGroupInvite(invite.group_id); if (r.error) toast({ title: "Error", description: r.error, variant: "destructive" }); }} className="px-4 py-2 rounded-xl bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-all border border-border">Decline</button>
+                </div>
+              </div>
+            ))}
+
+            {visualCalendarGroups.length === 0 && pendingGroupInvites.length === 0 && (
+              <div className="text-center py-8">
+                <Users size={28} className="mx-auto text-muted-foreground/40 mb-2" />
+                <p className="text-sm font-medium text-muted-foreground mb-1">No groups yet</p>
+                <p className="text-xs text-muted-foreground/70 mb-4 max-w-[220px] mx-auto">Create a group to start sharing calendars and pages.</p>
+                {onCreateGroup && <button onClick={onCreateGroup} className="px-4 py-2.5 rounded-xl bg-secondary text-foreground text-sm font-semibold border border-border">Add Group</button>}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* My Friends section */}
-        <div className="mt-8">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              My Friends
-            </p>
+        {/* Divider */}
+        <div className="my-3 flex-shrink-0" style={{ height: "0.5px", background: "rgba(0,0,0,0.08)" }} />
+
+        {/* Recent Activity Section */}
+        <div
+          className="flex flex-col overflow-hidden transition-all duration-300"
+          style={{
+            flex: activityExpanded ? "3 1 0%" : groupsExpanded ? "1 1 0%" : "1 1 0%",
+            minHeight: 0,
+          }}
+        >
+          <div className="flex items-center justify-between mb-3 flex-shrink-0">
+            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Activity</p>
             <button
-              onClick={() => setAddFriendOpen(true)}
-              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+              onClick={() => { setActivityExpanded(!activityExpanded); setGroupsExpanded(false); }}
+              className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all"
             >
-              <UserPlus size={12} />
-              Add Friend
+              {activityExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
           </div>
 
-          {/* Active friends */}
+          <div className="flex-1 overflow-y-auto space-y-3 scrollbar-none">
+            {loadingActivity ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 size={20} className="animate-spin text-muted-foreground" />
+              </div>
+            ) : activityPosts.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-xs text-muted-foreground">No recent activity from your groups</p>
+              </div>
+            ) : (
+              activityPosts.map((post) => (
+                <div key={post.id} className="space-y-1">
+                  <p className="text-[10px] font-medium text-muted-foreground/60 px-1">{post.group_name}</p>
+                  <GroupFeedPost
+                    post={post}
+                    onLike={() => {}}
+                    memberColors={["bg-[hsl(260,45%,60%)]", "bg-[hsl(340,50%,65%)]", "bg-[hsl(160,40%,55%)]"]}
+                    members={[]}
+                  />
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* My Friends section */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">My Friends</p>
+            <button onClick={() => setAddFriendOpen(true)} className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors">
+              <UserPlus size={12} />Add Friend
+            </button>
+          </div>
+
           {activeFriends.length > 0 && (
             <div className="space-y-1.5 mb-3">
               {activeFriends.map((f) => (
-                <FriendRow
-                  key={f.id}
-                  friendship={f}
-                  currentUserId={user?.id || ""}
-                  onRemove={async (id) => {
-                    const r = await removeFriend(id);
-                    if (r.error) toast({ title: "Error", description: r.error, variant: "destructive" });
-                    else toast({ title: "Friend removed" });
-                  }}
-                />
+                <FriendRow key={f.id} friendship={f} currentUserId={user?.id || ""} onRemove={async (id) => { const r = await removeFriend(id); if (r.error) toast({ title: "Error", description: r.error, variant: "destructive" }); else toast({ title: "Friend removed" }); }} />
               ))}
             </div>
           )}
 
-          {/* Incoming requests */}
           {pendingReceived.length > 0 && (
             <div className="space-y-1.5 mb-3">
               {pendingReceived.map((f) => (
-                <FriendRow
-                  key={f.id}
-                  friendship={f}
-                  currentUserId={user?.id || ""}
-                  onAccept={async (id) => {
-                    const r = await acceptFriendRequest(id);
-                    if (r.error) toast({ title: "Error", description: r.error, variant: "destructive" });
-                    else toast({ title: "Friend added!" });
-                  }}
-                  onDecline={async (id) => {
-                    const r = await declineFriendRequest(id);
-                    if (r.error) toast({ title: "Error", description: r.error, variant: "destructive" });
-                  }}
-                />
+                <FriendRow key={f.id} friendship={f} currentUserId={user?.id || ""} onAccept={async (id) => { const r = await acceptFriendRequest(id); if (r.error) toast({ title: "Error", description: r.error, variant: "destructive" }); else toast({ title: "Friend added!" }); }} onDecline={async (id) => { const r = await declineFriendRequest(id); if (r.error) toast({ title: "Error", description: r.error, variant: "destructive" }); }} />
               ))}
             </div>
           )}
 
-          {/* Outgoing pending */}
           {pendingSent.length > 0 && (
             <div className="space-y-1.5 mb-3">
               {pendingSent.map((f) => (
-                <FriendRow
-                  key={f.id}
-                  friendship={f}
-                  currentUserId={user?.id || ""}
-                  onCancel={async (id) => {
-                    const r = await cancelFriendRequest(id);
-                    if (r.error) toast({ title: "Error", description: r.error, variant: "destructive" });
-                  }}
-                />
+                <FriendRow key={f.id} friendship={f} currentUserId={user?.id || ""} onCancel={async (id) => { const r = await cancelFriendRequest(id); if (r.error) toast({ title: "Error", description: r.error, variant: "destructive" }); }} />
               ))}
             </div>
           )}
 
-          {/* Empty state */}
           {activeFriends.length === 0 && pendingSent.length === 0 && pendingReceived.length === 0 && (
             <div className="text-center py-8">
               <UserPlus size={28} className="mx-auto text-muted-foreground/40 mb-2" />
               <p className="text-sm font-medium text-muted-foreground mb-1">No friends yet</p>
               <p className="text-xs text-muted-foreground/70 mb-4 max-w-[220px] mx-auto">Add friends to start connecting.</p>
-              <button
-                onClick={() => setAddFriendOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-secondary text-foreground text-sm font-semibold border border-border"
-              >
-                Add Friend
-              </button>
+              <button onClick={() => setAddFriendOpen(true)} className="px-4 py-2.5 rounded-xl bg-secondary text-foreground text-sm font-semibold border border-border">Add Friend</button>
             </div>
           )}
         </div>
