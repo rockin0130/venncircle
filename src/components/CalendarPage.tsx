@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
   ChevronLeft, ChevronRight, Plus, X, Search,
-  Calendar as CalendarIcon, Settings,
+  Calendar as CalendarIcon, Settings, MoreHorizontal,
 } from "lucide-react";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
 import { useAuth, Group, GroupMember } from "@/context/AuthContext";
@@ -178,7 +178,7 @@ interface CalendarRecord {
 
 // ── Main Component ──────────────────────────────────────────
 
-const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) => {
+const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => void; onOpenMore?: () => void } = {}) => {
   const {
     events, filteredEvents, removeEvent, rescheduleEvent,
     tasks, filteredTasks, toggleTask, removeTask,
@@ -1090,6 +1090,11 @@ const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
             {onOpenSettings && (
               <button onClick={onOpenSettings} className="w-7 h-7 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
                 <Settings size={15} />
+              </button>
+            )}
+            {onOpenMore && (
+              <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+                <MoreHorizontal size={15} color="#888" />
               </button>
             )}
           </div>

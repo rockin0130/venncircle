@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Plus, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
+import { Plus, ChevronRight, Maximize2, Minimize2, MoreHorizontal } from "lucide-react";
 import { useAuth, Group, ShareablePage, PAGE_LABELS } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -20,6 +20,7 @@ interface SharedInterestsPageProps {
   onNavigateToFeature?: (tab: string, groupId?: string) => void;
   onCreateGroup?: () => void;
   onOpenGroupHub?: (group: Group) => void;
+  onOpenMore?: () => void;
 }
 
 const INTEREST_PILL_COLORS: Record<string, string> = {
@@ -89,7 +90,7 @@ const MemberDots = ({ members }: { members: { display_name: string | null; user_
 
 type SplitMode = "equal" | "groups-expanded" | "feed-expanded";
 
-const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHub }: SharedInterestsPageProps) => {
+const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHub, onOpenMore }: SharedInterestsPageProps) => {
   const { groups, user } = useAuth();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
@@ -208,13 +209,20 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
       {/* Header */}
       <header className="px-5 pt-12 pb-3 flex-shrink-0 flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight text-foreground">Explore</h1>
-        <button
-          onClick={onCreateGroup}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-primary text-primary text-xs font-semibold hover:bg-primary/5 transition-colors"
-        >
-          <Plus size={13} />
-          Create / Join
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onCreateGroup}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-primary text-primary text-xs font-semibold hover:bg-primary/5 transition-colors"
+          >
+            <Plus size={13} />
+            Create / Join
+          </button>
+          {onOpenMore && (
+            <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+              <MoreHorizontal size={15} color="#888" />
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Split container */}

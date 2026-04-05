@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { MessageCircle, Settings, Home, Compass, User } from "lucide-react";
+import { MessageCircle, Settings, Home, Compass, User, MoreHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, Group } from "@/context/AuthContext";
 
@@ -19,9 +19,11 @@ interface ChatPreview {
 const ChatListPage = ({
   onOpenChat,
   onOpenSettings,
+  onOpenMore,
 }: {
   onOpenChat: (group: Group) => void;
   onOpenSettings?: () => void;
+  onOpenMore?: () => void;
 }) => {
   const { user, groups } = useAuth();
   const [previews, setPreviews] = useState<ChatPreview[]>([]);
@@ -251,15 +253,22 @@ const ChatListPage = ({
     <div className="px-5 flex flex-col h-[calc(100svh-5rem)]">
       <header className="pt-12 pb-4 flex items-center justify-between flex-shrink-0">
         <h1 className="text-[1.75rem] font-bold tracking-tight">Chats</h1>
-        {onOpenSettings && (
-          <button
-            onClick={onOpenSettings}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-            aria-label="Settings"
-          >
-            <Settings size={18} />
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {onOpenSettings && (
+            <button
+              onClick={onOpenSettings}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              aria-label="Settings"
+            >
+              <Settings size={18} />
+            </button>
+          )}
+          {onOpenMore && (
+            <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+              <MoreHorizontal size={15} color="#888" />
+            </button>
+          )}
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto -webkit-overflow-scrolling-touch">

@@ -144,7 +144,7 @@ const Index = () => {
     if (chatGroup && chatMode === "chat") {
       return <ChatPage group={chatGroup} onBack={handleBackToList} />;
     }
-    return <ChatListPage onOpenChat={handleOpenChat} />;
+    return <ChatListPage onOpenChat={handleOpenChat} onOpenMore={() => setMoreOpen(true)} />;
   };
 
   const handleDrawerNavigate = (tab: Tab | "settings") => {
@@ -229,6 +229,7 @@ const Index = () => {
         onNavigateToFeature={handleNavigateToFeature}
         onCreateGroup={handleCreateInterestGroup}
         onOpenGroupHub={handleOpenGroupHub}
+        onOpenMore={() => setMoreOpen(true)}
       />
     ),
     "group-hub": hubGroup ? (
@@ -239,22 +240,22 @@ const Index = () => {
       />
     ) : null,
     profile: <ProfilePage onNavigate={(tab) => setActiveTab(tab as FullTab)} onOpenSettings={handleOpenSettings} onOpenMore={() => setMoreOpen(true)} />,
-    workout: <WorkoutsPage />,
-    nutrition: <NutritionPage />,
-    habits: <HabitsPage />,
-    sobriety: <SobrietyPage />,
-    specialdays: <SpecialDaysPage />,
-    shopping: <ShoppingListPage />,
-    calendar: <CalendarPage />,
+    workout: <WorkoutsPage onOpenMore={() => setMoreOpen(true)} />,
+    nutrition: <NutritionPage onOpenMore={() => setMoreOpen(true)} />,
+    habits: <HabitsPage onOpenMore={() => setMoreOpen(true)} />,
+    sobriety: <SobrietyPage onOpenMore={() => setMoreOpen(true)} />,
+    specialdays: <SpecialDaysPage onOpenMore={() => setMoreOpen(true)} />,
+    shopping: <ShoppingListPage onOpenMore={() => setMoreOpen(true)} />,
+    calendar: <CalendarPage onOpenMore={() => setMoreOpen(true)} />,
     chat: renderChatView(),
-    ai: <AiAssistantPage />,
+    ai: <AiAssistantPage onOpenMore={() => setMoreOpen(true)} />,
     settings: <SettingsPage />,
   };
 
   const isInnerPage = activeTab !== "launcher";
   const showBottomNav = isInnerPage && navStyle === "bottom";
   const showDrawerButton = isInnerPage && navStyle === "drawer";
-  const showFloatingMoreButton = isInnerPage && navStyle === "bottom" && !["home", "profile", "ai", "settings", "launcher"].includes(activeTab);
+  const showFloatingMoreButton = false;
 
   return (
     <AppProvider>
@@ -311,15 +312,6 @@ const Index = () => {
           />
         )}
 
-        {showFloatingMoreButton && (
-          <button
-            onClick={() => setMoreOpen(true)}
-            className="fixed top-3 right-3 z-50 w-10 h-10 rounded-full bg-card/80 backdrop-blur-sm border border-border shadow-sm flex items-center justify-center text-foreground hover:bg-secondary transition-colors"
-            aria-label="More"
-          >
-            <MoreHorizontal size={20} />
-          </button>
-        )}
 
         <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
           <SheetContent side="right" className="w-72 p-0 flex flex-col bg-card">

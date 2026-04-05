@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import GroupBadge from "@/components/GroupBadge";
-import { Plus, Flame, Check, Bell, Eye, EyeOff } from "lucide-react";
+import { Plus, Flame, Check, Bell, Eye, EyeOff, MoreHorizontal } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { useAuth, GroupMember } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,7 +60,7 @@ const USER_COLORS = [
 
 const getUserColor = (index: number) => USER_COLORS[index % USER_COLORS.length];
 
-const HabitsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) => {
+const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => void; onOpenMore?: () => void } = {}) => {
   const {
     habits, filteredHabits, filteredPartnerHabits,
     toggleHabit, addHabit, removeHabit, addSharedHabit,
@@ -360,13 +360,20 @@ const HabitsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) =>
           <h1 className="text-[1.75rem] font-bold tracking-display">Habits</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Build a better routine</p>
         </div>
-        <button
-          onClick={() => setAddingToSection(addingToSection ? null : "morning")}
-          className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-md mt-1 active:scale-95 transition-transform"
-          aria-label="Add habit"
-        >
-          <Plus size={18} strokeWidth={2.5} />
-        </button>
+        <div className="flex items-center gap-1.5 mt-1">
+          <button
+            onClick={() => setAddingToSection(addingToSection ? null : "morning")}
+            className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-md active:scale-95 transition-transform"
+            aria-label="Add habit"
+          >
+            <Plus size={18} strokeWidth={2.5} />
+          </button>
+          {onOpenMore && (
+            <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+              <MoreHorizontal size={15} color="#888" />
+            </button>
+          )}
+        </div>
       </header>
 
       <PageGroupSelector page="habits" personalLabel="Mine" hideAllPill />

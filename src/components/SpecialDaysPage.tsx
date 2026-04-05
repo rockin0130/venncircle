@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Heart, Search, X, SlidersHorizontal, Check } from "lucide-react";
+import { Plus, Heart, Search, X, SlidersHorizontal, Check, MoreHorizontal } from "lucide-react";
 import PageGroupSelector from "@/components/PageGroupSelector";
 import { motion, AnimatePresence } from "framer-motion";
 import SettingsButton from "@/components/SettingsButton";
@@ -15,7 +15,7 @@ const CATEGORY_FILTERS = [
   ...CATEGORY_OPTIONS,
 ];
 
-const SpecialDaysPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
+const SpecialDaysPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => void; onOpenMore?: () => void }) => {
   const { user, activeGroup, groups } = useAuth();
   const [days, setDays] = useState<SpecialDay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -207,6 +207,11 @@ const SpecialDaysPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) =>
             {showSearch ? <X size={14} /> : <Search size={14} />}
           </button>
           {onOpenSettings && <SettingsButton onClick={onOpenSettings} />}
+          {onOpenMore && (
+            <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+              <MoreHorizontal size={15} color="#888" />
+            </button>
+          )}
         </div>
       </div>
 

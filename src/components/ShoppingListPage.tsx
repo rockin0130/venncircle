@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Trash2, ShoppingCart, Check, X, ChevronRight } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, Check, X, ChevronRight, MoreHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, Group, GroupMember } from "@/context/AuthContext";
 import { Input } from "@/components/ui/input";
@@ -44,7 +44,7 @@ interface ShoppingListItem {
 
 const PERSONAL_SENTINEL = "__personal__";
 
-const ShoppingListPage = () => {
+const ShoppingListPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
   const { user, groups } = useAuth();
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [items, setItems] = useState<ShoppingListItem[]>([]);
@@ -469,6 +469,11 @@ const ShoppingListPage = () => {
               </p>
             )}
           </div>
+          {onOpenMore && (
+            <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+              <MoreHorizontal size={15} color="#888" />
+            </button>
+          )}
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, Mic, MicOff, Sparkles, Loader2, ArrowLeft, CheckCircle2, XCircle, Check, Image as ImageIcon, Camera, X, Menu, Plus } from "lucide-react";
+import { Send, Mic, MicOff, Sparkles, Loader2, ArrowLeft, CheckCircle2, XCircle, Check, Image as ImageIcon, Camera, X, Menu, Plus, MoreHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
@@ -75,7 +75,7 @@ const ACTION_LABELS: Record<string, string> = {
 // Thread auto-split: 30 minutes of inactivity = new thread
 const THREAD_SPLIT_MS = 30 * 60 * 1000;
 
-const AiAssistantPage = ({ onBack }: { onBack?: () => void }) => {
+const AiAssistantPage = ({ onBack, onOpenMore }: { onBack?: () => void; onOpenMore?: () => void }) => {
   const { user, profile, groups, activeGroup } = useAuth();
   const appContext = useAppContext();
   const [messages, setMessages] = useState<AiMessage[]>([]);
@@ -588,6 +588,11 @@ const AiAssistantPage = ({ onBack }: { onBack?: () => void }) => {
             >
               <Menu size={18} />
             </button>
+            {onOpenMore && (
+              <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+                <MoreHorizontal size={15} color="#888" />
+              </button>
+            )}
           </div>
         </div>
       </header>

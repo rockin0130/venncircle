@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Clock, Flame, Check, Trash2, ChevronDown, ChevronUp, Loader2, X, Dumbbell, AlertTriangle, Target, ArrowRight, RotateCcw, Calendar as CalIcon, Plus, Pencil, Settings, Heart, Gauge, Mountain, Footprints, Smartphone, ImageIcon, History, CloudDownload, Bell, ClipboardList } from "lucide-react";
+import { Clock, Flame, Check, Trash2, ChevronDown, ChevronUp, Loader2, X, Dumbbell, AlertTriangle, Target, ArrowRight, RotateCcw, Calendar as CalIcon, Plus, Pencil, Settings, Heart, Gauge, Mountain, Footprints, Smartphone, ImageIcon, History, CloudDownload, Bell, ClipboardList, MoreHorizontal } from "lucide-react";
 import CustomWorkoutBuilder from "@/components/CustomWorkoutBuilder";
 import WorkoutAiSuggest from "@/components/WorkoutAiSuggest";
 import GroupBadge from "@/components/GroupBadge";
@@ -323,7 +323,7 @@ const USER_BORDER_COLORS = [
   "border-l-purple-400",
 ];
 
-const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) => {
+const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => void; onOpenMore?: () => void } = {}) => {
   const { workouts, filteredWorkouts, filteredPartnerWorkouts, toggleWorkout, removeWorkout, removeWorkoutsByFilter, updateWorkout, setWorkouts, addWorkouts, rescheduleWorkout, rescheduleWorkoutCascade } = useAppContext();
   const { user, profile, activeGroup, groups } = useAuth();
   const [showCongrats, setShowCongrats] = useState(false);
@@ -764,6 +764,11 @@ const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) 
           >
             <Plus size={18} />
           </button>
+          {onOpenMore && (
+            <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+              <MoreHorizontal size={15} color="#888" />
+            </button>
+          )}
         </div>
       </header>
 
