@@ -6,7 +6,7 @@ import { useAppContext, Workout } from "@/context/AppContext";
 import { Droplets, Dumbbell, Trophy, Check, Flame, Heart, Apple, Sparkles, ShoppingCart } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
-import { SpecialDay as SpecialDayFull, getDisplayLabel as sdGetDisplayLabel } from "@/components/special-days/SpecialDayTypes";
+
 
 const fmtDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -381,85 +381,6 @@ export const HomeSobrietyWidget = ({ selectedDate, selectedTrackerIds }: { selec
   );
 };
 
-export const HomeSpecialDaysWidget = ({ selectedDate, selectedDayIds }: { selectedDate: Date; selectedDayIds: string[] }) => {
-  const { user, activeGroup, groups } = useAuth();
-  const [specialDays, setSpecialDays] = useState<SpecialDayFull[]>([]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const load = async () => {
-      let q = supabase
-        .from("special_days")
-        .select("*")
-        .order("is_featured", { ascending: false })
-        .order("event_date", { ascending: true });
-
-      if (activeGroup) {
-        // Group view: shared with this group + private events in this context for this user
-        q = q.or(
-          `shared_group_ids.cs.{${activeGroup.id}},and(context_group_id.eq.${activeGroup.id},user_id.eq.${user.id},shared_group_ids.eq.{})`
-        );
-      }
-      // "All" view: RLS returns own events + events shared with user's groups
-
-      const { data } = await q;
-      if (data) setSpecialDays(data as unknown as SpecialDayFull[]);
-    };
-
-    load();
-  }, [user, activeGroup?.id, groups.length]);
-
-  const refDate = useMemo(() => {
-    const d = new Date(selectedDate);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, [selectedDate]);
-
-  const selectedDays = useMemo(() => {
-    if (selectedDayIds.length === 0) return [];
-    const map = new Map(specialDays.map((d) => [d.id, d]));
-    return selectedDayIds.map((id) => map.get(id)).filter((d): d is SpecialDayFull => Boolean(d));
-  }, [specialDays, selectedDayIds]);
-
-  if (selectedDays.length === 0) {
-    return (
-      <div>
-        <h2 className="text-lg font-semibold tracking-display mb-3 flex items-center gap-2">
-          <Heart size={18} className="text-primary" /> Special Days
-        </h2>
-        <div className="bg-card rounded-xl p-3 shadow-card border border-border">
-          <p className="text-xs text-muted-foreground">No special days selected — choose them in Customize Home</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <h2 className="text-lg font-semibold tracking-display mb-3 flex items-center gap-2">
-        <Heart size={18} className="text-primary" /> Special Days
-      </h2>
-      <div className="bg-card rounded-xl p-3 shadow-card border border-border space-y-1.5">
-        {selectedDays.slice(0, 4).map((day) => {
-          const label = sdGetDisplayLabel(day as any, refDate);
-          return (
-            <div key={day.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 bg-secondary/40">
-              <span className="text-sm">{day.icon}</span>
-              <span className="flex-1 text-xs font-medium truncate">{day.title}</span>
-              <span className="text-[11px] font-bold text-primary whitespace-nowrap">
-                {label.primary}
-              </span>
-            </div>
-          );
-        })}
-        {selectedDays.length > 4 && (
-          <p className="text-[10px] text-muted-foreground px-1">+{selectedDays.length - 4} more selected</p>
-        )}
-      </div>
-    </div>
-  );
-};
 
 /** Dynamic Habit Section widget for Home page — date-aware */
 export const HomeHabitSectionWidget = ({ selectedDate, categoryKey, sectionLabel, sectionIcon }: {
