@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight } from "lucide-react";
+import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight, Droplets } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
 import { formatTime } from "@/lib/formatTime";
 import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 
 type UnifiedScheduledItem = {
