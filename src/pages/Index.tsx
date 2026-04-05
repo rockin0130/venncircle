@@ -42,6 +42,7 @@ const Index = () => {
   const [chatGroup, setChatGroup] = useState<Group | null>(null);
   const [chatMode, setChatMode] = useState<"list" | "chat">("list");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [createGroupCategory, setCreateGroupCategory] = useState<"home" | "interest" | undefined>(undefined);
   const [hubGroup, setHubGroup] = useState<Group | null>(null);
