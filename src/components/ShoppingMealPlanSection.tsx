@@ -109,7 +109,7 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
             {orgResult && (
               <>
                 <SmartToggle labels={orgResult.toggle_labels} viewMode={viewMode} onSwitch={setViewMode} />
-                {viewMode === "organized" && <AiBadge duplicatesMerged={orgResult.duplicates_merged} />}
+                {viewMode === "organized" && <AiBadge />}
               </>
             )}
 
