@@ -239,15 +239,15 @@ const Index = () => {
       />
     ) : null,
     profile: <ProfilePage onNavigate={(tab) => setActiveTab(tab as FullTab)} onOpenSettings={handleOpenSettings} onOpenMore={() => setMoreOpen(true)} />,
-    workout: <WorkoutsPage />,
-    nutrition: <NutritionPage />,
-    habits: <HabitsPage />,
-    sobriety: <SobrietyPage />,
-    specialdays: <SpecialDaysPage />,
-    shopping: <ShoppingListPage />,
-    calendar: <CalendarPage />,
+    workout: <WorkoutsPage onOpenMore={() => setMoreOpen(true)} />,
+    nutrition: <NutritionPage onOpenMore={() => setMoreOpen(true)} />,
+    habits: <HabitsPage onOpenMore={() => setMoreOpen(true)} />,
+    sobriety: <SobrietyPage onOpenMore={() => setMoreOpen(true)} />,
+    specialdays: <SpecialDaysPage onOpenMore={() => setMoreOpen(true)} />,
+    shopping: <ShoppingListPage onOpenMore={() => setMoreOpen(true)} />,
+    calendar: <CalendarPage onOpenMore={() => setMoreOpen(true)} />,
     chat: renderChatView(),
-    ai: <AiAssistantPage />,
+    ai: <AiAssistantPage onOpenMore={() => setMoreOpen(true)} />,
     settings: <SettingsPage />,
   };
 
