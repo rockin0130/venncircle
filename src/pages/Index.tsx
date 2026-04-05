@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence, useMotionValue, PanInfo } from "framer-motion";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import MorePage from "@/components/MorePage";
 import BottomNav, { type Tab, loadNavPages, saveNavPages, FIXED_NAV_PAGES, MAX_NAV_SLOTS } from "@/components/BottomNav";
 import HomePage from "@/components/HomePage";
@@ -41,6 +42,7 @@ const Index = () => {
   const [chatGroup, setChatGroup] = useState<Group | null>(null);
   const [chatMode, setChatMode] = useState<"list" | "chat">("list");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [createGroupCategory, setCreateGroupCategory] = useState<"home" | "interest" | undefined>(undefined);
   const [hubGroup, setHubGroup] = useState<Group | null>(null);
@@ -211,27 +213,12 @@ const Index = () => {
     chat: renderChatView(),
     ai: <AiAssistantPage />,
     settings: <SettingsPage />,
-    more: (
-      <MorePage
-        navPages={navPages}
-        onNavigate={handleTabChange}
-        onAddToNav={() => {}}
-        onRemoveFromNav={() => {}}
-        onReplaceInNav={() => {}}
-        onOpenSettings={handleOpenSettings}
-        navStyle={navStyle}
-        onNavStyleChange={setNavStyle}
-        weekStart={weekStart}
-        onWeekStartChange={setWeekStart}
-        onBack={() => setActiveTab("home")}
-      />
-    ),
   };
 
   const isInnerPage = activeTab !== "launcher";
   const showBottomNav = isInnerPage && navStyle === "bottom";
   const showDrawerButton = isInnerPage && navStyle === "drawer";
-  const showFloatingMoreButton = isInnerPage && navStyle === "bottom" && !["more", "ai", "settings", "launcher"].includes(activeTab);
+  const showFloatingMoreButton = isInnerPage && navStyle === "bottom" && !["ai", "settings", "launcher"].includes(activeTab);
 
   return (
     <AppProvider>
@@ -290,13 +277,32 @@ const Index = () => {
 
         {showFloatingMoreButton && (
           <button
-            onClick={() => setActiveTab("more")}
+            onClick={() => setMoreOpen(true)}
             className="fixed top-3 left-3 z-50 w-10 h-10 rounded-full bg-card/80 backdrop-blur-sm border border-border shadow-sm flex items-center justify-center text-foreground hover:bg-secondary transition-colors"
             aria-label="More"
           >
             <MoreHorizontal size={20} />
           </button>
         )}
+
+        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+          <SheetContent side="left" className="w-72 p-0 flex flex-col bg-card">
+            <div className="flex-1 overflow-y-auto">
+              <MorePage
+                navPages={navPages}
+                onNavigate={(tab) => { handleTabChange(tab); setMoreOpen(false); }}
+                onAddToNav={() => {}}
+                onRemoveFromNav={() => {}}
+                onReplaceInNav={() => {}}
+                onOpenSettings={() => { handleOpenSettings(); setMoreOpen(false); }}
+                navStyle={navStyle}
+                onNavStyleChange={setNavStyle}
+                weekStart={weekStart}
+                onWeekStartChange={setWeekStart}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {showDrawerButton && (
           <DrawerMenuButton onClick={() => setDrawerOpen(true)} />
