@@ -15,6 +15,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 interface ShoppingList {
   id: string;
@@ -52,6 +58,23 @@ const ShoppingListPage = () => {
   const [pendingGroceryItem, setPendingGroceryItem] = useState<string | null>(null);
   const [selectedSubCard, setSelectedSubCard] = useState<{ listId: string; mealName: string | null; label: string }>({ listId: "", mealName: null, label: "" });
   const [grocerySubCardOptions, setGrocerySubCardOptions] = useState<{ listId: string; mealName: string | null; label: string }[]>([]);
+
+  // Card-level add sheet state
+  type CardAddTarget = {
+    type: "manual";
+    listId: string;
+    label: string;
+  } | {
+    type: "grocery";
+    lists: ShoppingList[];
+  };
+  const [cardAddOpen, setCardAddOpen] = useState(false);
+  const [cardAddTarget, setCardAddTarget] = useState<CardAddTarget | null>(null);
+  const [cardAddText, setCardAddText] = useState("");
+  const [cardAddSubCard, setCardAddSubCard] = useState<{ listId: string; mealName: string | null; label: string }>({ listId: "", mealName: null, label: "" });
+  const [cardAddSubOptions, setCardAddSubOptions] = useState<{ listId: string; mealName: string | null; label: string }[]>([]);
+  const [showNewGroupInput, setShowNewGroupInput] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
 
   const [localContextId, setLocalContextId] = useState<string>(PERSONAL_SENTINEL);
 
@@ -298,6 +321,106 @@ const ShoppingListPage = () => {
     setNewItemText((prev) => ({ ...prev, [listId]: "" }));
   };
 
+  const openCardAddSheet = (target: CardAddTarget) => {
+    setCardAddTarget(target);
+    setCardAddText("");
+    setShowNewGroupInput(false);
+    setNewGroupName("");
+
+    if (target.type === "grocery") {
+      // Build sub-card options from grocery lists
+      const groceryItems = items.filter((i) => target.lists.some((l) => l.id === i.list_id));
+      const opts: { listId: string; mealName: string | null; label: string }[] = [];
+      target.lists.forEach((gl) => {
+        // Add the list itself as an option (e.g. "Week of 4/6 – 4/12")
+        opts.push({ listId: gl.id, mealName: null, label: gl.label });
+        // Add meal sub-groups inside this list
+        const mealNames = new Set(
+          groceryItems.filter((i) => i.list_id === gl.id && i.meal_name).map((i) => i.meal_name!)
+        );
+        mealNames.forEach((mn) => {
+          opts.push({ listId: gl.id, mealName: mn, label: `${gl.label} → ${mn}` });
+        });
+      });
+      const otherOpt = { listId: "", mealName: null, label: "Other" };
+      setCardAddSubOptions([...opts, otherOpt]);
+      setCardAddSubCard(otherOpt);
+    } else {
+      setCardAddSubOptions([]);
+      setCardAddSubCard({ listId: "", mealName: null, label: "" });
+    }
+    setCardAddOpen(true);
+  };
+
+  const handleCardAddConfirm = async () => {
+    if (!user || !cardAddText.trim() || !cardAddTarget) return;
+    const itemName = cardAddText.trim();
+
+    if (cardAddTarget.type === "manual") {
+      await addItem(cardAddTarget.listId, itemName);
+    } else {
+      // Grocery — determine target
+      if (showNewGroupInput && newGroupName.trim()) {
+        // Create a new sub-card (shopping_list) with custom name
+        const insertData: any = {
+          user_id: user.id,
+          label: newGroupName.trim(),
+          is_meal_plan: true,
+        };
+        if (groupId) insertData.group_id = groupId;
+        const { data: newList, error: listErr } = await supabase
+          .from("shopping_lists")
+          .insert(insertData)
+          .select()
+          .single();
+        if (listErr || !newList) {
+          toast({ title: "Error creating list", variant: "destructive" });
+          return;
+        }
+        setLists((prev) => [...prev, newList as ShoppingList]);
+        await addItem(newList.id, itemName);
+      } else if (cardAddSubCard.label === "Other") {
+        // Create an "Other" sub-card
+        const insertData: any = {
+          user_id: user.id,
+          label: "Other",
+          is_meal_plan: true,
+        };
+        if (groupId) insertData.group_id = groupId;
+        const { data: newList, error: listErr } = await supabase
+          .from("shopping_lists")
+          .insert(insertData)
+          .select()
+          .single();
+        if (listErr || !newList) {
+          toast({ title: "Error creating list", variant: "destructive" });
+          return;
+        }
+        setLists((prev) => [...prev, newList as ShoppingList]);
+        await addItem(newList.id, itemName);
+      } else {
+        // Add to existing list with optional meal_name
+        const { data, error } = await supabase
+          .from("shopping_list_items")
+          .insert({
+            list_id: cardAddSubCard.listId,
+            user_id: user.id,
+            name: itemName,
+            meal_name: cardAddSubCard.mealName,
+          })
+          .select()
+          .single();
+        if (!error && data) {
+          setItems((prev) => [...prev, data as ShoppingListItem]);
+        }
+      }
+    }
+
+    setCardAddOpen(false);
+    setCardAddTarget(null);
+    setCardAddText("");
+  };
+
   const mealPlanLists = lists.filter((l) => l.is_meal_plan);
   const manualLists = lists.filter((l) => !l.is_meal_plan);
 
@@ -472,11 +595,7 @@ const ShoppingListPage = () => {
                 onToggle={toggleItem}
                 onDelete={deleteItem}
                 onDeleteList={deleteList}
-                newItemText={newItemText[primaryList.id] || ""}
-                onNewItemTextChange={(t) =>
-                  setNewItemText((prev) => ({ ...prev, [primaryList.id]: t }))
-                }
-                onAddItem={() => handleInlineAdd(primaryList.id)}
+                onAddToCard={() => openCardAddSheet({ type: "manual", listId: primaryList.id, label })}
                 isGroupView={false}
                 onNudge={() => {}}
                 isMineView={true}
@@ -493,11 +612,7 @@ const ShoppingListPage = () => {
               onToggle={toggleItem}
               onDelete={deleteItem}
               onDeleteList={deleteList}
-              newItemText={newItemText[list.id] || ""}
-              onNewItemTextChange={(t) =>
-                setNewItemText((prev) => ({ ...prev, [list.id]: t }))
-              }
-              onAddItem={() => handleInlineAdd(list.id)}
+              onAddToCard={() => openCardAddSheet({ type: "manual", listId: list.id, label: list.label })}
               isGroupView={isGroupView}
               onNudge={() => setNudgeOpen(true)}
             />
@@ -517,6 +632,7 @@ const ShoppingListPage = () => {
             onNudge={() => setNudgeOpen(true)}
             isMineView={isMineView}
             listGroupLabelMap={listGroupLabelMap}
+            onAddToCard={() => openCardAddSheet({ type: "grocery", lists: mealPlanLists })}
           />
         )}
       </div>
@@ -612,6 +728,104 @@ const ShoppingListPage = () => {
           </Button>
         </DialogContent>
       </Dialog>
+
+      {/* Card-level add sheet */}
+      <Sheet open={cardAddOpen} onOpenChange={(open) => {
+        if (!open) {
+          setCardAddOpen(false);
+          setCardAddTarget(null);
+          setShowNewGroupInput(false);
+          setNewGroupName("");
+        }
+      }}>
+        <SheetContent side="bottom" className="rounded-t-2xl px-5 pb-8">
+          <SheetHeader className="pb-3">
+            <SheetTitle className="text-base">
+              Add to {cardAddTarget?.type === "grocery" ? "Grocery" : cardAddTarget?.type === "manual" ? cardAddTarget.label : ""}
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="space-y-4">
+            <Input
+              value={cardAddText}
+              onChange={(e) => setCardAddText(e.target.value)}
+              placeholder="Item name..."
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && cardAddText.trim()) handleCardAddConfirm();
+              }}
+            />
+
+            {/* Sub-card selector — only for Grocery */}
+            {cardAddTarget?.type === "grocery" && cardAddSubOptions.length > 0 && !showNewGroupInput && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">Add to…</p>
+                <div className="max-h-48 overflow-y-auto space-y-1 -mx-1 px-1">
+                  {cardAddSubOptions.map((opt, idx) => {
+                    const isSelected = cardAddSubCard.listId === opt.listId && cardAddSubCard.mealName === opt.mealName && cardAddSubCard.label === opt.label;
+                    return (
+                      <button
+                        key={`${opt.listId}-${opt.mealName ?? "x"}-${idx}`}
+                        onClick={() => setCardAddSubCard(opt)}
+                        className={`flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm transition-all ${
+                          isSelected
+                            ? "bg-primary/10 text-primary font-semibold border border-primary/30"
+                            : "text-foreground hover:bg-secondary/50 border border-transparent"
+                        }`}
+                      >
+                        <ChevronRight size={12} className={isSelected ? "text-primary" : "text-muted-foreground"} />
+                        <span className="truncate">{opt.label}</span>
+                        {isSelected && <Check size={14} className="ml-auto text-primary shrink-0" />}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setShowNewGroupInput(true)}
+                    className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-secondary/50 border border-transparent transition-all"
+                  >
+                    <Plus size={12} />
+                    <span>Create new group…</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Create new group input */}
+            {cardAddTarget?.type === "grocery" && showNewGroupInput && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">New group name</p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="e.g. Snacks, Party, etc."
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newGroupName.trim() && cardAddText.trim()) handleCardAddConfirm();
+                    }}
+                  />
+                  <Button size="icon" variant="ghost" onClick={() => { setShowNewGroupInput(false); setNewGroupName(""); }}>
+                    <X size={16} />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <Button
+              className="w-full"
+              disabled={!cardAddText.trim() || (showNewGroupInput && !newGroupName.trim())}
+              onClick={handleCardAddConfirm}
+            >
+              {cardAddTarget?.type === "grocery" && !showNewGroupInput
+                ? `Add to ${cardAddSubCard.label || "Grocery"}`
+                : showNewGroupInput && newGroupName.trim()
+                  ? `Add to ${newGroupName.trim()}`
+                  : "Add"
+              }
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
@@ -638,9 +852,7 @@ interface ListSectionProps {
   onToggle: (id: string, checked: boolean) => void;
   onDelete: (id: string) => void;
   onDeleteList: (id: string) => void;
-  newItemText: string;
-  onNewItemTextChange: (text: string) => void;
-  onAddItem: () => void;
+  onAddToCard: () => void;
   isGroupView: boolean;
   onNudge: () => void;
   isMineView?: boolean;
@@ -663,9 +875,7 @@ const ListSection = ({
   onToggle,
   onDelete,
   onDeleteList,
-  newItemText,
-  onNewItemTextChange,
-  onAddItem,
+  onAddToCard,
   isGroupView,
   onNudge,
   isMineView,
@@ -688,6 +898,12 @@ const ListSection = ({
           </span>
           {isGroupView && <NudgePill onClick={onNudge} />}
           <button
+            onClick={onAddToCard}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+          >
+            <Plus size={14} />
+          </button>
+          <button
             onClick={() => onDeleteList(list.id)}
             className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
           >
@@ -706,19 +922,6 @@ const ListSection = ({
             groupLabel={isMineView ? listGroupLabelMap?.[item.list_id] : undefined}
           />
         ))}
-
-        <div className="flex items-center gap-2 px-4 py-2">
-          <Plus size={14} className="text-muted-foreground shrink-0" />
-          <input
-            value={newItemText}
-            onChange={(e) => onNewItemTextChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onAddItem();
-            }}
-            placeholder="Add item..."
-            className="flex-1 text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
-          />
-        </div>
 
         {checked.length > 0 && (
           <>
