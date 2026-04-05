@@ -389,38 +389,31 @@ const SettingsPage = () => {
         )}
       </div>
 
-      {/* Google Calendar Integration (account-level) */}
+      {/* Google Calendar Integration */}
       <div className="bg-card rounded-xl border border-border shadow-card mb-6 overflow-hidden">
         <div className="p-4">
           <div className="flex items-center gap-3 mb-3">
             <Calendar size={16} className="text-primary" />
-            <span className="text-sm font-semibold">Google Calendar Sync</span>
+            <span className="text-sm font-semibold">Google Calendar</span>
           </div>
-          <p className="text-xs text-muted-foreground mb-3">
-            Connect your Google Calendar once to sync events across Personal, All, and shared groups.
-          </p>
-
           {gcalConnected === null ? (
             <div className="flex items-center justify-center py-3">
               <Loader2 size={16} className="animate-spin text-muted-foreground" />
             </div>
           ) : gcalConnected ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
-                <span className="text-xl">📅</span>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-primary">Connected</p>
-                  <p className="text-xs text-muted-foreground">Your Google calendars are available everywhere</p>
-                </div>
-                <Check size={16} className="text-primary" />
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/20">
+                <span className="text-sm">📅</span>
+                <span className="flex-1 text-xs font-medium text-primary">Connected</span>
+                <Check size={14} className="text-primary" />
               </div>
               <button
                 onClick={handleDisconnectGoogleCalendar}
                 disabled={gcalLoading}
-                className="w-full py-2.5 rounded-xl border border-destructive/30 text-destructive text-sm font-semibold hover:bg-destructive/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-2 rounded-lg border border-destructive/30 text-destructive text-xs font-semibold hover:bg-destructive/10 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
-                {gcalLoading ? <Loader2 size={16} className="animate-spin" /> : <Unlink size={16} />}
-                Disconnect Google Calendar
+                {gcalLoading ? <Loader2 size={12} className="animate-spin" /> : <Unlink size={12} />}
+                Disconnect
               </button>
             </div>
           ) : (
@@ -429,10 +422,9 @@ const SettingsPage = () => {
               disabled={gcalLoading}
               className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
-              <span className="text-xl">📅</span>
+              <span className="text-lg">📅</span>
               <div className="flex-1 text-left">
                 <p className="text-sm font-semibold">Connect Google Calendar</p>
-                <p className="text-xs opacity-80">Sync your calendars across the app</p>
               </div>
               {gcalLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
             </button>
