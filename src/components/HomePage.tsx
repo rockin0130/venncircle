@@ -865,7 +865,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
         order={sectionOrder}
         visible={sectionVisible}
         selectedSobrietyIds={selectedSobrietyIds}
-        selectedSpecialDayIds={selectedSpecialDayIds}
+        selectedSpecialDayIds={[]}
         selectedHabitSubIds={selectedHabitSubIds}
         onSave={handleSaveSections}
       />
