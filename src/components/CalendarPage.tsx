@@ -178,7 +178,7 @@ interface CalendarRecord {
 
 // ── Main Component ──────────────────────────────────────────
 
-const CalendarPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) => {
+const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => void; onOpenMore?: () => void } = {}) => {
   const {
     events, filteredEvents, removeEvent, rescheduleEvent,
     tasks, filteredTasks, toggleTask, removeTask,
