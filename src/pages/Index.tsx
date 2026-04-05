@@ -221,6 +221,7 @@ const Index = () => {
     specialdays: <SpecialDaysPage onOpenMore={() => setMoreOpen(true)} />,
     shopping: <ShoppingListPage onOpenMore={() => setMoreOpen(true)} />,
     calendar: <CalendarPage onOpenMore={() => setMoreOpen(true)} />,
+    study: <StudyPage onOpenMore={() => setMoreOpen(true)} />,
     chat: renderChatView(),
     ai: <AiAssistantPage onOpenMore={() => setMoreOpen(true)} />,
     settings: <SettingsPage />,
