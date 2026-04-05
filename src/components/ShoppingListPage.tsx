@@ -66,16 +66,21 @@ const ShoppingListPage = () => {
     if (!user) return;
     setLoading(true);
 
+    const isEveryone = selectedUserIds.has(EVERYONE_SENTINEL);
+
     let listQuery = supabase
       .from("shopping_lists")
       .select("*")
-      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (groupId) {
       listQuery = listQuery.eq("group_id", groupId);
+      // Filter by selected users unless "Everyone" is selected
+      if (!isEveryone) {
+        listQuery = listQuery.in("user_id", [...selectedUserIds]);
+      }
     } else {
-      listQuery = listQuery.is("group_id", null);
+      listQuery = listQuery.eq("user_id", user.id).is("group_id", null);
     }
 
     const { data: listsData } = await listQuery;
