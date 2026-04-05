@@ -323,7 +323,7 @@ const USER_BORDER_COLORS = [
   "border-l-purple-400",
 ];
 
-const WorkoutsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) => {
+const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => void; onOpenMore?: () => void } = {}) => {
   const { workouts, filteredWorkouts, filteredPartnerWorkouts, toggleWorkout, removeWorkout, removeWorkoutsByFilter, updateWorkout, setWorkouts, addWorkouts, rescheduleWorkout, rescheduleWorkoutCascade } = useAppContext();
   const { user, profile, activeGroup, groups } = useAuth();
   const [showCongrats, setShowCongrats] = useState(false);
