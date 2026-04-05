@@ -214,7 +214,6 @@ const Index = () => {
   };
 
   const pages: Record<string, React.ReactNode> = {
-    launcher: <LauncherPage onEnterGroup={handleEnterGroup} onOpenSettings={handleOpenSettings} />,
     home: <HomePage onOpenSettings={handleOpenSettings} onNavigate={(page) => handleNavigateToFeature(page)} />,
     "shared-interests": (
       <SharedInterestsPage
