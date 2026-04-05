@@ -199,7 +199,7 @@ const AiAssistantPage = ({ onBack }: { onBack?: () => void }) => {
     const existingNames = new Set((existingItems || []).map((it: any) => (it.name as string).toLowerCase().trim()));
     const newItems = selectedItems.filter(name => !existingNames.has(name.toLowerCase().trim()));
     if (newItems.length > 0) {
-      const rows = newItems.map(name => ({ list_id: listId, user_id: user.id, name }));
+      const rows = newItems.map(name => ({ list_id: listId, user_id: user.id, name, meal_name: shopPrompt.mealTitle }));
       await supabase.from("shopping_list_items").insert(rows);
     }
 
