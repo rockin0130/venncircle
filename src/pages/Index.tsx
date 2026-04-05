@@ -71,7 +71,6 @@ const Index = () => {
   }
 
   const handleEnterGroup = (groupId: string | null) => {
-    resetHomeSwipeState();
     if (groupId) {
       const group = groups.find((g) => g.id === groupId);
       if (group) setActiveGroup(group);
@@ -79,7 +78,6 @@ const Index = () => {
       setActiveGroup(null);
     }
     setActiveTab("home");
-    requestAnimationFrame(resetHomeSwipeState);
   };
 
 
