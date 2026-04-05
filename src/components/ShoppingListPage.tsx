@@ -595,11 +595,7 @@ const ShoppingListPage = () => {
                 onToggle={toggleItem}
                 onDelete={deleteItem}
                 onDeleteList={deleteList}
-                newItemText={newItemText[primaryList.id] || ""}
-                onNewItemTextChange={(t) =>
-                  setNewItemText((prev) => ({ ...prev, [primaryList.id]: t }))
-                }
-                onAddItem={() => handleInlineAdd(primaryList.id)}
+                onAddToCard={() => openCardAddSheet({ type: "manual", listId: primaryList.id, label })}
                 isGroupView={false}
                 onNudge={() => {}}
                 isMineView={true}
