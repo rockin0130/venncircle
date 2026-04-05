@@ -421,6 +421,7 @@ const ShoppingListPage = () => {
     setCardAddText("");
   };
 
+  const mealPlanLists = lists.filter((l) => l.is_meal_plan);
   const manualLists = lists.filter((l) => !l.is_meal_plan);
 
   // In Mine aggregate view, group manual lists by label
