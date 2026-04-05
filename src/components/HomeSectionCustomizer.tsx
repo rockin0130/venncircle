@@ -22,6 +22,7 @@ export const FIXED_SECTIONS: HomeSection[] = [
   { id: "sobriety", label: "Sobriety Tracker", icon: "🏆" },
   { id: "special-days", label: "Special Days", icon: "❤️" },
   { id: "shopping", label: "Shopping List", icon: "🛒" },
+  { id: "study", label: "Study", icon: "📖" },
 ];
 
 // Keep for backward compat — no longer adds dynamic habit sections at top level
