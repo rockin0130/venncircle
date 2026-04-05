@@ -15,6 +15,7 @@ import SobrietyPage from "@/components/SobrietyPage";
 import SpecialDaysPage from "@/components/SpecialDaysPage";
 import SettingsPage from "@/components/SettingsPage";
 import ShoppingListPage from "@/components/ShoppingListPage";
+import StudyPage from "@/components/StudyPage";
 
 import AuthPage from "@/components/AuthPage";
 import ProfileSetupPage from "@/components/ProfileSetupPage";
@@ -99,6 +100,7 @@ const Index = () => {
       specialdays: "special_days",
       calendar: "calendar",
       shopping: "shopping",
+      study: "study",
     };
     const pageKey = TAB_TO_PAGE_KEY[tab];
     if (pageKey && activeGroup && !(activeGroup as any)?._personal) {
@@ -147,6 +149,7 @@ const Index = () => {
     specialdays: "special_days",
     calendar: "calendar",
     shopping: "shopping",
+    study: "study",
   };
 
   const handleNavigateToFeature = (feature: string, groupId?: string) => {
@@ -159,6 +162,7 @@ const Index = () => {
       specialdays: "specialdays",
       calendar: "calendar",
       shopping: "shopping",
+      study: "study",
     };
     const tab = tabMap[feature];
     if (!tab) return;
@@ -217,6 +221,7 @@ const Index = () => {
     specialdays: <SpecialDaysPage onOpenMore={() => setMoreOpen(true)} />,
     shopping: <ShoppingListPage onOpenMore={() => setMoreOpen(true)} />,
     calendar: <CalendarPage onOpenMore={() => setMoreOpen(true)} />,
+    study: <StudyPage onOpenMore={() => setMoreOpen(true)} />,
     chat: renderChatView(),
     ai: <AiAssistantPage onOpenMore={() => setMoreOpen(true)} />,
     settings: <SettingsPage />,
