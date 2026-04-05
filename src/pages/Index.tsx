@@ -162,6 +162,7 @@ const Index = () => {
       specialdays: "specialdays",
       calendar: "calendar",
       shopping: "shopping",
+      study: "study",
     };
     const tab = tabMap[feature];
     if (!tab) return;
