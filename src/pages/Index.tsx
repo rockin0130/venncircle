@@ -231,7 +231,7 @@ const Index = () => {
   const isInnerPage = activeTab !== "launcher";
   const showBottomNav = isInnerPage && navStyle === "bottom";
   const showDrawerButton = isInnerPage && navStyle === "drawer";
-  const showFloatingMoreButton = isInnerPage && navStyle === "bottom" && !["more", "home", "shared-interests", "ai", "chat", "profile"].includes(activeTab);
+  const showFloatingMoreButton = isInnerPage && navStyle === "bottom" && !["more", "ai", "settings", "launcher"].includes(activeTab);
 
   return (
     <AppProvider>
