@@ -319,7 +319,7 @@ const HomeScheduledSection = ({
           const items = periodMap[period];
           const periodHabits = habitsByPeriod[period];
           const config = PERIOD_CONFIG[period];
-          const totalCount = items.length + periodHabits.length;
+          const totalCount = items.length + periodHabits.length + (period === "flexible" && showWater ? 1 : 0);
           return (
             <div key={period}>
               {/* Period separator */}
@@ -329,6 +329,11 @@ const HomeScheduledSection = ({
                 <span className="text-[10px] text-muted-foreground/60">({totalCount})</span>
                 <div className="flex-1 h-px bg-border ml-1" />
               </div>
+
+              {/* Water widget pinned as first item in Flexible */}
+              {period === "flexible" && showWater && (
+                <InlineWaterWidget selectedDate={selectedDate} isToday={isToday} />
+              )}
 
               {/* Habits card at top of period */}
               {periodHabits.length > 0 && (
