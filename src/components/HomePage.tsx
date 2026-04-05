@@ -71,21 +71,36 @@ const QUICK_ACCESS_FEATURES = [
   )},
 ];
 
-const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress }: {
+const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress, onDragReposition }: {
   enabledSections: Set<string>;
   onNavigate?: (page: string) => void;
   isWiggling?: boolean;
   onLongPress?: () => void;
+  onDragReposition?: (direction: "up" | "down") => void;
 }) => {
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragStartY = useRef<number | null>(null);
   const clearLp = () => { if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; } };
   const tiles = QUICK_ACCESS_FEATURES.filter(f => enabledSections.has(f.id));
   if (tiles.length === 0) return null;
 
   return (
-    <section
-      className="mb-6"
-      onPointerDown={() => {
+    <motion.section
+      className="mb-6 select-none"
+      drag={isWiggling ? "y" : false}
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={0.5}
+      onDragStart={(_e, info) => {
+        dragStartY.current = info.point.y;
+      }}
+      onDragEnd={(_e, info) => {
+        const dy = info.offset.y;
+        if (Math.abs(dy) > 50) {
+          onDragReposition?.(dy < 0 ? "up" : "down");
+        }
+        dragStartY.current = null;
+      }}
+      onPointerDown={(e) => {
         if (isWiggling) return;
         clearLp();
         longPressRef.current = setTimeout(() => {
@@ -96,10 +111,16 @@ const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress
       onPointerUp={clearLp}
       onPointerLeave={clearLp}
       onPointerCancel={clearLp}
-      onContextMenu={(e) => e.preventDefault()}
-      onClick={(e) => { if (isWiggling) e.stopPropagation(); }}
+      onContextMenu={(e: React.MouseEvent) => e.preventDefault()}
+      onClick={(e: React.MouseEvent) => { if (isWiggling) e.stopPropagation(); }}
+      style={isWiggling ? { cursor: "grab", zIndex: 50 } : undefined}
     >
-      <div className={`bg-card rounded-xl border p-3 shadow-card transition-all ${isWiggling ? 'border-primary/30 shadow-lg' : 'border-border'}`}>
+      <div className={`bg-card rounded-xl border p-3 shadow-card transition-all ${isWiggling ? 'border-primary/30 shadow-lg ring-2 ring-primary/20' : 'border-border'}`}>
+        {isWiggling && (
+          <div className="flex justify-center mb-1.5">
+            <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
+          </div>
+        )}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {tiles.map((tile, i) => (
             <button
@@ -116,7 +137,7 @@ const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress
           ))}
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 };
 
@@ -740,14 +761,8 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
 
       {/* Wiggle mode banner */}
       {wiggleMode && (
-        <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-xl px-4 py-2.5 mb-4" onClick={(e) => e.stopPropagation()}>
-          <span className="text-xs font-medium text-primary">Tap a zone to reposition Quick Access</span>
-          <button
-            onClick={() => setWiggleMode(false)}
-            className="px-3 py-1 rounded-lg bg-primary text-primary-foreground text-xs font-semibold"
-          >
-            Done
-          </button>
+        <div className="flex items-center justify-center bg-primary/5 border border-primary/20 rounded-xl px-4 py-2.5 mb-4" onClick={(e) => e.stopPropagation()}>
+          <span className="text-xs font-medium text-primary">Drag the strip up or down to reposition</span>
         </div>
       )}
 
@@ -869,16 +884,9 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                           onNavigate={onNavigate}
                           isWiggling={wiggleMode}
                           onLongPress={() => setWiggleMode(true)}
+                          onDragReposition={(dir) => { if (dir === "down") saveQuickAccessPos("below-todo"); }}
                         />
                       </div>
-                    )}
-                    {wiggleMode && quickAccessPos !== "above-scheduled" && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); saveQuickAccessPos("above-scheduled"); }}
-                        className="w-full border-2 border-dashed border-primary/25 rounded-xl py-3 mb-4 text-center text-xs text-primary/50 font-medium hover:border-primary/40 hover:bg-primary/5 transition-all"
-                      >
-                        Move Quick Access here
-                      </button>
                     )}
                     <HomeScheduledSection
                       allDayItems={allDayItems}
@@ -910,14 +918,6 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                       selectedDate={selectedDate}
                       memberFilters={[]}
                     />
-                    {wiggleMode && quickAccessPos !== "below-todo" && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); saveQuickAccessPos("below-todo"); }}
-                        className="w-full border-2 border-dashed border-primary/25 rounded-xl py-3 mb-4 text-center text-xs text-primary/50 font-medium hover:border-primary/40 hover:bg-primary/5 transition-all"
-                      >
-                        Move Quick Access here
-                      </button>
-                    )}
                     {quickAccessPos === "below-todo" && (
                       <div onClick={(e) => e.stopPropagation()}>
                         <QuickAccessStrip
@@ -925,6 +925,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                           onNavigate={onNavigate}
                           isWiggling={wiggleMode}
                           onLongPress={() => setWiggleMode(true)}
+                          onDragReposition={(dir) => { if (dir === "up") saveQuickAccessPos("above-scheduled"); }}
                         />
                       </div>
                     )}
