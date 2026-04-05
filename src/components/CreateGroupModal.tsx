@@ -106,7 +106,9 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
   const stepIdx = allSteps.indexOf(step);
   const stepLabels = ["Members", "Interests", "Details"];
 
-  const selectedFriendProfiles = activeFriends.filter((f) => selectedFriends.has(f.id));
+  // activeFriends are Friendship objects; the friend's user ID is in .friend.id
+  const getFriendUserId = (f: { friend: FriendProfile | null; requester_id: string; addressee_id: string }) => f.friend?.id || "";
+  const selectedFriendItems = activeFriends.filter((f) => selectedFriends.has(getFriendUserId(f)));
 
   return (
     <>
