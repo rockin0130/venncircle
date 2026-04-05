@@ -817,11 +817,6 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                       isViewingMemberName={undefined}
                       showWater={sectionVisible.has("water")}
                     />
-                    {/* Quick Access Strip */}
-                    <QuickAccessStrip
-                      enabledSections={sectionVisible}
-                      onNavigate={onNavigate}
-                    />
                   </div>
                 );
 
