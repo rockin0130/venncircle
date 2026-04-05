@@ -207,6 +207,11 @@ const SpecialDaysPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () =
             {showSearch ? <X size={14} /> : <Search size={14} />}
           </button>
           {onOpenSettings && <SettingsButton onClick={onOpenSettings} />}
+          {onOpenMore && (
+            <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+              <MoreHorizontal size={15} color="#888" />
+            </button>
+          )}
         </div>
       </div>
 

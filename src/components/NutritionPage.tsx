@@ -989,12 +989,19 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
           <h1 className="text-2xl font-bold text-foreground">Nutrition</h1>
           <p className="text-xs text-muted-foreground">{dateLabel}</p>
         </div>
-        <button
-          onClick={() => setShowLogPage(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-secondary text-foreground border border-border hover:bg-muted transition-colors"
-        >
-          <ClipboardList size={14} /> Log
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShowLogPage(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-secondary text-foreground border border-border hover:bg-muted transition-colors"
+          >
+            <ClipboardList size={14} /> Log
+          </button>
+          {onOpenMore && (
+            <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+              <MoreHorizontal size={15} color="#888" />
+            </button>
+          )}
+        </div>
       </div>
 
       <PageGroupSelector page="nutrition" personalLabel="Mine" hideAllPill />

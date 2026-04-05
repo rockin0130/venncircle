@@ -1092,6 +1092,11 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
                 <Settings size={15} />
               </button>
             )}
+            {onOpenMore && (
+              <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+                <MoreHorizontal size={15} color="#888" />
+              </button>
+            )}
           </div>
         </div>
       </header>

@@ -360,13 +360,20 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
           <h1 className="text-[1.75rem] font-bold tracking-display">Habits</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Build a better routine</p>
         </div>
-        <button
-          onClick={() => setAddingToSection(addingToSection ? null : "morning")}
-          className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-md mt-1 active:scale-95 transition-transform"
-          aria-label="Add habit"
-        >
-          <Plus size={18} strokeWidth={2.5} />
-        </button>
+        <div className="flex items-center gap-1.5 mt-1">
+          <button
+            onClick={() => setAddingToSection(addingToSection ? null : "morning")}
+            className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-md active:scale-95 transition-transform"
+            aria-label="Add habit"
+          >
+            <Plus size={18} strokeWidth={2.5} />
+          </button>
+          {onOpenMore && (
+            <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+              <MoreHorizontal size={15} color="#888" />
+            </button>
+          )}
+        </div>
       </header>
 
       <PageGroupSelector page="habits" personalLabel="Mine" hideAllPill />

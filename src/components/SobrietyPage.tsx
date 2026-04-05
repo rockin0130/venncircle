@@ -894,14 +894,21 @@ const SobrietyPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
       <div className="rounded-[30px] border border-[hsl(var(--sobriety-outline))] bg-[hsl(var(--sobriety-shell))] p-4 shadow-card">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-[2rem] font-semibold tracking-[-0.04em] text-foreground">Sobriety</h1>
-          <button
-            type="button"
-            onClick={openBlankDrawer}
-            aria-label="Add tracker"
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-transform active:scale-95"
-          >
-            <Plus className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={openBlankDrawer}
+              aria-label="Add tracker"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-transform active:scale-95"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+            {onOpenMore && (
+              <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+                <MoreHorizontal size={15} color="#888" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 flex gap-2 overflow-x-auto scroll-smooth-touch pb-1">

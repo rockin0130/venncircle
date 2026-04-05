@@ -209,13 +209,20 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
       {/* Header */}
       <header className="px-5 pt-12 pb-3 flex-shrink-0 flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight text-foreground">Explore</h1>
-        <button
-          onClick={onCreateGroup}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-primary text-primary text-xs font-semibold hover:bg-primary/5 transition-colors"
-        >
-          <Plus size={13} />
-          Create / Join
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onCreateGroup}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-primary text-primary text-xs font-semibold hover:bg-primary/5 transition-colors"
+          >
+            <Plus size={13} />
+            Create / Join
+          </button>
+          {onOpenMore && (
+            <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
+              <MoreHorizontal size={15} color="#888" />
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Split container */}
