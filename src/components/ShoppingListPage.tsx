@@ -50,7 +50,7 @@ const ShoppingListPage = () => {
   const [items, setItems] = useState<ShoppingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [newItemText, setNewItemText] = useState<Record<string, string>>({});
-  const [showManualAdd, setShowManualAdd] = useState(false);
+  const [_showManualAdd, _setShowManualAdd] = useState(false); // unused, kept for compatibility
   const [manualItemText, setManualItemText] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [nudgeOpen, setNudgeOpen] = useState(false);
