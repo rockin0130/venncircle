@@ -205,7 +205,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     }
   };
 
-  useModalScrollLock(!!detailMeal || !!showAddMeal || showGoalSettings || showAiResults || !!aiConfirmSelection || !!shopPrompt || !!ideaPreview);
+  useModalScrollLock(!!detailMeal || !!showAddMeal || showGoalSettings || showAiResults || !!aiConfirmSelection || !!shopPrompt || !!ideaPreview || !!shopDestination);
 
   const isPersonalActive = (activeGroup as any)?._personal === true;
   const isAllView = activeGroup === null && !isPersonalActive;
