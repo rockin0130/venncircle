@@ -147,35 +147,41 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
               <p className="text-xs text-muted-foreground">Select friends to add to this group.</p>
 
               {/* Selected member pills */}
-              {selectedFriendProfiles.length > 0 && (
+              {selectedFriendItems.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {selectedFriendProfiles.map((friend) => (
-                    <button
-                      key={friend.id}
-                      onClick={() => toggleFriend(friend.id)}
-                      className="flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary transition-all hover:bg-primary/15"
-                    >
-                      <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[9px] font-bold text-primary overflow-hidden">
-                        {friend.avatar_url ? (
-                          <img src={friend.avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          friend.display_name?.[0]?.toUpperCase() || "?"
-                        )}
-                      </div>
-                      {friend.display_name}
-                      <X size={10} className="ml-0.5" />
-                    </button>
-                  ))}
+                  {selectedFriendItems.map((fs) => {
+                    const f = fs.friend;
+                    if (!f) return null;
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => toggleFriend(f.id)}
+                        className="flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary transition-all hover:bg-primary/15"
+                      >
+                        <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[9px] font-bold text-primary overflow-hidden">
+                          {f.avatar_url ? (
+                            <img src={f.avatar_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            f.display_name?.[0]?.toUpperCase() || "?"
+                          )}
+                        </div>
+                        {f.display_name}
+                        <X size={10} className="ml-0.5" />
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
               <div className="space-y-1.5 max-h-[40vh] overflow-y-auto">
-                {activeFriends.map((friend) => {
-                  const checked = selectedFriends.has(friend.id);
+                {activeFriends.map((fs) => {
+                  const f = fs.friend;
+                  if (!f) return null;
+                  const checked = selectedFriends.has(f.id);
                   return (
                     <button
-                      key={friend.id}
-                      onClick={() => toggleFriend(friend.id)}
+                      key={f.id}
+                      onClick={() => toggleFriend(f.id)}
                       className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
                         checked
                           ? "border-primary bg-primary/5"
@@ -183,13 +189,13 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
                       }`}
                     >
                       <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold text-muted-foreground overflow-hidden flex-shrink-0">
-                        {friend.avatar_url ? (
-                          <img src={friend.avatar_url} alt="" className="w-full h-full object-cover" />
+                        {f.avatar_url ? (
+                          <img src={f.avatar_url} alt="" className="w-full h-full object-cover" />
                         ) : (
-                          friend.display_name?.[0]?.toUpperCase() || "?"
+                          f.display_name?.[0]?.toUpperCase() || "?"
                         )}
                       </div>
-                      <span className="flex-1 text-sm font-medium truncate">{friend.display_name}</span>
+                      <span className="flex-1 text-sm font-medium truncate">{f.display_name}</span>
                       <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-all ${
                         checked ? "border-primary bg-primary" : "border-muted-foreground/30"
                       }`}>
