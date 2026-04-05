@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Trash2, ShoppingCart, Check, X } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, Check, X, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, Group, GroupMember } from "@/context/AuthContext";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import CreateGroupModal from "@/components/CreateGroupModal";
 import ShoppingNudgeSheet, { NudgePill } from "@/components/ShoppingNudgeSheet";
 import ShoppingGroceryCard from "@/components/ShoppingGroceryCard";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ShoppingList {
   id: string;
@@ -42,6 +48,10 @@ const ShoppingListPage = () => {
   const [manualItemText, setManualItemText] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [nudgeOpen, setNudgeOpen] = useState(false);
+  const [groceryPickerOpen, setGroceryPickerOpen] = useState(false);
+  const [pendingGroceryItem, setPendingGroceryItem] = useState<string | null>(null);
+  const [selectedSubCard, setSelectedSubCard] = useState<{ listId: string; mealName: string | null }>({ listId: "", mealName: null });
+  const [grocerySubCardOptions, setGrocerySubCardOptions] = useState<{ listId: string; mealName: string | null; label: string }[]>([]);
 
   const [localContextId, setLocalContextId] = useState<string>(PERSONAL_SENTINEL);
 
@@ -238,6 +248,31 @@ const ShoppingListPage = () => {
         const { category, icon, is_grocery } = catData as { category: string; icon: string; is_grocery: boolean };
 
         if (is_grocery) {
+          const existingGroceryLists = lists.filter((l) => l.is_meal_plan);
+          if (existingGroceryLists.length > 0) {
+            // Build sub-card options from existing grocery lists
+            const groceryItems = items.filter((i) => existingGroceryLists.some((l) => l.id === i.list_id));
+            const subCardOptions: { listId: string; mealName: string | null; label: string }[] = [];
+
+            existingGroceryLists.forEach((gl) => {
+              subCardOptions.push({ listId: gl.id, mealName: null, label: gl.label });
+              const mealNames = new Set(
+                groceryItems.filter((i) => i.list_id === gl.id && i.meal_name).map((i) => i.meal_name!)
+              );
+              mealNames.forEach((mn) => {
+                subCardOptions.push({ listId: gl.id, mealName: mn, label: mn });
+              });
+            });
+
+            // Add "Other" option — uses first grocery list with no meal_name
+            const otherOption = { listId: existingGroceryLists[0].id, mealName: null as string | null, label: "Other" };
+
+            setPendingGroceryItem(itemName);
+            setGrocerySubCardOptions([...subCardOptions, otherOption]);
+            setSelectedSubCard(otherOption);
+            setGroceryPickerOpen(true);
+            return;
+          }
           targetListId = await getOrCreateCategoryList("Grocery", "🛒", true);
         } else if (category && category !== "My Items") {
           targetListId = await getOrCreateCategoryList(category, icon || "📦", false);
@@ -491,6 +526,63 @@ const ShoppingListPage = () => {
         onOpenChange={setNudgeOpen}
         groupMembers={groupMembers}
       />
+
+      {/* Grocery sub-card picker */}
+      <Dialog open={groceryPickerOpen} onOpenChange={(open) => {
+        if (!open) {
+          setGroceryPickerOpen(false);
+          setPendingGroceryItem(null);
+        }
+      }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="text-base">Add to…</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1 max-h-60 overflow-y-auto -mx-1 px-1">
+            {grocerySubCardOptions.map((opt, idx) => {
+              const isSelected = selectedSubCard.listId === opt.listId && selectedSubCard.mealName === opt.mealName;
+              return (
+                <button
+                  key={`${opt.listId}-${opt.mealName ?? "other"}-${idx}`}
+                  onClick={() => setSelectedSubCard(opt)}
+                  className={`flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm transition-all ${
+                    isSelected
+                      ? "bg-primary/10 text-primary font-semibold border border-primary/30"
+                      : "text-foreground hover:bg-secondary/50 border border-transparent"
+                  }`}
+                >
+                  <ChevronRight size={12} className={isSelected ? "text-primary" : "text-muted-foreground"} />
+                  <span className="truncate">{opt.label}</span>
+                  {isSelected && <Check size={14} className="ml-auto text-primary shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+          <Button
+            className="w-full mt-2"
+            onClick={async () => {
+              if (!pendingGroceryItem || !selectedSubCard.listId) return;
+              const { data, error } = await supabase
+                .from("shopping_list_items")
+                .insert({
+                  list_id: selectedSubCard.listId,
+                  user_id: user!.id,
+                  name: pendingGroceryItem,
+                  meal_name: selectedSubCard.mealName,
+                })
+                .select()
+                .single();
+              if (!error && data) {
+                setItems((prev) => [...prev, data as ShoppingListItem]);
+              }
+              setGroceryPickerOpen(false);
+              setPendingGroceryItem(null);
+            }}
+          >
+            Confirm
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
