@@ -761,12 +761,10 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
 
       {/* Wiggle mode banner */}
       {wiggleMode && (
-        <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-xl px-4 py-2.5 mb-4" onClick={(e) => e.stopPropagation()}>
-          <span className="text-xs font-medium text-primary">Tap a zone to reposition Quick Access</span>
-          <button
-            onClick={() => setWiggleMode(false)}
-            className="px-3 py-1 rounded-lg bg-primary text-primary-foreground text-xs font-semibold"
-          >
+        <div className="flex items-center justify-center bg-primary/5 border border-primary/20 rounded-xl px-4 py-2.5 mb-4" onClick={(e) => e.stopPropagation()}>
+          <span className="text-xs font-medium text-primary">Drag the strip up or down to reposition</span>
+        </div>
+      )}
             Done
           </button>
         </div>
