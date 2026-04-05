@@ -189,7 +189,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
     } catch {}
   }, []);
 
-  // Sync quick access position from backend for cross-device persistence
+  // Sync quick access position from backend (only override if DB has a saved value)
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("home_quick_access_position").eq("id", user.id).single()
@@ -198,6 +198,15 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
         if (pos === "above-scheduled" || pos === "below-todo") {
           setQuickAccessPos(pos);
           localStorage.setItem("home_qa_position", pos);
+        }
+        // If DB has no value yet, push localStorage value to DB
+        else {
+          try {
+            const local = localStorage.getItem("home_qa_position");
+            if (local === "above-scheduled" || local === "below-todo") {
+              supabase.from("profiles").update({ home_quick_access_position: local } as any).eq("id", user.id);
+            }
+          } catch {}
         }
       });
   }, [user?.id]);
