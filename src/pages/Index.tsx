@@ -31,7 +31,7 @@ import { useNavStyle } from "@/hooks/useNavStyle";
 import { useWeekStart } from "@/hooks/useWeekStart";
 import { Loader2, MoreHorizontal } from "lucide-react";
 
-type FullTab = "launcher" | Tab;
+type FullTab = Tab;
 
 const SWIPE_THRESHOLD = 80;
 
