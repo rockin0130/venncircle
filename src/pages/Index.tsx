@@ -202,7 +202,7 @@ const Index = () => {
         onNavigateToFeature={handleNavigateToFeature}
       />
     ) : null,
-    profile: <ProfilePage onNavigate={(tab) => setActiveTab(tab as FullTab)} onOpenSettings={handleOpenSettings} />,
+    profile: <ProfilePage onNavigate={(tab) => setActiveTab(tab as FullTab)} onOpenSettings={handleOpenSettings} onOpenMore={() => setMoreOpen(true)} />,
     workout: <WorkoutsPage />,
     nutrition: <NutritionPage />,
     habits: <HabitsPage />,
