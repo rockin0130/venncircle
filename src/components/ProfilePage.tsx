@@ -1,11 +1,51 @@
 import { useState, useEffect, useMemo } from "react";
-import { Search, Info, MoreHorizontal, Plus, Dumbbell, Heart, Shield, Apple, ShoppingCart, Star, Pencil } from "lucide-react";
+import {
+  Search,
+  Info,
+  MoreHorizontal,
+  Plus,
+  Dumbbell,
+  Heart,
+  Shield,
+  Apple,
+  ShoppingCart,
+  Star,
+  Pencil,
+  Bell,
+  Palette,
+  HelpCircle,
+  LogOut,
+  ChevronRight,
+  Calendar,
+  ExternalLink,
+  Unlink,
+  Loader2,
+  Check,
+  Activity,
+} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
+import { requestCalendarPermission, getCalendarEvents, hasCalendarReadPermission } from "@/integrations/appleCalendar";
+import { requestHealthKitReadPermission } from "@/integrations/appleHealth";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import EditProfileModal from "@/components/EditProfileModal";
 import AddFriendModal from "@/components/AddFriendModal";
 import { useFriendships } from "@/hooks/useFriendships";
+
+const appleCalendarRange = () => {
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endDate = new Date(now.getFullYear(), now.getMonth() + 3, 0, 23, 59, 59, 999);
+  return { startDate, endDate };
+};
+
+const settingsItems = [
+  { icon: Bell, label: "Notifications", desc: "Reminders & alerts" },
+  { icon: Shield, label: "Privacy", desc: "Data & sharing" },
+  { icon: Palette, label: "Appearance", desc: "Theme & display" },
+  { icon: HelpCircle, label: "Help & Support", desc: "FAQ & contact" },
+];
 
 interface ProfilePageProps {
   onNavigate?: (tab: string) => void;
@@ -24,12 +64,12 @@ interface ActivityItem {
 }
 
 const FEATURE_COLORS: Record<ActivityItem["type"], { bg: string; text: string }> = {
-  workout:    { bg: "#EEF4FF", text: "#3B82F6" },
-  habits:     { bg: "#ECFDF5", text: "#10B981" },
-  nutrition:  { bg: "#FFF7ED", text: "#F97316" },
-  sobriety:   { bg: "#ECFDF5", text: "#10B981" },
+  workout: { bg: "#EEF4FF", text: "#3B82F6" },
+  habits: { bg: "#ECFDF5", text: "#10B981" },
+  nutrition: { bg: "#FFF7ED", text: "#F97316" },
+  sobriety: { bg: "#ECFDF5", text: "#10B981" },
   specialday: { bg: "#FDF2F8", text: "#EC4899" },
-  shopping:   { bg: "#F5F3FF", text: "#6C47FF" },
+  shopping: { bg: "#F5F3FF", text: "#6C47FF" },
 };
 
 const FEATURE_ICONS: Record<ActivityItem["type"], typeof Dumbbell> = {
@@ -65,12 +105,26 @@ function timeAgo(date: Date) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+const cardStyle = { background: "#fff", borderRadius: 16, border: "0.5px solid rgba(0,0,0,0.07)" } as const;
+
 const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProps) => {
-  const { profile, user, groups } = useAuth();
-  const { habits, workouts, getHabitStreak } = useAppContext();
+  const { profile, user, groups, session, signOut } = useAuth();
+  const {
+    habits,
+    workouts,
+    getHabitStreak,
+    setAppleCalendarEvents,
+    appleFitnessSyncEnabled,
+    setAppleFitnessSyncEnabled,
+  } = useAppContext();
   const { activeFriends } = useFriendships();
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showAddFriend, setShowAddFriend] = useState(false);
+  const [gcalConnected, setGcalConnected] = useState<boolean | null>(null);
+  const [gcalLoading, setGcalLoading] = useState(false);
+  const [appleCalendarConnected, setAppleCalendarConnected] = useState(false);
+  const [appleCalendarLoading, setAppleCalendarLoading] = useState(false);
+  const [appleFitnessLoading, setAppleFitnessLoading] = useState(false);
 
   // ─── Sobriety data ───
   const [sobrietyDays, setSobrietyDays] = useState<number | null>(null);
@@ -91,13 +145,123 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
     })();
   }, [user]);
 
+  useEffect(() => {
+    if (!user) {
+      setGcalConnected(false);
+      return;
+    }
+    const check = async () => {
+      const { data } = await supabase
+        .from("google_calendar_tokens")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      setGcalConnected(!!data);
+    };
+    check();
+  }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const ok = await hasCalendarReadPermission();
+        if (cancelled || !ok) return;
+        const { startDate, endDate } = appleCalendarRange();
+        const events = await getCalendarEvents(startDate, endDate);
+        if (cancelled) return;
+        setAppleCalendarEvents(events);
+        setAppleCalendarConnected(true);
+      } catch {
+        /* Web or unavailable plugin */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [setAppleCalendarEvents]);
+
+  const handleConnectAppleCalendar = async () => {
+    setAppleCalendarLoading(true);
+    try {
+      const { result } = await requestCalendarPermission();
+      if (result !== "granted") {
+        toast.error("Calendar access was denied");
+        return;
+      }
+      const { startDate, endDate } = appleCalendarRange();
+      const events = await getCalendarEvents(startDate, endDate);
+      setAppleCalendarEvents(events);
+      setAppleCalendarConnected(true);
+      toast.success("Apple Calendar connected");
+    } catch {
+      toast.error("Could not connect Apple Calendar");
+    } finally {
+      setAppleCalendarLoading(false);
+    }
+  };
+
+  const handleDisconnectAppleCalendar = () => {
+    setAppleCalendarEvents([]);
+    setAppleCalendarConnected(false);
+  };
+
+  const handleConnectAppleFitness = async () => {
+    setAppleFitnessLoading(true);
+    try {
+      const granted = await requestHealthKitReadPermission();
+      if (!granted) {
+        toast.error("Health data access was denied");
+        return;
+      }
+      setAppleFitnessSyncEnabled(true);
+      toast.success("Apple Fitness sync enabled");
+    } catch {
+      toast.error("Could not enable Apple Fitness sync");
+    } finally {
+      setAppleFitnessLoading(false);
+    }
+  };
+
+  const handleDisconnectAppleFitness = () => {
+    setAppleFitnessSyncEnabled(false);
+    toast.success("Apple Fitness sync turned off");
+  };
+
+  const handleConnectGoogleCalendar = async () => {
+    if (!user) return;
+    setGcalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("google-calendar-auth-url", {});
+      if (error || !data?.url) throw error || new Error("No URL returned");
+      window.location.href = data.url;
+    } catch {
+      toast.error("Failed to start Google Calendar connection");
+      setGcalLoading(false);
+    }
+  };
+
+  const handleDisconnectGoogleCalendar = async () => {
+    setGcalLoading(true);
+    try {
+      const { error } = await supabase.functions.invoke("google-calendar-disconnect", {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (error) throw error;
+      setGcalConnected(false);
+      toast.success("Google Calendar disconnected");
+    } catch {
+      toast.error("Failed to disconnect Google Calendar");
+    }
+    setGcalLoading(false);
+  };
+
   // ─── Activity feed ───
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   useEffect(() => {
     if (!user) return;
     const items: ActivityItem[] = [];
 
-    // completed workouts
     workouts
       .filter((w) => w.done && w.completedDate)
       .forEach((w) => {
@@ -112,7 +276,6 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
         });
       });
 
-    // habits with streaks
     habits
       .filter((h) => h.done)
       .forEach((h) => {
@@ -127,7 +290,6 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
         });
       });
 
-    // Sort by timestamp desc, take 4
     items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     setRecentActivity(items.slice(0, 4));
   }, [user, workouts, habits, groups, getHabitStreak]);
@@ -152,13 +314,12 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
   const initial = profile?.display_name?.charAt(0)?.toUpperCase() || "?";
   const avatarColor = user?.id ? hashColor(user.id) : "#6C47FF";
 
-  // Shared groups per friend
   const friendGroupMap = useMemo(() => {
     const map: Record<string, string[]> = {};
     for (const f of activeFriends) {
       if (!f.friend) continue;
       const shared = groups
-        .filter((g) => g.members?.some((m: any) => m.user_id === f.friend!.id))
+        .filter((g) => g.members?.some((m: { user_id: string }) => m.user_id === f.friend!.id))
         .map((g) => g.name);
       map[f.friend.id] = shared;
     }
@@ -167,7 +328,6 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
 
   return (
     <div className="px-4 pb-28" style={{ background: "#F4F3F0" }}>
-      {/* ─── Header ─── */}
       <header className="pt-12 pb-4 flex items-center justify-between">
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", fontFamily: "'DM Sans', sans-serif" }}>
           Profile
@@ -203,11 +363,7 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
         </div>
       </header>
 
-      {/* ─── 1. Identity Card ─── */}
-      <div
-        className="mb-4 flex flex-col items-center py-6 px-4"
-        style={{ background: "#fff", borderRadius: 16, border: "0.5px solid rgba(0,0,0,0.07)" }}
-      >
+      <div className="mb-4 flex flex-col items-center py-6 px-4" style={cardStyle}>
         <div className="relative mb-3">
           <div
             className="w-[76px] h-[76px] rounded-full flex items-center justify-center text-white text-2xl font-semibold overflow-hidden"
@@ -231,10 +387,8 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
         <p style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A", fontFamily: "'DM Sans', sans-serif" }}>
           {profile?.display_name || "You"}
         </p>
-        {(profile as any)?.username && (
-          <p style={{ fontSize: 13, color: "#999", marginTop: 2 }}>
-            @{(profile as any).username}
-          </p>
+        {(profile as { username?: string })?.username && (
+          <p style={{ fontSize: 13, color: "#999", marginTop: 2 }}>@{((profile as { username?: string }).username)}</p>
         )}
         <button
           onClick={() => setShowEditProfile(true)}
@@ -252,11 +406,10 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
         </button>
       </div>
 
-      {/* ─── 2. Stats Row ─── */}
       {(hasHabits || hasWorkouts || hasSobriety) && (
         <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: `repeat(${[hasHabits, hasWorkouts, hasSobriety].filter(Boolean).length}, 1fr)` }}>
           {hasHabits && (
-            <div style={{ background: "#fff", borderRadius: 16, border: "0.5px solid rgba(0,0,0,0.07)", padding: "14px 12px" }}>
+            <div style={{ ...cardStyle, padding: "14px 12px" }}>
               <div
                 className="w-[26px] h-[26px] rounded-lg flex items-center justify-center mb-2"
                 style={{ background: "#FFF7ED" }}
@@ -274,7 +427,7 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
             </div>
           )}
           {hasWorkouts && (
-            <div style={{ background: "#fff", borderRadius: 16, border: "0.5px solid rgba(0,0,0,0.07)", padding: "14px 12px" }}>
+            <div style={{ ...cardStyle, padding: "14px 12px" }}>
               <div
                 className="w-[26px] h-[26px] rounded-lg flex items-center justify-center mb-2"
                 style={{ background: "#EEF4FF" }}
@@ -292,7 +445,7 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
             </div>
           )}
           {hasSobriety && sobrietyDays !== null && (
-            <div style={{ background: "#fff", borderRadius: 16, border: "0.5px solid rgba(0,0,0,0.07)", padding: "14px 12px" }}>
+            <div style={{ ...cardStyle, padding: "14px 12px" }}>
               <div
                 className="w-[26px] h-[26px] rounded-lg flex items-center justify-center mb-2"
                 style={{ background: "#ECFDF5" }}
@@ -312,7 +465,125 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
         </div>
       )}
 
-      {/* ─── 3. Friends Section ─── */}
+      {/* Google Calendar */}
+      <div className="mb-4 overflow-hidden p-4" style={cardStyle}>
+        <div className="flex items-center gap-3 mb-3">
+          <Calendar size={16} className="text-primary" />
+          <span className="text-sm font-semibold text-foreground">Google Calendar</span>
+        </div>
+        {gcalConnected === null ? (
+          <div className="flex items-center justify-center py-3">
+            <Loader2 size={16} className="animate-spin text-muted-foreground" />
+          </div>
+        ) : gcalConnected ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/20">
+              <span className="text-sm">📅</span>
+              <span className="flex-1 text-xs font-medium text-primary">Connected</span>
+              <Check size={14} className="text-primary" />
+            </div>
+            <button
+              type="button"
+              onClick={handleDisconnectGoogleCalendar}
+              disabled={gcalLoading}
+              className="w-full py-2 rounded-lg border border-destructive/30 text-destructive text-xs font-semibold hover:bg-destructive/10 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {gcalLoading ? <Loader2 size={12} className="animate-spin" /> : <Unlink size={12} />}
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleConnectGoogleCalendar}
+            disabled={gcalLoading}
+            className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            <span className="text-lg">📅</span>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-semibold">Connect Google Calendar</p>
+            </div>
+            {gcalLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+          </button>
+        )}
+      </div>
+
+      {/* Apple Calendar (device) */}
+      <div className="mb-4 overflow-hidden p-4" style={cardStyle}>
+        <div className="flex items-center gap-3 mb-3">
+          <Calendar size={16} className="text-primary" />
+          <span className="text-sm font-semibold text-foreground">Apple Calendar</span>
+        </div>
+        {appleCalendarConnected ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/20">
+              <span className="text-sm">🍎</span>
+              <span className="flex-1 text-xs font-medium text-primary">Connected</span>
+              <Check size={14} className="text-primary" />
+            </div>
+            <button
+              type="button"
+              onClick={handleDisconnectAppleCalendar}
+              disabled={appleCalendarLoading}
+              className="w-full py-2 rounded-lg border border-destructive/30 text-destructive text-xs font-semibold hover:bg-destructive/10 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              Disconnect Apple Calendar
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleConnectAppleCalendar}
+            disabled={appleCalendarLoading}
+            className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            <span className="text-lg">🍎</span>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-semibold">Connect Apple Calendar</p>
+            </div>
+            {appleCalendarLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+          </button>
+        )}
+      </div>
+
+      {/* Apple Fitness / HealthKit */}
+      <div className="mb-4 overflow-hidden p-4" style={cardStyle}>
+        <div className="flex items-center gap-3 mb-3">
+          <Activity size={16} className="text-primary" />
+          <span className="text-sm font-semibold text-foreground">Apple Fitness</span>
+        </div>
+        {appleFitnessSyncEnabled ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/20">
+              <span className="text-sm">❤️</span>
+              <span className="flex-1 text-xs font-medium text-primary">Sync on</span>
+              <Check size={14} className="text-primary" />
+            </div>
+            <button
+              type="button"
+              onClick={handleDisconnectAppleFitness}
+              disabled={appleFitnessLoading}
+              className="w-full py-2 rounded-lg border border-destructive/30 text-destructive text-xs font-semibold hover:bg-destructive/10 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              Turn off sync
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleConnectAppleFitness}
+            disabled={appleFitnessLoading}
+            className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            <span className="text-lg">❤️</span>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-semibold">Enable Apple Fitness Sync</p>
+            </div>
+            {appleFitnessLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+          </button>
+        )}
+      </div>
+
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2 px-0.5">
           <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>Friends</p>
@@ -323,7 +594,7 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
             See all
           </button>
         </div>
-        <div style={{ background: "#fff", borderRadius: 16, border: "0.5px solid rgba(0,0,0,0.07)", overflow: "hidden" }}>
+        <div style={{ ...cardStyle, overflow: "hidden" }}>
           {activeFriends.slice(0, 5).map((f, i) => {
             if (!f.friend) return null;
             const fInitial = f.friend.display_name?.charAt(0)?.toUpperCase() || "?";
@@ -365,7 +636,6 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
             );
           })}
 
-          {/* Add a friend row */}
           <button
             onClick={() => setShowAddFriend(true)}
             className="flex items-center gap-3 px-4 py-3 w-full"
@@ -382,16 +652,13 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
         </div>
       </div>
 
-      {/* ─── 4. My Activity Section ─── */}
       {recentActivity.length > 0 && (
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2 px-0.5">
             <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>My activity</p>
-            <button style={{ fontSize: 12, fontWeight: 500, color: "#6C47FF" }}>
-              See all
-            </button>
+            <button style={{ fontSize: 12, fontWeight: 500, color: "#6C47FF" }}>See all</button>
           </div>
-          <div style={{ background: "#fff", borderRadius: 16, border: "0.5px solid rgba(0,0,0,0.07)", overflow: "hidden" }}>
+          <div style={{ ...cardStyle, overflow: "hidden" }}>
             {recentActivity.map((item, i) => {
               const colors = FEATURE_COLORS[item.type];
               const Icon = FEATURE_ICONS[item.type];
@@ -411,7 +678,9 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
                     <p style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A" }} className="truncate">
                       {item.title}
                     </p>
-                    <p style={{ fontSize: 11, color: "#999" }} className="truncate">{item.detail}</p>
+                    <p style={{ fontSize: 11, color: "#999" }} className="truncate">
+                      {item.detail}
+                    </p>
                     <div className="flex items-center gap-2 mt-1">
                       <span
                         className="inline-flex px-2 py-0.5 rounded-full"
@@ -428,6 +697,38 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
           </div>
         </div>
       )}
+
+      <div className="space-y-1 mb-4">
+        {settingsItems.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-secondary/60 transition-colors text-left"
+            style={cardStyle}
+          >
+            <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center">
+              <item.icon size={20} className="text-foreground" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-semibold text-foreground">{item.label}</p>
+              <p className="text-xs text-muted-foreground">{item.desc}</p>
+            </div>
+            <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+          </button>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => signOut()}
+        className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-destructive/10 transition-colors text-destructive mb-4"
+        style={cardStyle}
+      >
+        <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+          <LogOut size={20} />
+        </div>
+        <span className="text-sm font-semibold">Log out</span>
+      </button>
 
       <EditProfileModal open={showEditProfile} onOpenChange={setShowEditProfile} />
       <AddFriendModal open={showAddFriend} onOpenChange={setShowAddFriend} />

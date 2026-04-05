@@ -4,6 +4,8 @@ import CustomWorkoutBuilder from "@/components/CustomWorkoutBuilder";
 import WorkoutAiSuggest from "@/components/WorkoutAiSuggest";
 import GroupBadge from "@/components/GroupBadge";
 import { useAppContext, Workout, isCardioWorkout } from "@/context/AppContext";
+import { mergeAppWorkoutsWithHealthKit } from "@/lib/healthKitWorkoutMerge";
+import { formatDistanceFromKm } from "@/lib/distanceDisplay";
 import WorkoutDetailModal from "@/components/WorkoutDetailModal";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -323,8 +325,25 @@ const USER_BORDER_COLORS = [
   "border-l-purple-400",
 ];
 
-const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => void; onOpenMore?: () => void } = {}) => {
-  const { workouts, filteredWorkouts, filteredPartnerWorkouts, toggleWorkout, removeWorkout, removeWorkoutsByFilter, updateWorkout, setWorkouts, addWorkouts, rescheduleWorkout, rescheduleWorkoutCascade } = useAppContext();
+const WorkoutsPage = ({
+  onOpenSettings,
+  onOpenMore,
+  isActive = true,
+}: { onOpenSettings?: () => void; onOpenMore?: () => void; isActive?: boolean } = {}) => {
+  const {
+    workouts,
+    filteredWorkouts,
+    filteredPartnerWorkouts,
+    toggleWorkout,
+    removeWorkout,
+    removeWorkoutsByFilter,
+    updateWorkout,
+    setWorkouts,
+    addWorkouts,
+    rescheduleWorkout,
+    rescheduleWorkoutCascade,
+    appleFitnessSyncEnabled,
+  } = useAppContext();
   const { user, profile, activeGroup, groups } = useAuth();
   const [showCongrats, setShowCongrats] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
@@ -340,8 +359,49 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   const [showHistory, setShowHistory] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [nudgeCooldown, setNudgeCooldown] = useState<Set<string>>(new Set());
+  const [healthKitWorkouts, setHealthKitWorkouts] = useState<Workout[]>([]);
+  const [healthKitLoading, setHealthKitLoading] = useState(false);
 
   const selectedDate = todayStr(); // Main page always shows today
+
+  const fetchHealthKitHistory = useCallback(async () => {
+    if (!appleFitnessSyncEnabled || !user?.id) {
+      setHealthKitWorkouts([]);
+      return;
+    }
+    setHealthKitLoading(true);
+    try {
+      const { fetchHealthKitWorkoutHistory90Days } = await import("@/integrations/appleHealth");
+      const list = await fetchHealthKitWorkoutHistory90Days(user.id);
+      setHealthKitWorkouts(list);
+    } catch (e) {
+      console.warn("HealthKit workout history:", e);
+    } finally {
+      setHealthKitLoading(false);
+    }
+  }, [appleFitnessSyncEnabled, user?.id]);
+
+  useEffect(() => {
+    if (!isActive || !appleFitnessSyncEnabled || !user?.id) return;
+    void fetchHealthKitHistory();
+  }, [isActive, appleFitnessSyncEnabled, user?.id, fetchHealthKitHistory]);
+
+  useEffect(() => {
+    let remove: (() => void) | undefined;
+    let cancelled = false;
+    import("@capacitor/app").then(({ App }) => {
+      if (cancelled) return;
+      App.addListener("appStateChange", ({ isActive: appActive }) => {
+        if (appActive && appleFitnessSyncEnabled && user?.id) void fetchHealthKitHistory();
+      }).then((handle) => {
+        remove = () => handle.remove();
+      });
+    });
+    return () => {
+      cancelled = true;
+      remove?.();
+    };
+  }, [appleFitnessSyncEnabled, fetchHealthKitHistory, user?.id]);
 
   const [weeklyGoal, setWeeklyGoal] = useState(() => {
     const saved = localStorage.getItem("workout_weekly_goal");
@@ -446,6 +506,15 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
     });
   }, [allContextWorkouts, filteredWorkouts, userFilterIds, isPersonalView, user?.id]);
 
+  const displayWorkouts = useMemo(
+    () => mergeAppWorkoutsWithHealthKit(userFilteredWorkouts, healthKitWorkouts, user?.id || ""),
+    [userFilteredWorkouts, healthKitWorkouts, user?.id]
+  );
+
+  useEffect(() => {
+    if (!appleFitnessSyncEnabled) setHealthKitWorkouts([]);
+  }, [appleFitnessSyncEnabled]);
+
   const selectedUserInfos = useMemo(() => {
     const infos: { userId: string; label: string; initial: string; avatarUrl: string | null }[] = [];
     if (isPersonalView) {
@@ -482,17 +551,17 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   const userWorkoutData: UserWorkoutData[] = useMemo(() => {
     return selectedUserInfos.map((u) => ({
       ...u,
-      workouts: userFilteredWorkouts.filter((w) => (w.ownerUserId || user?.id) === u.userId),
+      workouts: displayWorkouts.filter((w) => (w.ownerUserId || user?.id) === u.userId),
     }));
-  }, [selectedUserInfos, userFilteredWorkouts, user?.id]);
+  }, [selectedUserInfos, displayWorkouts, user?.id]);
 
   const isMultiUserView = selectedUserInfos.length > 1;
 
   const today = todayStr();
 
   const dateWorkouts = useMemo(() => {
-    return userFilteredWorkouts.filter((w) => w.scheduledDate === selectedDate);
-  }, [selectedDate, userFilteredWorkouts]);
+    return displayWorkouts.filter((w) => w.scheduledDate === selectedDate);
+  }, [selectedDate, displayWorkouts]);
 
   const perUserDateWorkouts = useMemo(() => {
     if (!isMultiUserView) return [];
@@ -503,8 +572,8 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   }, [isMultiUserView, selectedUserInfos, dateWorkouts, user?.id]);
 
   const missedWorkouts = useMemo(() => {
-    return userFilteredWorkouts.filter((w) => w.ownerUserId === user?.id && w.scheduledDate && w.scheduledDate < today && !w.done);
-  }, [userFilteredWorkouts, today, user?.id]);
+    return displayWorkouts.filter((w) => w.ownerUserId === user?.id && w.scheduledDate && w.scheduledDate < today && !w.done);
+  }, [displayWorkouts, today, user?.id]);
 
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
@@ -522,6 +591,7 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   };
 
   const handleReschedule = (id: string, toDate: string) => {
+    if (id.startsWith("hk-")) return;
     rescheduleWorkout(id, toDate);
     const dateLabel = toDate === today ? "today" : new Date(toDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
     toast.success(`Moved to ${dateLabel}`);
@@ -552,6 +622,7 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   };
 
   const handleToggleWorkout = (id: string) => {
+    if (id.startsWith("hk-")) return;
     const w = workouts.find((w) => w.id === id);
     const isOwnWorkout = !w?.ownerUserId || w.ownerUserId === user?.id;
     if (!isOwnWorkout) return;
@@ -654,6 +725,7 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   if (showLog) {
     return (
       <WorkoutLogPage
+        workoutsForLog={displayWorkouts}
         onBack={() => setShowLog(false)}
         onRecordWorkout={() => {
           setShowLog(false);
@@ -788,7 +860,7 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
         {isMultiUserView ? (
           <MultiUserHeroCard userData={userWorkoutData} weeklyGoal={weeklyGoal} />
         ) : (
-          <HeroCard workouts={userFilteredWorkouts} weeklyGoal={weeklyGoal} onGoalChange={saveGoal} />
+          <HeroCard workouts={displayWorkouts} weeklyGoal={weeklyGoal} onGoalChange={saveGoal} />
         )}
 
         {/* Missed Workouts Banner */}
@@ -854,10 +926,15 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
         {/* Today's Workouts Section */}
         <section className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Today's Workouts</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Today's Workouts</h3>
+              {appleFitnessSyncEnabled && healthKitLoading && (
+                <Loader2 size={12} className="animate-spin text-muted-foreground" aria-hidden />
+              )}
+            </div>
             <WorkoutAiSuggest
               selectedDate={selectedDate}
-              recentWorkouts={userFilteredWorkouts}
+              recentWorkouts={displayWorkouts}
               onAddWorkout={addWorkouts}
             />
           </div>
@@ -876,7 +953,7 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
                 wkStart.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
                 wkStart.setHours(0, 0, 0, 0);
                 const weekStartStr = fmtDate(wkStart);
-                const weeklyCompleted = userFilteredWorkouts.filter(w =>
+                const weeklyCompleted = displayWorkouts.filter(w =>
                   (w.ownerUserId || user?.id) === section.userId &&
                   w.done && w.completedDate && w.completedDate >= weekStartStr
                 ).length;
@@ -922,7 +999,7 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
                             onRemove={removeWorkout}
                             onReschedule={handleReschedule}
                             onRescheduleCascade={rescheduleWorkoutCascade}
-                            allWorkouts={userFilteredWorkouts}
+                            allWorkouts={displayWorkouts}
                             onSelectExercise={setSelectedExercise}
                             onEditExercise={startEditExercise}
                             onDeleteExercise={deleteExercise}
@@ -937,7 +1014,7 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
                             }}
                             onProgressUpdate={handleProgressUpdate}
                             onCaloriesSaved={handleCaloriesSaved}
-                            readOnly={!!w.ownerUserId && w.ownerUserId !== user?.id}
+                            readOnly={(!!w.ownerUserId && w.ownerUserId !== user?.id) || w.id.startsWith("hk-")}
                             progress={workoutProgress[w.id]?.progress}
                             onCopyWorkout={handleCopyWorkout}
                             accentBorder={borderColor}
@@ -967,7 +1044,7 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
                       onRemove={removeWorkout}
                       onReschedule={handleReschedule}
                       onRescheduleCascade={rescheduleWorkoutCascade}
-                      allWorkouts={userFilteredWorkouts}
+                      allWorkouts={displayWorkouts}
                       onSelectExercise={setSelectedExercise}
                       onEditExercise={startEditExercise}
                       onDeleteExercise={deleteExercise}
@@ -982,7 +1059,7 @@ const WorkoutsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
                       }}
                       onProgressUpdate={handleProgressUpdate}
                       onCaloriesSaved={handleCaloriesSaved}
-                      readOnly={!!w.ownerUserId && w.ownerUserId !== user?.id}
+                      readOnly={(!!w.ownerUserId && w.ownerUserId !== user?.id) || w.id.startsWith("hk-")}
                       progress={workoutProgress[w.id]?.progress}
                       onCopyWorkout={handleCopyWorkout}
                     />
@@ -1057,12 +1134,16 @@ const WorkoutCard = ({
   const [showDetail, setShowDetail] = useState(false);
   const [cascadeConfirm, setCascadeConfirm] = useState<{ newDate: string; diffDays: number; followingCount: number } | null>(null);
 
-  const showDist = ["running", "cycling", "walking", "swimming"].some(t => workout.title.toLowerCase().includes(t));
+  const isHealthKitEntry =
+    workout.id.startsWith("hk-") || (!!workout.externalId && workout.sourceApp === "apple_health");
+  const showDist = (workout.distance ?? 0) > 0;
+  const distFmt = showDist ? formatDistanceFromKm(workout.distance) : null;
 
   const fmtD = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
   const handleMoveToDate = (date: Date) => {
+    if (workout.id.startsWith("hk-")) return;
     const newDate = fmtD(date);
     if (!workout.scheduledDate) {
       onReschedule(workout.id, newDate);
@@ -1085,6 +1166,7 @@ const WorkoutCard = ({
   };
 
   const handleMoveToTomorrow = () => {
+    if (workout.id.startsWith("hk-")) return;
     const base = workout.scheduledDate || fmtD(new Date());
     const d = new Date(base + "T00:00:00");
     d.setDate(d.getDate() + 1);
@@ -1137,7 +1219,14 @@ const WorkoutCard = ({
 
           {/* Card body */}
           <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowDetail(true)}>
-            <p className={`text-[14px] font-semibold truncate ${workout.done ? "line-through text-muted-foreground" : ""}`}>{workout.title}</p>
+            <div className="flex items-center gap-1.5 min-w-0">
+              {isHealthKitEntry && (
+                <span className="text-[12px] shrink-0 leading-none" title="Apple Health">
+                  🍎
+                </span>
+              )}
+              <p className={`text-[14px] font-semibold truncate ${workout.done ? "line-through text-muted-foreground" : ""}`}>{workout.title}</p>
+            </div>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
                 <Clock size={9} /> {workout.duration}
@@ -1150,9 +1239,14 @@ const WorkoutCard = ({
                   {workout.tag}
                 </span>
               )}
-              {showDist && (workout.distance ?? 0) > 0 && (
+              {distFmt && (
                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
-                  <Footprints size={9} /> {workout.distance} {workout.distanceUnit || "km"}
+                  <Footprints size={9} /> {distFmt.value} {distFmt.unit}
+                </span>
+              )}
+              {workout.heartRateAvg != null && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
+                  <Heart size={9} /> {workout.heartRateAvg} bpm
                 </span>
               )}
             </div>

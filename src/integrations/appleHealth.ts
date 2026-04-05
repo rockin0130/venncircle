@@ -2,9 +2,22 @@ import { Capacitor } from "@capacitor/core";
 import { Health } from "@capgo/capacitor-health";
 import type { HealthDataType, Workout as HKWorkout, WorkoutType } from "@capgo/capacitor-health";
 import type { Workout } from "@/context/AppContext";
-import { parseWorkoutDurationToMinutes } from "@/lib/workoutSync";
+import { formatHealthKitWorkoutLabel } from "@/lib/healthKitWorkoutTypes";
+import { getWorkoutTypeEmoji, normalizeWorkoutType, parseWorkoutDurationToMinutes } from "@/lib/workoutSync";
+import { toast } from "sonner";
 
-const READ_TYPES: HealthDataType[] = ["calories", "distance", "distanceCycling", "heartRate"];
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/** Types we can verify via checkAuthorization (excludes workouts — iOS does not expose workout read denial). */
+const READ_TYPES_FOR_CHECK: HealthDataType[] = [
+  "calories",
+  "distance",
+  "distanceCycling",
+  "heartRate",
+  "basalCalories",
+];
+
+const READ_TYPES: HealthDataType[] = [...READ_TYPES_FOR_CHECK, "workouts" as HealthDataType];
 
 export async function isHealthNativeAvailable(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
@@ -21,7 +34,7 @@ export async function requestHealthKitReadPermission(): Promise<boolean> {
   const { available } = await Health.isAvailable();
   if (!available) return false;
   const status = await Health.requestAuthorization({ read: READ_TYPES });
-  return READ_TYPES.every((t) => status.readAuthorized.includes(t));
+  return READ_TYPES_FOR_CHECK.every((t) => status.readAuthorized.includes(t));
 }
 
 export async function hasHealthReadPermission(): Promise<boolean> {
@@ -29,8 +42,17 @@ export async function hasHealthReadPermission(): Promise<boolean> {
   try {
     const { available } = await Health.isAvailable();
     if (!available) return false;
-    const status = await Health.checkAuthorization({ read: READ_TYPES });
-    return READ_TYPES.every((t) => status.readAuthorized.includes(t));
+    const status = await Health.checkAuthorization({ read: READ_TYPES_FOR_CHECK });
+    if (!READ_TYPES_FOR_CHECK.every((t) => status.readAuthorized.includes(t))) return false;
+    const end = new Date();
+    const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+    await Health.queryWorkouts({
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+      limit: 1,
+      ascending: false,
+    });
+    return true;
   } catch {
     return false;
   }
@@ -73,6 +95,78 @@ export interface HealthKitWorkoutMetrics {
   sourceApp: string;
 }
 
+function isoToLocalDateString(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function tagFromNormalized(norm: string): string {
+  if (["Run", "Walk", "Cycle", "Swim"].includes(norm)) return "Cardio";
+  if (["Strength", "HIIT"].includes(norm)) return "Full Body";
+  if (norm === "Yoga") return "Flexibility";
+  if (norm === "Boxing") return "Boxing";
+  if (norm === "Golf") return "Golf";
+  return "Activity";
+}
+
+export function mapHealthKitWorkoutToWorkout(w: HKWorkout, metrics: HealthKitWorkoutMetrics, userId: string): Workout {
+  const end = new Date(w.endDate);
+  const start = new Date(w.startDate);
+  const dateStr = isoToLocalDateString(w.startDate);
+  const norm = normalizeWorkoutType(w.workoutType as string, undefined);
+  const emoji = getWorkoutTypeEmoji(norm);
+  const durationMin = Math.max(1, Math.round((w.duration || 0) / 60) || Math.round((end.getTime() - start.getTime()) / 60000));
+  const platformId = w.platformId || `fallback-${w.startDate}-${w.workoutType}`;
+  return {
+    id: `hk-${platformId}`,
+    title: formatHealthKitWorkoutLabel(w.workoutType as WorkoutType),
+    duration: `${durationMin} min`,
+    cal: metrics.cal,
+    tag: tagFromNormalized(norm),
+    emoji,
+    done: true,
+    scheduledDate: dateStr,
+    completedDate: dateStr,
+    distance: metrics.distance,
+    distanceUnit: metrics.distanceUnit,
+    heartRateAvg: metrics.heartRateAvg,
+    externalId: platformId,
+    normalizedType: w.workoutType,
+    originType: "imported",
+    sourceApp: "apple_health",
+    startTime: w.startDate,
+    endTime: w.endDate,
+    ownerUserId: userId,
+  };
+}
+
+async function sumBasalEnergyKcalDuringWorkout(best: HKWorkout): Promise<number> {
+  const attempts: { dataType: HealthDataType; label: string }[] = [
+    { dataType: "basalCalories", label: "basalCalories" },
+    { dataType: "basalEnergyBurned" as HealthDataType, label: "basalEnergyBurned" },
+  ];
+
+  for (const { dataType, label } of attempts) {
+    try {
+      const { samples } = await Health.readSamples({
+        dataType,
+        startDate: best.startDate,
+        endDate: best.endDate,
+        limit: 5000,
+        ascending: true,
+      });
+      const sum = samples.reduce((s, x) => s + x.value, 0);
+      console.log(
+        `[HealthKit] basal kcal (${label}): sampleCount=${samples.length}, sumKcal=${sum.toFixed(2)}`
+      );
+      if (sum > 0) return sum;
+    } catch (e) {
+      console.warn(`[HealthKit] basal readSamples (${label}) failed:`, e);
+    }
+  }
+  return 0;
+}
+
 async function buildMetricsFromHKWorkout(best: HKWorkout): Promise<HealthKitWorkoutMetrics> {
   let heartRateAvg: number | null = null;
   try {
@@ -90,11 +184,18 @@ async function buildMetricsFromHKWorkout(best: HKWorkout): Promise<HealthKitWork
     /* heart rate optional */
   }
 
+  const activeKcal = best.totalEnergyBurned ?? 0;
+  const basalKcal = await sumBasalEnergyKcalDuringWorkout(best);
+  console.log(
+    `[HealthKit] calories: activeKcal=${activeKcal.toFixed(2)}, basalKcal=${basalKcal.toFixed(2)}, total=${Math.round(activeKcal + basalKcal)}`
+  );
+  const totalKcal = Math.round(activeKcal + basalKcal);
+
   const distanceM = best.totalDistance ?? 0;
   const distanceKm = distanceM / 1000;
 
   return {
-    cal: Math.round(best.totalEnergyBurned ?? 0),
+    cal: totalKcal,
     distance: Math.round(distanceKm * 1000) / 1000,
     distanceUnit: "km",
     heartRateAvg: heartRateAvg != null ? Math.round(heartRateAvg) : null,
@@ -143,6 +244,75 @@ export async function fetchHealthKitMetricsForWorkout(w: Workout): Promise<Healt
   const best = pickBestWorkout(list, centerMs, null);
   if (!best) return null;
   return buildMetricsFromHKWorkout(best);
+}
+
+/**
+ * Fetches all workouts in the last 90 days from HealthKit / Health Connect (not persisted to Supabase).
+ * Note: Apple Health “weekly distance” can include walking/step distance; only sessions recorded as
+ * HKWorkout (e.g. Running with distance) appear in queryWorkouts — not step totals alone.
+ */
+export async function fetchHealthKitWorkoutHistory90Days(userId: string): Promise<Workout[]> {
+  if (!Capacitor.isNativePlatform()) return [];
+  const { available } = await Health.isAvailable();
+  if (!available) return [];
+
+  const end = new Date();
+  const start = new Date(end.getTime() - 90 * MS_PER_DAY);
+  const startIso = start.toISOString();
+  const endIso = end.toISOString();
+
+  toast.info(`HK query range: ${startIso} to ${endIso}`);
+
+  const raw: HKWorkout[] = [];
+  try {
+    let anchor: string | undefined;
+    let page = 0;
+    const maxPages = 50;
+    /** iOS only emits anchor when a full page is returned; use a high limit to reduce round-trips. */
+    const pageLimit = 1000;
+
+    while (page < maxPages) {
+      const r = await Health.queryWorkouts({
+        startDate: startIso,
+        endDate: endIso,
+        limit: pageLimit,
+        ascending: true,
+        anchor,
+      });
+      const batch = r.workouts ?? [];
+      raw.push(...batch);
+      page++;
+      console.log(
+        `[HealthKit] queryWorkouts page ${page}: batch=${batch.length}, totalRaw=${raw.length}, hasAnchor=${!!r.anchor}`
+      );
+      anchor = r.anchor;
+      if (!r.anchor) break;
+    }
+  } catch (e) {
+    console.warn("HealthKit queryWorkouts:", e);
+    return [];
+  }
+
+  const seen = new Map<string, HKWorkout>();
+  for (const w of raw) {
+    const key = w.platformId || `${w.startDate}-${w.workoutType}-${w.endDate}`;
+    if (!seen.has(key)) seen.set(key, w);
+  }
+  const unique = Array.from(seen.values());
+
+  const CHUNK = 12;
+  const out: Workout[] = [];
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const slice = unique.slice(i, i + CHUNK);
+    const mapped = await Promise.all(
+      slice.map(async (w) => {
+        const metrics = await buildMetricsFromHKWorkout(w);
+        return mapHealthKitWorkoutToWorkout(w, metrics, userId);
+      })
+    );
+    out.push(...mapped);
+  }
+  return out;
 }
 
 export async function syncCompletedWorkoutFromHealthKit(

@@ -1,13 +1,39 @@
-import { useState, useMemo, useEffect, useRef } from "react";
-import { ChevronLeft, ChevronRight, Search, Trophy, Flame, Target, Dumbbell, ArrowLeft, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { useState, useMemo } from "react";
+import { ChevronLeft, ChevronRight, Search, Flame, Target, Dumbbell, ArrowLeft, ChevronDown, ChevronUp, Plus, Heart, Footprints } from "lucide-react";
 import { useAppContext, Workout } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import WorkoutDetailModal from "@/components/WorkoutDetailModal";
 import { getWeekStartDate, loadWeekStart } from "@/hooks/useWeekStart";
+import { parseWorkoutDurationToMinutes } from "@/lib/workoutSync";
+import { formatDistanceFromKm } from "@/lib/distanceDisplay";
 
 const fmtDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidYmd(d: string): boolean {
+  return YMD.test(d);
+}
+
+/** Prefer completed date, then scheduled; normalize ISO strings to local YYYY-MM-DD for grouping and calendar keys. */
+function workoutLogDate(w: Workout): string {
+  const raw = w.completedDate || w.scheduledDate;
+  if (!raw || typeof raw !== "string") return "";
+  const head = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (head && YMD.test(head[1])) return head[1];
+  const t = new Date(raw);
+  if (Number.isNaN(t.getTime())) return "";
+  return fmtDate(t);
+}
+
+function logDurationMinutes(w: Workout): number {
+  const fromParsed = parseWorkoutDurationToMinutes(w.duration || "");
+  if (fromParsed > 0) return fromParsed;
+  const n = parseInt(String(w.duration), 10);
+  return Number.isNaN(n) ? 0 : n;
+}
 
 const MILESTONES = [
   { id: "first", label: "First Workout", icon: "🏅", threshold: 1, type: "total" },
@@ -23,8 +49,8 @@ const MILESTONES = [
 function computeStreak(workouts: Workout[]): number {
   const doneDates = new Set(
     workouts
-      .filter((w) => w.done && (w.completedDate || w.scheduledDate))
-      .map((w) => w.completedDate || w.scheduledDate!)
+      .filter((w) => w.done && isValidYmd(workoutLogDate(w)))
+      .map((w) => workoutLogDate(w))
   );
   if (doneDates.size === 0) return 0;
   let streak = 0;
@@ -43,10 +69,12 @@ function computeStreak(workouts: Workout[]): number {
 interface Props {
   onBack: () => void;
   onRecordWorkout: () => void;
+  /** Merged app + HealthKit workouts (e.g. displayWorkouts from WorkoutsPage). */
+  workoutsForLog: Workout[];
 }
 
-const WorkoutLogPage = ({ onBack, onRecordWorkout }: Props) => {
-  const { workouts, updateWorkout, removeWorkout } = useAppContext();
+const WorkoutLogPage = ({ onBack, onRecordWorkout, workoutsForLog }: Props) => {
+  const { updateWorkout, removeWorkout } = useAppContext();
   const { user } = useAuth();
   const weekStart = loadWeekStart();
 
@@ -61,13 +89,15 @@ const WorkoutLogPage = ({ onBack, onRecordWorkout }: Props) => {
 
   const today = fmtDate(new Date());
 
-  // Only user's own workouts
   const myWorkouts = useMemo(
-    () => workouts.filter((w) => !w.ownerUserId || w.ownerUserId === user?.id),
-    [workouts, user?.id]
+    () => workoutsForLog.filter((w) => !w.ownerUserId || w.ownerUserId === user?.id),
+    [workoutsForLog, user?.id]
   );
 
-  const doneWorkouts = useMemo(() => myWorkouts.filter((w) => w.done), [myWorkouts]);
+  const doneWorkouts = useMemo(
+    () => myWorkouts.filter((w) => w.done && isValidYmd(workoutLogDate(w))),
+    [myWorkouts]
+  );
 
   // Stats
   const totalWorkouts = doneWorkouts.length;
@@ -78,8 +108,11 @@ const WorkoutLogPage = ({ onBack, onRecordWorkout }: Props) => {
     const startStr = getWeekStartDate(new Date(), weekStart);
     return new Set(
       doneWorkouts
-        .filter((w) => (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today)
-        .map((w) => w.completedDate || w.scheduledDate!)
+        .filter((w) => {
+          const d = workoutLogDate(w);
+          return isValidYmd(d) && d >= startStr && d <= today;
+        })
+        .map((w) => workoutLogDate(w))
     ).size;
   }, [doneWorkouts, today, weekStart]);
 
@@ -98,9 +131,9 @@ const WorkoutLogPage = ({ onBack, onRecordWorkout }: Props) => {
   const workoutDatesMap = useMemo(() => {
     const map = new Map<string, number>();
     for (const w of doneWorkouts) {
-      const d = w.completedDate || w.scheduledDate;
-      if (!d) continue;
-      const durMin = parseInt(w.duration) || 0;
+      const d = workoutLogDate(w);
+      if (!isValidYmd(d)) continue;
+      const durMin = logDurationMinutes(w);
       map.set(d, (map.get(d) || 0) + durMin);
     }
     return map;
@@ -143,16 +176,16 @@ const WorkoutLogPage = ({ onBack, onRecordWorkout }: Props) => {
     return weeks;
   }, [viewMonth]);
 
-  // Past workouts filtered by selected date + search
+  // Past workouts for the calendar-selected day only (grouped for a single date header)
   const pastWorkoutsByDate = useMemo(() => {
     let filtered = doneWorkouts
       .filter((w) => {
-        const d = w.completedDate || w.scheduledDate || "";
-        return d <= today;
+        const d = workoutLogDate(w);
+        return isValidYmd(d) && d <= today && d === selectedDate;
       })
       .sort((a, b) => {
-        const da = a.completedDate || a.scheduledDate || "";
-        const db = b.completedDate || b.scheduledDate || "";
+        const da = workoutLogDate(a);
+        const db = workoutLogDate(b);
         return db.localeCompare(da);
       });
 
@@ -161,20 +194,20 @@ const WorkoutLogPage = ({ onBack, onRecordWorkout }: Props) => {
       filtered = filtered.filter((w) => w.title.toLowerCase().includes(q));
     }
 
-    // Group by date
     const groups: { date: string; workouts: Workout[]; totalMin: number }[] = [];
     let current: typeof groups[0] | null = null;
     for (const w of filtered) {
-      const d = w.completedDate || w.scheduledDate || "";
+      const d = workoutLogDate(w);
+      if (!isValidYmd(d)) continue;
       if (!current || current.date !== d) {
         current = { date: d, workouts: [], totalMin: 0 };
         groups.push(current);
       }
       current.workouts.push(w);
-      current.totalMin += parseInt(w.duration) || 0;
+      current.totalMin += logDurationMinutes(w);
     }
     return groups;
-  }, [doneWorkouts, today, searchQuery]);
+  }, [doneWorkouts, today, searchQuery, selectedDate]);
 
   const DAY_ABBRS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -357,18 +390,20 @@ const WorkoutLogPage = ({ onBack, onRecordWorkout }: Props) => {
       {/* Past workouts list */}
       <div className="space-y-4 mb-6">
         {pastWorkoutsByDate.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">No completed workouts yet.</p>
+          <p className="text-sm text-muted-foreground text-center py-8">No completed workouts on this day.</p>
         ) : (
           pastWorkoutsByDate.map((group) => (
             <div key={group.date}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-xs font-semibold text-muted-foreground">
-                  {new Date(group.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                  {new Date(group.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                 </span>
                 <span className="text-[10px] text-muted-foreground">· {group.totalMin} min total</span>
               </div>
               <div className="space-y-2">
-                {group.workouts.map((w) => (
+                {group.workouts.map((w) => {
+                  const distFmt = (w.distance ?? 0) > 0 ? formatDistanceFromKm(w.distance) : null;
+                  return (
                   <button
                     key={w.id}
                     onClick={() => setDetailWorkout(w)}
@@ -379,14 +414,26 @@ const WorkoutLogPage = ({ onBack, onRecordWorkout }: Props) => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate">{w.title}</p>
-                      <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-[11px] text-muted-foreground">{w.exercises?.length || 0} ex</span>
-                        <span className="text-[11px] text-muted-foreground">{w.cal} kcal</span>
-                        <span className="text-[11px] text-muted-foreground">{w.duration}</span>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap text-[11px] text-muted-foreground">
+                        <span>{w.duration}</span>
+                        <span>{w.cal ?? 0} kcal</span>
+                        {distFmt && (
+                          <span className="inline-flex items-center gap-0.5">
+                            <Footprints size={10} className="shrink-0 opacity-70" />
+                            {distFmt.value} {distFmt.unit}
+                          </span>
+                        )}
+                        {w.heartRateAvg != null && (
+                          <span className="inline-flex items-center gap-0.5">
+                            <Heart size={10} className="shrink-0 opacity-70" />
+                            {w.heartRateAvg} bpm
+                          </span>
+                        )}
                       </div>
                     </div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))

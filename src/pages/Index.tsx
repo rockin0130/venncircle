@@ -213,8 +213,14 @@ const Index = () => {
         onNavigateToFeature={handleNavigateToFeature}
       />
     ) : null,
-    profile: <ProfilePage onNavigate={(tab) => handleTabChange(tab as Tab)} onOpenSettings={handleOpenSettings} onOpenMore={() => setMoreOpen(true)} />,
-    workout: <WorkoutsPage onOpenMore={() => setMoreOpen(true)} />,
+    profile: (
+      <ProfilePage
+        onNavigate={(tab) => handleTabChange(tab as Tab)}
+        onOpenSettings={handleOpenSettings}
+        onOpenMore={() => setMoreOpen(true)}
+      />
+    ),
+    workout: <WorkoutsPage onOpenMore={() => setMoreOpen(true)} isActive={activeTab === "workout"} />,
     nutrition: <NutritionPage onOpenMore={() => setMoreOpen(true)} />,
     habits: <HabitsPage onOpenMore={() => setMoreOpen(true)} />,
     sobriety: <SobrietyPage onOpenMore={() => setMoreOpen(true)} />,
