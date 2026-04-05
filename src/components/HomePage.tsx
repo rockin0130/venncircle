@@ -96,7 +96,7 @@ const QuickAccessStrip = ({ enabledSections, onNavigate }: { enabledSections: Se
   );
 };
 
-const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate, onOpenMore }: { onBackToLauncher?: () => void; onOpenSettings?: () => void; onNavigate?: (page: string) => void; onOpenMore?: () => void }) => {
+const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLauncher?: () => void; onOpenSettings?: () => void; onNavigate?: (page: string) => void }) => {
   const { profile, partner, groups, user } = useAuth();
   // Home page is ALWAYS the logged-in user's aggregate view — never influenced by global group selection
   const filter: Filter = "mine";
