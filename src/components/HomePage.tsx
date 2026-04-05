@@ -68,6 +68,12 @@ const QUICK_ACCESS_FEATURES = [
       <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 16.4 5.7 21l2.3-7-6-4.6h7.6z" />
     </svg>
   )},
+  { id: "study", label: "Study", page: "study", icon: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  )},
 ];
 
 const QuickAccessStrip = ({ enabledSections, onNavigate }: { enabledSections: Set<string>; onNavigate?: (page: string) => void }) => {
