@@ -1065,6 +1065,7 @@ export type Database = {
           created_at: string
           display_name: string
           email: string | null
+          home_quick_access_position: string | null
           id: string
           invite_code: string | null
           partner_id: string | null
@@ -1078,6 +1079,7 @@ export type Database = {
           created_at?: string
           display_name?: string
           email?: string | null
+          home_quick_access_position?: string | null
           id: string
           invite_code?: string | null
           partner_id?: string | null
@@ -1091,6 +1093,7 @@ export type Database = {
           created_at?: string
           display_name?: string
           email?: string | null
+          home_quick_access_position?: string | null
           id?: string
           invite_code?: string | null
           partner_id?: string | null

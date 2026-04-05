@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS home_quick_access_position text DEFAULT 'below-todo';
