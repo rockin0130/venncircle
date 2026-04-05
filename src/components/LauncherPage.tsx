@@ -704,6 +704,7 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
                   </div>
                 );
               })}
+            </div>
 
             {/* Pending group invites */}
             {pendingGroupInvites.map((invite) => (
