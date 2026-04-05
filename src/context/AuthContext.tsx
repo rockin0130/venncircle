@@ -473,10 +473,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // Run orphaned data cleanup once per session
+  const cleanupRanRef = useRef(false);
+
   // Load groups when user is available
   useEffect(() => {
     if (user) {
-      fetchGroups();
+      fetchGroups().then(() => {
+        if (!cleanupRanRef.current) {
+          cleanupRanRef.current = true;
+          cleanupOrphanedData(user.id);
+        }
+      });
     }
   }, [user, fetchGroups]);
 
