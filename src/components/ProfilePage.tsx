@@ -19,7 +19,7 @@ interface ProfilePageProps {
   onOpenSettings?: () => void;
 }
 
-const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
+const ProfilePage = ({ onNavigate, onOpenSettings }: ProfilePageProps) => {
   const { user, session, profile, signOut } = useAuth();
   const { filteredHabits, filteredWorkouts } = useAppContext();
   const { activeFriends } = useFriendships();
