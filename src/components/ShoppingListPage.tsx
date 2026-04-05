@@ -249,7 +249,7 @@ const ShoppingListPage = () => {
     if (!manualItemText.trim()) return;
     const itemName = manualItemText.trim();
     setManualItemText("");
-    setShowManualAdd(false);
+    
 
     const existingCategories = lists
       .filter((l) => !l.is_meal_plan)
