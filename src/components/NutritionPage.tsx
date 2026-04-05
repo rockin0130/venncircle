@@ -12,6 +12,7 @@ import PageGroupSelector from "@/components/PageGroupSelector";
 import NutritionUserFilter, { EVERYONE_SENTINEL } from "@/components/NutritionUserFilter";
 import NutritionCollapsibleDateStrip from "@/components/NutritionCollapsibleDateStrip";
 import NutritionLogPage from "@/components/NutritionLogPage";
+import ShoppingDestinationSheet from "@/components/ShoppingDestinationSheet";
 
 
 const fmtDate = (d: Date) =>
@@ -178,6 +179,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   const [shopQueue, setShopQueue] = useState<{ ingredients: string[]; mealTitle: string; mealDate: string }[]>([]);
   const [shopChecked, setShopChecked] = useState<Record<number, boolean>>({});
   const [shopSaving, setShopSaving] = useState(false);
+  const [shopDestination, setShopDestination] = useState<{ open: boolean; groupName: string; selectedItems: string[]; mealTitle: string; weekStart: string; weekEnd: string; weekLabel: string } | null>(null);
 
   const dismissShopPrompt = () => {
     setShopPrompt(null);
@@ -203,7 +205,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     }
   };
 
-  useModalScrollLock(!!detailMeal || !!showAddMeal || showGoalSettings || showAiResults || !!aiConfirmSelection || !!shopPrompt || !!ideaPreview);
+  useModalScrollLock(!!detailMeal || !!showAddMeal || showGoalSettings || showAiResults || !!aiConfirmSelection || !!shopPrompt || !!ideaPreview || !!shopDestination);
 
   const isPersonalActive = (activeGroup as any)?._personal === true;
   const isAllView = activeGroup === null && !isPersonalActive;
@@ -710,7 +712,12 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     return fmtDate(d);
   };
 
-  const saveToShoppingList = async () => {
+  const shoppingEnabledGroups = useMemo(
+    () => groups.filter(g => g.shared_pages?.includes("shopping")),
+    [groups]
+  );
+
+  const saveToShoppingList = async (overrideGroupId?: string | null) => {
     if (!user || !shopPrompt) return;
     setShopSaving(true);
     const selectedItems = shopPrompt.ingredients.filter((_, i) => shopChecked[i]);
@@ -720,15 +727,46 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
       setShopSaving(false);
       return;
     }
+
     const weekStart = getWeekMonday(shopPrompt.mealDate);
     const weekEnd = getWeekSunday(weekStart);
     const monDate = new Date(weekStart + "T00:00:00");
     const sunDate = new Date(weekEnd + "T00:00:00");
-    const weekLabel = `Week of ${monDate.getMonth() + 1}/${monDate.getDate()} (Mon) – ${sunDate.getMonth() + 1}/${sunDate.getDate()} (Sun)`;
+    const weekLabel = `Week of ${monDate.getMonth() + 1}/${monDate.getDate()} – ${sunDate.getMonth() + 1}/${sunDate.getDate()}`;
+
+    // Determine target group
+    const targetGroupId = overrideGroupId !== undefined ? overrideGroupId : groupId;
+
+    // If current context is a group without Shopping enabled, show destination picker
+    if (overrideGroupId === undefined && groupId) {
+      const currentGroup = groups.find(g => g.id === groupId);
+      if (currentGroup && !currentGroup.shared_pages?.includes("shopping")) {
+        setShopDestination({
+          open: true,
+          groupName: currentGroup.name,
+          selectedItems,
+          mealTitle: shopPrompt.mealTitle,
+          weekStart,
+          weekEnd,
+          weekLabel,
+        });
+        setShopSaving(false);
+        return;
+      }
+    }
+
+    await doSaveToShoppingList(selectedItems, shopPrompt.mealTitle, targetGroupId, weekStart, weekEnd, weekLabel);
+    dismissShopPrompt();
+    setShopSaving(false);
+  };
+
+  const doSaveToShoppingList = async (selectedItems: string[], mealTitle: string, targetGroupId: string | null | undefined, weekStart: string, weekEnd: string, weekLabel: string) => {
+    if (!user) return;
 
     let listQuery = supabase.from("shopping_lists").select("*")
       .eq("user_id", user.id).eq("is_meal_plan", true).eq("date_range_start", weekStart).eq("date_range_end", weekEnd);
-    if (groupId) listQuery = listQuery.eq("group_id", groupId);
+    if (targetGroupId) listQuery = listQuery.eq("group_id", targetGroupId);
+    else listQuery = listQuery.is("group_id", null);
 
     const { data: existingLists } = await listQuery;
     let listId: string;
@@ -736,9 +774,9 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     if (existingLists && existingLists.length > 0) {
       listId = existingLists[0].id;
     } else {
-      const insertData: any = { user_id: user.id, group_id: groupId, label: weekLabel, date_range_start: weekStart, date_range_end: weekEnd, is_meal_plan: true };
+      const insertData: any = { user_id: user.id, group_id: targetGroupId || null, label: weekLabel, date_range_start: weekStart, date_range_end: weekEnd, is_meal_plan: true };
       const { data: listData, error: listErr } = await supabase.from("shopping_lists").insert(insertData).select().single();
-      if (listErr || !listData) { toast.error("Failed to create shopping list"); setShopSaving(false); return; }
+      if (listErr || !listData) { toast.error("Failed to create shopping list"); return; }
       listId = (listData as any).id;
     }
 
@@ -746,10 +784,24 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
     const existingNames = new Set((existingItems || []).map((it: any) => (it.name as string).toLowerCase().trim()));
     const newItems = selectedItems.filter(name => !existingNames.has(name.toLowerCase().trim()));
     if (newItems.length > 0) {
-      const rows = newItems.map(name => ({ list_id: listId, user_id: user.id, name }));
+      const rows = newItems.map(name => ({ list_id: listId, user_id: user.id, name, meal_name: mealTitle }));
       await supabase.from("shopping_list_items").insert(rows);
     }
     toast.success(existingLists && existingLists.length > 0 ? "Items added to weekly shopping list!" : "Weekly shopping list created!");
+  };
+
+  const handleDestinationSelect = async (destGroupId: string | null) => {
+    if (!shopDestination || !shopPrompt) return;
+    setShopSaving(true);
+    await doSaveToShoppingList(
+      shopDestination.selectedItems,
+      shopDestination.mealTitle,
+      destGroupId,
+      shopDestination.weekStart,
+      shopDestination.weekEnd,
+      shopDestination.weekLabel,
+    );
+    setShopDestination(null);
     dismissShopPrompt();
     setShopSaving(false);
   };
@@ -1669,7 +1721,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
               </div>
               <div className="flex-shrink-0 px-5 pb-6 pt-3 flex gap-2">
                 <button onClick={() => dismissShopPrompt()} className="flex-1 py-2.5 rounded-xl bg-secondary text-foreground text-sm font-semibold">Skip</button>
-                <button onClick={saveToShoppingList} disabled={shopSaving} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+                <button onClick={() => saveToShoppingList()} disabled={shopSaving} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
                   {shopSaving ? <Loader2 size={14} className="animate-spin" /> : null} Add to Shopping List
                 </button>
               </div>
@@ -1677,6 +1729,19 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Shopping destination redirect sheet */}
+      {shopDestination && (
+        <ShoppingDestinationSheet
+          open={shopDestination.open}
+          groupName={shopDestination.groupName}
+          ingredientCount={shopDestination.selectedItems.length}
+          shoppingGroups={shoppingEnabledGroups}
+          onSelect={handleDestinationSelect}
+          onDismiss={() => { setShopDestination(null); setShopSaving(false); }}
+          saving={shopSaving}
+        />
+      )}
     </div>
   );
 };

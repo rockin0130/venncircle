@@ -1110,26 +1110,32 @@ export type Database = {
       }
       shopping_list_items: {
         Row: {
+          assignee_user_ids: string[]
           checked: boolean
           created_at: string
           id: string
           list_id: string
+          meal_name: string | null
           name: string
           user_id: string
         }
         Insert: {
+          assignee_user_ids?: string[]
           checked?: boolean
           created_at?: string
           id?: string
           list_id: string
+          meal_name?: string | null
           name: string
           user_id: string
         }
         Update: {
+          assignee_user_ids?: string[]
           checked?: boolean
           created_at?: string
           id?: string
           list_id?: string
+          meal_name?: string | null
           name?: string
           user_id?: string
         }
