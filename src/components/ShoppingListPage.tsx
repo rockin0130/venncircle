@@ -7,15 +7,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import CreateGroupModal from "@/components/CreateGroupModal";
-import ShoppingMealPlanSection from "@/components/ShoppingMealPlanSection";
 import ShoppingNudgeSheet, { NudgePill } from "@/components/ShoppingNudgeSheet";
-import {
-  OrganizePill,
-  SmartToggle,
-  AiBadge,
-  OrganizedView,
-  useOrganize,
-} from "@/components/ShoppingOrganize";
+import ShoppingGroceryCard from "@/components/ShoppingGroceryCard";
 
 interface ShoppingList {
   id: string;
@@ -347,12 +340,11 @@ const ShoppingListPage = () => {
           />
         ))}
 
-        {/* Weekly meal plan lists */}
-        {mealPlanLists.map((list) => (
-          <ShoppingMealPlanSection
-            key={list.id}
-            list={list}
-            items={items.filter((i) => i.list_id === list.id)}
+        {/* Grocery card wrapping all meal plan lists */}
+        {mealPlanLists.length > 0 && (
+          <ShoppingGroceryCard
+            lists={mealPlanLists}
+            allItems={items.filter((i) => mealPlanLists.some((l) => l.id === i.list_id))}
             onToggle={toggleItem}
             onDelete={deleteItem}
             onDeleteList={deleteList}
@@ -360,7 +352,7 @@ const ShoppingListPage = () => {
             groupMembers={groupMembers}
             onNudge={() => setNudgeOpen(true)}
           />
-        ))}
+        )}
       </div>
 
       <ShoppingNudgeSheet
@@ -415,9 +407,6 @@ const ListSection = ({
 }: ListSectionProps) => {
   const unchecked = items.filter((i) => !i.checked);
   const checked = items.filter((i) => i.checked);
-  const checkedIds = new Set(checked.map((i) => i.id));
-
-  const { loading: orgLoading, result: orgResult, viewMode, setViewMode, organize } = useOrganize();
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -426,7 +415,6 @@ const ListSection = ({
           <p className="text-sm font-semibold text-foreground">
             {list.is_meal_plan ? "🍽️" : "📝"} {list.label}
           </p>
-          <OrganizePill loading={orgLoading} onClick={() => organize(items)} />
         </div>
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
@@ -442,61 +430,47 @@ const ListSection = ({
         </div>
       </div>
 
-      {/* Smart toggle — only after organizing */}
-      {orgResult && (
-        <>
-          <SmartToggle labels={orgResult.toggle_labels} viewMode={viewMode} onSwitch={setViewMode} />
-          {viewMode === "organized" && <AiBadge />}
-        </>
-      )}
+      <div className="divide-y divide-border/50">
+        {unchecked.map((item) => (
+          <ShoppingItem
+            key={item.id}
+            item={item}
+            onToggle={onToggle}
+            onDelete={onDelete}
+          />
+        ))}
 
-      {/* Organized view */}
-      {orgResult && viewMode === "organized" ? (
-        <OrganizedView result={orgResult} allItems={items} onToggle={onToggle} onDelete={onDelete} />
-      ) : (
-        /* Original view */
-        <div className="divide-y divide-border/50">
-          {unchecked.map((item) => (
-            <ShoppingItem
-              key={item.id}
-              item={item}
-              onToggle={onToggle}
-              onDelete={onDelete}
-            />
-          ))}
-
-          <div className="flex items-center gap-2 px-4 py-2">
-            <Plus size={14} className="text-muted-foreground shrink-0" />
-            <input
-              value={newItemText}
-              onChange={(e) => onNewItemTextChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onAddItem();
-              }}
-              placeholder="Add item..."
-              className="flex-1 text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
-            />
-          </div>
-
-          {checked.length > 0 && (
-            <>
-              <div className="px-4 py-1.5 bg-secondary/20">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Purchased ({checked.length})
-                </p>
-              </div>
-              {checked.map((item) => (
-                <ShoppingItem
-                  key={item.id}
-                  item={item}
-                  onToggle={onToggle}
-                  onDelete={onDelete}
-                />
-              ))}
-            </>
-          )}
+        <div className="flex items-center gap-2 px-4 py-2">
+          <Plus size={14} className="text-muted-foreground shrink-0" />
+          <input
+            value={newItemText}
+            onChange={(e) => onNewItemTextChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onAddItem();
+            }}
+            placeholder="Add item..."
+            className="flex-1 text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
+          />
         </div>
-      )}
+
+        {checked.length > 0 && (
+          <>
+            <div className="px-4 py-1.5 bg-secondary/20">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                Purchased ({checked.length})
+              </p>
+            </div>
+            {checked.map((item) => (
+              <ShoppingItem
+                key={item.id}
+                item={item}
+                onToggle={onToggle}
+                onDelete={onDelete}
+              />
+            ))}
+          </>
+        )}
+      </div>
     </div>
   );
 };
