@@ -130,6 +130,7 @@ const HomeScheduledSection = ({
   enabledHabitCategories = [],
   selectedDate,
   isViewingMemberName,
+  showWater = false,
 }: Props) => {
   const { groups, activeGroup, user } = useAuth();
   const { filteredHabits, toggleHabit, getHabitStreak } = useAppContext();
