@@ -100,6 +100,7 @@ const Index = () => {
       specialdays: "special_days",
       calendar: "calendar",
       shopping: "shopping",
+      study: "study",
     };
     const pageKey = TAB_TO_PAGE_KEY[tab];
     if (pageKey && activeGroup && !(activeGroup as any)?._personal) {
