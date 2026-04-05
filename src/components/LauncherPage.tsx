@@ -623,78 +623,76 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
                     <div
                       onPointerDown={(e) => { e.preventDefault(); handleCardPointerDown(index); }}
                       onPointerUp={() => handleCardPointerUp(group)}
-                      className={`relative overflow-hidden bg-card flex ${editMode ? "animate-nav-wiggle" : ""} ${isDragging ? "opacity-60 scale-[1.02]" : ""}`}
+                      className={`flex overflow-hidden ${editMode ? "animate-nav-wiggle" : ""} ${isDragging ? "opacity-60 scale-[1.02]" : ""}`}
                       style={{
                         height: CARD_HEIGHT,
                         borderRadius: 14,
                         border: "0.5px solid rgba(0,0,0,0.07)",
+                        background: "#fff",
                         boxShadow: `0 4px 12px rgba(0,0,0,${shadowOpacity})`,
                         ...(editMode ? { animationDelay: `${index * 0.05}s` } : {}),
                       }}
                     >
-                      {/* Left side — info */}
-                      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-[13px] font-medium truncate text-foreground leading-tight">{group.name}</p>
-                          {/* Member avatar dots inline */}
+                      {/* Left child */}
+                      <div style={{ flex: 1, padding: "10px 12px", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                        {/* Row 1: name + member dots */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} className="text-foreground">{group.name}</span>
                           {activeMembers.length > 0 && (
-                            <div className="flex items-center -space-x-1 flex-shrink-0">
-                              {activeMembers.slice(0, 3).map((m, mIdx) => {
-                                const colors = ["bg-[hsl(260,45%,60%)]", "bg-[hsl(340,50%,65%)]", "bg-[hsl(160,40%,55%)]", "bg-[hsl(30,55%,60%)]"];
+                            <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                              {activeMembers.slice(0, 4).map((m, mIdx) => {
+                                const dotColors = ["#7C5CCC", "#CC5C80", "#5CA88A", "#CC8A3D"];
                                 return (
                                   <div
                                     key={m.user_id}
-                                    className={`w-[18px] h-[18px] rounded-full ${colors[mIdx % colors.length]} flex items-center justify-center text-[8px] font-bold text-white border border-card`}
+                                    style={{
+                                      width: 18, height: 18, borderRadius: "50%",
+                                      backgroundColor: dotColors[mIdx % dotColors.length],
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      fontSize: 8, fontWeight: 700, color: "#fff",
+                                      border: "1.5px solid #fff",
+                                      marginLeft: mIdx > 0 ? -4 : 0,
+                                    }}
                                     title={m.display_name || "Member"}
                                   >
                                     {(m.display_name || "M")[0].toUpperCase()}
                                   </div>
                                 );
                               })}
-                              {activeMembers.length > 3 && (
-                                <div className="w-[18px] h-[18px] rounded-full bg-secondary flex items-center justify-center text-[7px] font-semibold text-muted-foreground border border-card">
-                                  +{activeMembers.length - 3}
-                                </div>
-                              )}
                             </div>
                           )}
                         </div>
-                        {/* Interest pills */}
+                        {/* Row 2: interest pills */}
                         {validPages.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
                             {validPages.slice(0, 4).map((page) => (
-                              <span key={page} className="text-[9px] font-medium text-primary bg-primary/8 px-1.5 py-0.5 rounded">
+                              <span key={page} className="text-primary" style={{ fontSize: 9, fontWeight: 500, padding: "2px 6px", borderRadius: 4, background: "rgba(var(--primary-rgb, 99,102,241), 0.08)" }}>
                                 {PAGE_LABELS[page]}
                               </span>
                             ))}
                             {validPages.length > 4 && (
-                              <span className="text-[9px] font-medium bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">+{validPages.length - 4}</span>
+                              <span style={{ fontSize: 9, fontWeight: 500, padding: "2px 6px", borderRadius: 4 }} className="bg-secondary text-muted-foreground">+{validPages.length - 4}</span>
                             )}
                           </div>
                         )}
                       </div>
 
-                      {/* Right side — photo, 100px wide */}
-                      <div className="relative flex-shrink-0" style={{ width: 100 }}>
+                      {/* Right child — photo area */}
+                      <div style={{ width: 100, flexShrink: 0, borderRadius: "0 14px 14px 0", overflow: "hidden" }}>
                         {hasCover ? (
-                          <>
-                            <img src={currentCoverUrl!} alt="" className="w-full h-full object-cover" />
-                            <div className="absolute inset-0" style={{ background: "linear-gradient(to right, rgba(255,255,255,0.15), transparent 30%)" }} />
-                            <div className="absolute inset-y-0 right-0 flex items-center pr-2">
-                              <ChevronRight size={16} className="text-white/70" />
-                            </div>
-                          </>
+                          <img src={currentCoverUrl!} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                         ) : (
                           <div
-                            className={`w-full h-full bg-gradient-to-br ${gradient} flex flex-col items-center justify-center gap-0.5`}
+                            className={`bg-gradient-to-br ${gradient}`}
+                            style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, cursor: isAdmin ? "pointer" : "default" }}
                             onClick={(e) => { if (isAdmin && !editMode) { e.stopPropagation(); triggerFileInput(group.id, e); } }}
                           >
                             {isUploading ? (
                               <Loader2 size={12} className="animate-spin text-muted-foreground/40" />
                             ) : (
                               <>
-                                <Camera size={12} className="text-muted-foreground/35" />
-                                <span className="text-[8px] text-muted-foreground/35 font-medium">Add photo</span>
+                                <Camera size={12} style={{ color: "rgba(0,0,0,0.2)" }} />
+                                <span style={{ fontSize: 8, color: "rgba(0,0,0,0.2)", fontWeight: 500 }}>Add photo</span>
                               </>
                             )}
                           </div>
