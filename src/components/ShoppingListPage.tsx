@@ -45,6 +45,8 @@ const ShoppingListPage = () => {
 
   const [localContextId, setLocalContextId] = useState<string>(PERSONAL_SENTINEL);
 
+  const isMineView = localContextId === PERSONAL_SENTINEL;
+
   const shoppingGroups = useMemo(
     () => groups.filter((g) => g.shared_pages?.includes("shopping")),
     [groups]
@@ -63,6 +65,20 @@ const ShoppingListPage = () => {
     [localGroup]
   );
 
+  const groupNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    groups.forEach((g) => { map[g.id] = g.name; });
+    return map;
+  }, [groups]);
+
+  const listGroupLabelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    lists.forEach((l) => {
+      map[l.id] = l.group_id ? (groupNameMap[l.group_id] || "Group") : "Personal";
+    });
+    return map;
+  }, [lists, groupNameMap]);
+
   const fetchData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -72,10 +88,11 @@ const ShoppingListPage = () => {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (groupId) {
+    if (isMineView) {
+      // Aggregate view: fetch all accessible lists (RLS handles access)
+      // No additional filters
+    } else if (groupId) {
       listQuery = listQuery.eq("group_id", groupId);
-    } else {
-      listQuery = listQuery.eq("user_id", user.id).is("group_id", null);
     }
 
     const { data: listsData } = await listQuery;
@@ -95,7 +112,7 @@ const ShoppingListPage = () => {
     }
 
     setLoading(false);
-  }, [user, groupId]);
+  }, [user, groupId, isMineView]);
 
   useEffect(() => {
     fetchData();
@@ -167,17 +184,14 @@ const ShoppingListPage = () => {
   const getOrCreateCategoryList = async (category: string, icon: string, isMealPlan: boolean): Promise<string | null> => {
     if (!user) return null;
 
-    // For grocery items, find an existing meal plan list
     if (isMealPlan) {
       const existing = lists.find((l) => l.is_meal_plan);
       if (existing) return existing.id;
     } else {
-      // Find existing list with matching label
       const existing = lists.find((l) => !l.is_meal_plan && l.label === category);
       if (existing) return existing.id;
     }
 
-    // Create a new list for this category
     const insertData: any = {
       user_id: user.id,
       label: isMealPlan ? "Grocery" : category,
@@ -204,13 +218,11 @@ const ShoppingListPage = () => {
     setManualItemText("");
     setShowManualAdd(false);
 
-    // Collect existing category names for AI context
     const existingCategories = lists
       .filter((l) => !l.is_meal_plan)
       .map((l) => l.label);
     if (lists.some((l) => l.is_meal_plan)) existingCategories.push("Grocery");
 
-    // Fire-and-forget AI categorization — add item immediately to avoid blocking
     let targetListId: string | null = null;
 
     try {
@@ -235,7 +247,6 @@ const ShoppingListPage = () => {
       // AI failed silently — fall back to My Items
     }
 
-    // Fallback: My Items
     if (!targetListId) {
       targetListId = await getOrCreateManualList();
     }
@@ -254,6 +265,24 @@ const ShoppingListPage = () => {
 
   const mealPlanLists = lists.filter((l) => l.is_meal_plan);
   const manualLists = lists.filter((l) => !l.is_meal_plan);
+
+  // In Mine aggregate view, group manual lists by label
+  const manualListsByLabel = useMemo(() => {
+    if (!isMineView) return null;
+    const map: Record<string, ShoppingList[]> = {};
+    manualLists.forEach((l) => {
+      if (!map[l.label]) map[l.label] = [];
+      map[l.label].push(l);
+    });
+    return map;
+  }, [isMineView, manualLists]);
+
+  const sortedManualLabels = useMemo(() => {
+    if (!manualListsByLabel) return [];
+    return Object.keys(manualListsByLabel).sort((a, b) =>
+      a === "My Items" ? -1 : b === "My Items" ? 1 : a.localeCompare(b)
+    );
+  }, [manualListsByLabel]);
 
   if (loading) {
     return (
@@ -393,24 +422,52 @@ const ShoppingListPage = () => {
           </div>
         )}
 
-        {/* Manual lists first */}
-        {manualLists.map((list) => (
-          <ListSection
-            key={list.id}
-            list={list}
-            items={items.filter((i) => i.list_id === list.id)}
-            onToggle={toggleItem}
-            onDelete={deleteItem}
-            onDeleteList={deleteList}
-            newItemText={newItemText[list.id] || ""}
-            onNewItemTextChange={(t) =>
-              setNewItemText((prev) => ({ ...prev, [list.id]: t }))
-            }
-            onAddItem={() => handleInlineAdd(list.id)}
-            isGroupView={isGroupView}
-            onNudge={() => setNudgeOpen(true)}
-          />
-        ))}
+        {/* Manual lists */}
+        {isMineView && manualListsByLabel ? (
+          // Mine aggregate: one card per label combining all groups
+          sortedManualLabels.map((label) => {
+            const listsForLabel = manualListsByLabel[label];
+            const combinedItems = items.filter((i) => listsForLabel.some((l) => l.id === i.list_id));
+            const primaryList = listsForLabel[0];
+            return (
+              <ListSection
+                key={label}
+                list={primaryList}
+                items={combinedItems}
+                onToggle={toggleItem}
+                onDelete={deleteItem}
+                onDeleteList={deleteList}
+                newItemText={newItemText[primaryList.id] || ""}
+                onNewItemTextChange={(t) =>
+                  setNewItemText((prev) => ({ ...prev, [primaryList.id]: t }))
+                }
+                onAddItem={() => handleInlineAdd(primaryList.id)}
+                isGroupView={false}
+                onNudge={() => {}}
+                isMineView={true}
+                listGroupLabelMap={listGroupLabelMap}
+              />
+            );
+          })
+        ) : (
+          manualLists.map((list) => (
+            <ListSection
+              key={list.id}
+              list={list}
+              items={items.filter((i) => i.list_id === list.id)}
+              onToggle={toggleItem}
+              onDelete={deleteItem}
+              onDeleteList={deleteList}
+              newItemText={newItemText[list.id] || ""}
+              onNewItemTextChange={(t) =>
+                setNewItemText((prev) => ({ ...prev, [list.id]: t }))
+              }
+              onAddItem={() => handleInlineAdd(list.id)}
+              isGroupView={isGroupView}
+              onNudge={() => setNudgeOpen(true)}
+            />
+          ))
+        )}
 
         {/* Grocery card wrapping all meal plan lists */}
         {mealPlanLists.length > 0 && (
@@ -423,6 +480,8 @@ const ShoppingListPage = () => {
             isGroupView={isGroupView}
             groupMembers={groupMembers}
             onNudge={() => setNudgeOpen(true)}
+            isMineView={isMineView}
+            listGroupLabelMap={listGroupLabelMap}
           />
         )}
       </div>
@@ -435,6 +494,16 @@ const ShoppingListPage = () => {
     </div>
   );
 };
+
+/* ── GroupLabelPill ── */
+const GroupLabelPill = ({ label }: { label: string }) => (
+  <span
+    className="inline-flex items-center px-1.5 py-0.5 rounded-full font-normal shrink-0"
+    style={{ fontSize: "11px", color: "#888", background: "hsl(var(--secondary) / 0.5)" }}
+  >
+    {label}
+  </span>
+);
 
 /* ── ListSection ── */
 
@@ -453,6 +522,8 @@ interface ListSectionProps {
   onAddItem: () => void;
   isGroupView: boolean;
   onNudge: () => void;
+  isMineView?: boolean;
+  listGroupLabelMap?: Record<string, string>;
 }
 
 interface ShoppingListItem {
@@ -476,6 +547,8 @@ const ListSection = ({
   onAddItem,
   isGroupView,
   onNudge,
+  isMineView,
+  listGroupLabelMap,
 }: ListSectionProps) => {
   const unchecked = items.filter((i) => !i.checked);
   const checked = items.filter((i) => i.checked);
@@ -509,6 +582,7 @@ const ListSection = ({
             item={item}
             onToggle={onToggle}
             onDelete={onDelete}
+            groupLabel={isMineView ? listGroupLabelMap?.[item.list_id] : undefined}
           />
         ))}
 
@@ -538,6 +612,7 @@ const ListSection = ({
                 item={item}
                 onToggle={onToggle}
                 onDelete={onDelete}
+                groupLabel={isMineView ? listGroupLabelMap?.[item.list_id] : undefined}
               />
             ))}
           </>
@@ -551,10 +626,12 @@ const ShoppingItem = ({
   item,
   onToggle,
   onDelete,
+  groupLabel,
 }: {
   item: ShoppingListItem;
   onToggle: (id: string, checked: boolean) => void;
   onDelete: (id: string) => void;
+  groupLabel?: string;
 }) => (
   <div className="flex items-center gap-3 px-4 py-2.5 group">
     <button
@@ -576,6 +653,7 @@ const ShoppingItem = ({
     >
       {item.name}
     </span>
+    {groupLabel && <GroupLabelPill label={groupLabel} />}
     <button
       onClick={() => onDelete(item.id)}
       className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-destructive transition-all"

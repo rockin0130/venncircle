@@ -2,7 +2,6 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight, Check, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GroupMember } from "@/context/AuthContext";
-import { NudgePill } from "./ShoppingNudgeSheet";
 
 interface ShoppingListItem {
   id: string;
@@ -33,9 +32,19 @@ interface Props {
   isGroupView: boolean;
   groupMembers: GroupMember[];
   onNudge?: () => void;
+  groupLabel?: string;
 }
 
-const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList, isGroupView, onNudge }: Props) => {
+const GroupLabelPill = ({ label }: { label: string }) => (
+  <span
+    className="inline-flex items-center px-1.5 py-0.5 rounded-full font-normal shrink-0"
+    style={{ fontSize: "11px", color: "#888", background: "hsl(var(--secondary) / 0.5)" }}
+  >
+    {label}
+  </span>
+);
+
+const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList, isGroupView, onNudge, groupLabel }: Props) => {
   const [weekOpen, setWeekOpen] = useState(true);
   const [openMeals, setOpenMeals] = useState<Record<string, boolean>>({});
 
@@ -71,6 +80,7 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
         <div className="flex items-center gap-2">
           {weekOpen ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronRight size={14} className="text-muted-foreground" />}
           <p className="text-sm font-semibold text-foreground">🍽️ {list.label}</p>
+          {groupLabel && <GroupLabelPill label={groupLabel} />}
         </div>
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
