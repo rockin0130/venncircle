@@ -822,24 +822,22 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
 
               case "todo":
                 return (
-                  <TodoListSection
-                    key={sectionId}
-                    tasks={todoTasks}
-                    onToggle={isViewingPartner ? undefined : toggleTask}
-                    onCongrats={() => setCongratsType("task")}
-                    readOnly={isViewingPartner}
-                    addTask={addTask}
-                    selectedDate={selectedDate}
-                    memberFilters={[]}
-                  />
-                  {/* Quick Access Strip */}
-                  <QuickAccessStrip
-                    enabledSections={sectionVisible}
-                    onNavigate={onNavigate}
-                  />
-                </>;
-              return <div key={sectionId}>{todoBlock}</div>
-              );
+                  <div key={sectionId}>
+                    <TodoListSection
+                      tasks={todoTasks}
+                      onToggle={isViewingPartner ? undefined : toggleTask}
+                      onCongrats={() => setCongratsType("task")}
+                      readOnly={isViewingPartner}
+                      addTask={addTask}
+                      selectedDate={selectedDate}
+                      memberFilters={[]}
+                    />
+                    <QuickAccessStrip
+                      enabledSections={sectionVisible}
+                      onNavigate={onNavigate}
+                    />
+                  </div>
+                );
 
               case "water":
                 // Water is now rendered inside the Scheduled section's Flexible period
