@@ -765,10 +765,6 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
           <span className="text-xs font-medium text-primary">Drag the strip up or down to reposition</span>
         </div>
       )}
-            Done
-          </button>
-        </div>
-      )}
 
       {/* Voice Mode Overlay */}
       <AnimatePresence>
