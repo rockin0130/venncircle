@@ -20,6 +20,7 @@ interface SharedInterestsPageProps {
   onNavigateToFeature?: (tab: string, groupId?: string) => void;
   onCreateGroup?: () => void;
   onOpenGroupHub?: (group: Group) => void;
+  onOpenMore?: () => void;
 }
 
 const INTEREST_PILL_COLORS: Record<string, string> = {
