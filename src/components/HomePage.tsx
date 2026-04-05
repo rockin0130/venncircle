@@ -884,16 +884,9 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                           onNavigate={onNavigate}
                           isWiggling={wiggleMode}
                           onLongPress={() => setWiggleMode(true)}
+                          onDragReposition={(dir) => { if (dir === "down") saveQuickAccessPos("below-todo"); }}
                         />
                       </div>
-                    )}
-                    {wiggleMode && quickAccessPos !== "above-scheduled" && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); saveQuickAccessPos("above-scheduled"); }}
-                        className="w-full border-2 border-dashed border-primary/25 rounded-xl py-3 mb-4 text-center text-xs text-primary/50 font-medium hover:border-primary/40 hover:bg-primary/5 transition-all"
-                      >
-                        Move Quick Access here
-                      </button>
                     )}
                     <HomeScheduledSection
                       allDayItems={allDayItems}
@@ -925,14 +918,6 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                       selectedDate={selectedDate}
                       memberFilters={[]}
                     />
-                    {wiggleMode && quickAccessPos !== "below-todo" && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); saveQuickAccessPos("below-todo"); }}
-                        className="w-full border-2 border-dashed border-primary/25 rounded-xl py-3 mb-4 text-center text-xs text-primary/50 font-medium hover:border-primary/40 hover:bg-primary/5 transition-all"
-                      >
-                        Move Quick Access here
-                      </button>
-                    )}
                     {quickAccessPos === "below-todo" && (
                       <div onClick={(e) => e.stopPropagation()}>
                         <QuickAccessStrip
@@ -940,6 +925,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                           onNavigate={onNavigate}
                           isWiggling={wiggleMode}
                           onLongPress={() => setWiggleMode(true)}
+                          onDragReposition={(dir) => { if (dir === "up") saveQuickAccessPos("above-scheduled"); }}
                         />
                       </div>
                     )}
