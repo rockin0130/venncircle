@@ -187,7 +187,7 @@ const Index = () => {
 
   const pages: Record<string, React.ReactNode> = {
     launcher: <LauncherPage onEnterGroup={handleEnterGroup} onOpenSettings={handleOpenSettings} />,
-    home: <HomePage onOpenSettings={handleOpenSettings} onNavigate={(page) => handleNavigateToFeature(page)} />,
+    home: <HomePage onOpenSettings={handleOpenSettings} onNavigate={(page) => handleNavigateToFeature(page)} onOpenMore={() => setMoreOpen(true)} />,
     "shared-interests": (
       <SharedInterestsPage
         onNavigateToFeature={handleNavigateToFeature}
