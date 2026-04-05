@@ -582,7 +582,7 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
 
           <div
             ref={listRef}
-            className="space-y-3 overflow-y-auto flex-1 scrollbar-none"
+            className="overflow-y-auto flex-1 scrollbar-none"
             onPointerMove={handleCardPointerMove}
             onPointerLeave={() => clearLP()}
             onPointerCancel={() => { clearLP(); setDragIdx(null); setDragOverIdx(null); }}
@@ -592,90 +592,118 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
                 <button onClick={() => setEditMode(false)} className="text-[10px] font-semibold text-primary px-3 py-0.5 rounded-full bg-primary/10">Done</button>
               </div>
             )}
-            {visualCalendarGroups.map((group, index) => {
-              const activeMembers = group.members.filter((m) => m.status === 'active' && m.user_id !== profile?.id);
-              const pendingMembers = group.members.filter((m) => m.status === 'pending_invited');
-              const memberNames = activeMembers.map((m) => m.display_name || "Member").join(", ");
-              const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
-              const currentCoverUrl = localCoverMap[group.id] || group.cover_image_url || null;
-              const hasCover = !!currentCoverUrl;
-              const isUploading = uploadingGroupId === group.id;
-              const isDragging = editMode && dragIdx !== null && orderedVisibleGroups[dragIdx]?.id === group.id;
-              const isAdmin = group.created_by === user?.id;
-              const validPages = (group.shared_pages || []).filter((p: string) => (SHAREABLE_PAGES as readonly string[]).includes(p as ShareablePage)) as ShareablePage[];
+            {/* Sticky stack container */}
+            <div className="relative" style={{ paddingBottom: visualCalendarGroups.length > 1 ? 0 : undefined }}>
+              {visualCalendarGroups.map((group, index) => {
+                const activeMembers = group.members.filter((m) => m.status === 'active' && m.user_id !== profile?.id);
+                const pendingMembers = group.members.filter((m) => m.status === 'pending_invited');
+                const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
+                const currentCoverUrl = localCoverMap[group.id] || group.cover_image_url || null;
+                const hasCover = !!currentCoverUrl;
+                const isUploading = uploadingGroupId === group.id;
+                const isDragging = editMode && dragIdx !== null && orderedVisibleGroups[dragIdx]?.id === group.id;
+                const isAdmin = group.created_by === user?.id;
+                const validPages = (group.shared_pages || []).filter((p: string) => (SHAREABLE_PAGES as readonly string[]).includes(p as ShareablePage)) as ShareablePage[];
+                const CARD_HEIGHT = 76;
+                const PEEK_OFFSET = 52;
+                const shadowOpacity = Math.max(0.10 - index * 0.02, 0.02);
 
-              return (
-                <div
-                  key={group.id}
-                  ref={(el) => { cardRefs.current[index] = el; }}
-                  onPointerDown={(e) => { e.preventDefault(); handleCardPointerDown(index); }}
-                  onPointerUp={() => handleCardPointerUp(group)}
-                  className={`relative overflow-hidden rounded-2xl shadow-sm border border-border/60 select-none touch-none ${editMode ? "animate-nav-wiggle" : ""} ${isDragging ? "opacity-60 scale-[1.02]" : ""}`}
-                  style={editMode ? { animationDelay: `${index * 0.05}s` } : undefined}
-                >
-                  {/* Photo Strip — 52px */}
-                  <div className="relative w-full" style={{ height: 52 }}>
-                    {hasCover ? (
-                      <>
-                        <img src={currentCoverUrl!} alt="" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.05), rgba(0,0,0,0.25))" }} />
-                      </>
-                    ) : (
-                      <div
-                        className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center gap-1.5`}
-                        onClick={(e) => { if (isAdmin && !editMode) { e.stopPropagation(); triggerFileInput(group.id, e); } }}
-                      >
-                        {isUploading ? (
-                          <Loader2 size={12} className="animate-spin text-muted-foreground/40" />
-                        ) : (
+                return (
+                  <div
+                    key={group.id}
+                    ref={(el) => { cardRefs.current[index] = el; }}
+                    className="sticky select-none touch-none"
+                    style={{
+                      top: index * PEEK_OFFSET,
+                      zIndex: visualCalendarGroups.length - index,
+                      marginBottom: index < visualCalendarGroups.length - 1 ? PEEK_OFFSET - CARD_HEIGHT : 0,
+                    }}
+                  >
+                    <div
+                      onPointerDown={(e) => { e.preventDefault(); handleCardPointerDown(index); }}
+                      onPointerUp={() => handleCardPointerUp(group)}
+                      className={`relative overflow-hidden bg-card flex ${editMode ? "animate-nav-wiggle" : ""} ${isDragging ? "opacity-60 scale-[1.02]" : ""}`}
+                      style={{
+                        height: CARD_HEIGHT,
+                        borderRadius: 14,
+                        border: "0.5px solid rgba(0,0,0,0.07)",
+                        boxShadow: `0 4px 12px rgba(0,0,0,${shadowOpacity})`,
+                        ...(editMode ? { animationDelay: `${index * 0.05}s` } : {}),
+                      }}
+                    >
+                      {/* Left side — info */}
+                      <div className="flex-1 min-w-0 p-3 flex flex-col justify-center">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[13px] font-medium truncate text-foreground leading-tight">{group.name}</p>
+                          {/* Member avatar dots inline */}
+                          {activeMembers.length > 0 && (
+                            <div className="flex items-center -space-x-1 flex-shrink-0">
+                              {activeMembers.slice(0, 3).map((m, mIdx) => {
+                                const colors = ["bg-[hsl(260,45%,60%)]", "bg-[hsl(340,50%,65%)]", "bg-[hsl(160,40%,55%)]", "bg-[hsl(30,55%,60%)]"];
+                                return (
+                                  <div
+                                    key={m.user_id}
+                                    className={`w-[18px] h-[18px] rounded-full ${colors[mIdx % colors.length]} flex items-center justify-center text-[8px] font-bold text-white border border-card`}
+                                    title={m.display_name || "Member"}
+                                  >
+                                    {(m.display_name || "M")[0].toUpperCase()}
+                                  </div>
+                                );
+                              })}
+                              {activeMembers.length > 3 && (
+                                <div className="w-[18px] h-[18px] rounded-full bg-secondary flex items-center justify-center text-[7px] font-semibold text-muted-foreground border border-card">
+                                  +{activeMembers.length - 3}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {/* Interest pills */}
+                        {validPages.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {validPages.slice(0, 4).map((page) => (
+                              <span key={page} className="text-[9px] font-medium text-primary bg-primary/8 px-1.5 py-0.5 rounded">
+                                {PAGE_LABELS[page]}
+                              </span>
+                            ))}
+                            {validPages.length > 4 && (
+                              <span className="text-[9px] font-medium bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">+{validPages.length - 4}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right side — photo, 100px wide */}
+                      <div className="relative flex-shrink-0" style={{ width: 100 }}>
+                        {hasCover ? (
                           <>
-                            <Camera size={11} className="text-muted-foreground/40" />
-                            <span className="text-[9px] text-muted-foreground/40 font-medium">Add photo</span>
+                            <img src={currentCoverUrl!} alt="" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0" style={{ background: "linear-gradient(to right, rgba(255,255,255,0.15), transparent 30%)" }} />
+                            {/* Chevron on photo */}
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+                              <ChevronRight size={16} className="text-white/70" />
+                            </div>
                           </>
+                        ) : (
+                          <div
+                            className={`w-full h-full bg-gradient-to-br ${gradient} flex flex-col items-center justify-center gap-0.5`}
+                            onClick={(e) => { if (isAdmin && !editMode) { e.stopPropagation(); triggerFileInput(group.id, e); } }}
+                          >
+                            {isUploading ? (
+                              <Loader2 size={12} className="animate-spin text-muted-foreground/40" />
+                            ) : (
+                              <>
+                                <Camera size={12} className="text-muted-foreground/35" />
+                                <span className="text-[8px] text-muted-foreground/35 font-medium">Add photo</span>
+                              </>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                    {/* Edit button on photo strip for admin */}
-                    {!editMode && hasCover && isAdmin && (
-                      <button
-                        onClick={(e) => triggerFileInput(group.id, e)}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center z-10"
-                        style={{ background: "rgba(255,255,255,0.25)", backdropFilter: "blur(6px)" }}
-                      >
-                        {isUploading ? <Loader2 size={9} className="animate-spin text-white" /> : <Camera size={9} className="text-white" />}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Card Body */}
-                  <div className="p-3 bg-card">
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[14px] font-semibold truncate text-foreground leading-tight">{group.name}</p>
-                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                          {memberNames || "Just you"} · {activeMembers.length + 1} member{activeMembers.length !== 0 ? "s" : ""}
-                          {pendingMembers.length > 0 && <span className="text-muted-foreground/60"> · {pendingMembers.length} pending</span>}
-                        </p>
-                      </div>
-                      <ChevronRight size={16} className="text-muted-foreground/40 flex-shrink-0" />
                     </div>
-                    {/* Interest pills */}
-                    {validPages.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {validPages.slice(0, 4).map((page) => (
-                          <span key={page} className="text-[9px] font-medium bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">
-                            {PAGE_ICONS[page]} {PAGE_LABELS[page]}
-                          </span>
-                        ))}
-                        {validPages.length > 4 && (
-                          <span className="text-[9px] font-medium bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">+{validPages.length - 4}</span>
-                        )}
-                      </div>
-                    )}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
 
             {/* Pending group invites */}
             {pendingGroupInvites.map((invite) => (
