@@ -728,6 +728,104 @@ const ShoppingListPage = () => {
           </Button>
         </DialogContent>
       </Dialog>
+
+      {/* Card-level add sheet */}
+      <Sheet open={cardAddOpen} onOpenChange={(open) => {
+        if (!open) {
+          setCardAddOpen(false);
+          setCardAddTarget(null);
+          setShowNewGroupInput(false);
+          setNewGroupName("");
+        }
+      }}>
+        <SheetContent side="bottom" className="rounded-t-2xl px-5 pb-8">
+          <SheetHeader className="pb-3">
+            <SheetTitle className="text-base">
+              Add to {cardAddTarget?.type === "grocery" ? "Grocery" : cardAddTarget?.type === "manual" ? cardAddTarget.label : ""}
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="space-y-4">
+            <Input
+              value={cardAddText}
+              onChange={(e) => setCardAddText(e.target.value)}
+              placeholder="Item name..."
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && cardAddText.trim()) handleCardAddConfirm();
+              }}
+            />
+
+            {/* Sub-card selector — only for Grocery */}
+            {cardAddTarget?.type === "grocery" && cardAddSubOptions.length > 0 && !showNewGroupInput && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">Add to…</p>
+                <div className="max-h-48 overflow-y-auto space-y-1 -mx-1 px-1">
+                  {cardAddSubOptions.map((opt, idx) => {
+                    const isSelected = cardAddSubCard.listId === opt.listId && cardAddSubCard.mealName === opt.mealName && cardAddSubCard.label === opt.label;
+                    return (
+                      <button
+                        key={`${opt.listId}-${opt.mealName ?? "x"}-${idx}`}
+                        onClick={() => setCardAddSubCard(opt)}
+                        className={`flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm transition-all ${
+                          isSelected
+                            ? "bg-primary/10 text-primary font-semibold border border-primary/30"
+                            : "text-foreground hover:bg-secondary/50 border border-transparent"
+                        }`}
+                      >
+                        <ChevronRight size={12} className={isSelected ? "text-primary" : "text-muted-foreground"} />
+                        <span className="truncate">{opt.label}</span>
+                        {isSelected && <Check size={14} className="ml-auto text-primary shrink-0" />}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setShowNewGroupInput(true)}
+                    className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-secondary/50 border border-transparent transition-all"
+                  >
+                    <Plus size={12} />
+                    <span>Create new group…</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Create new group input */}
+            {cardAddTarget?.type === "grocery" && showNewGroupInput && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">New group name</p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="e.g. Snacks, Party, etc."
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newGroupName.trim() && cardAddText.trim()) handleCardAddConfirm();
+                    }}
+                  />
+                  <Button size="icon" variant="ghost" onClick={() => { setShowNewGroupInput(false); setNewGroupName(""); }}>
+                    <X size={16} />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <Button
+              className="w-full"
+              disabled={!cardAddText.trim() || (showNewGroupInput && !newGroupName.trim())}
+              onClick={handleCardAddConfirm}
+            >
+              {cardAddTarget?.type === "grocery" && !showNewGroupInput
+                ? `Add to ${cardAddSubCard.label || "Grocery"}`
+                : showNewGroupInput && newGroupName.trim()
+                  ? `Add to ${newGroupName.trim()}`
+                  : "Add"
+              }
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
