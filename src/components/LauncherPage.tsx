@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, Plus, Settings, Users, Loader2, X, Check, Camera, Compass, UserPlus } from "lucide-react";
 import AddFriendModal from "@/components/AddFriendModal";
 import FriendRow from "@/components/FriendRow";
-import { Group, useAuth, PAGE_LABELS, PAGE_ICONS, ShareablePage } from "@/context/AuthContext";
+import { Group, useAuth, PAGE_LABELS, PAGE_ICONS, ShareablePage, SHAREABLE_PAGES } from "@/context/AuthContext";
 import { useFriendships } from "@/hooks/useFriendships";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
