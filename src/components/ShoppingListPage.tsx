@@ -561,13 +561,40 @@ const ShoppingListPage = () => {
           <Button
             className="w-full mt-2"
             onClick={async () => {
-              if (!pendingGroceryItem || !selectedSubCard.listId) return;
+              if (!pendingGroceryItem) return;
               const isOther = selectedSubCard.label === "Other";
-              const mealName = isOther ? "Other" : selectedSubCard.mealName;
+
+              let targetListId = selectedSubCard.listId;
+              let mealName = selectedSubCard.mealName;
+
+              if (isOther) {
+                // Create a brand-new "Other" shopping_list (sub-card) for grocery
+                const insertData: any = {
+                  user_id: user!.id,
+                  label: "Other",
+                  is_meal_plan: true,
+                };
+                if (groupId) insertData.group_id = groupId;
+                const { data: newList, error: listErr } = await supabase
+                  .from("shopping_lists")
+                  .insert(insertData)
+                  .select()
+                  .single();
+                if (listErr || !newList) {
+                  toast({ title: "Error creating list", variant: "destructive" });
+                  setGroceryPickerOpen(false);
+                  setPendingGroceryItem(null);
+                  return;
+                }
+                setLists((prev) => [...prev, newList as ShoppingList]);
+                targetListId = newList.id;
+                mealName = null;
+              }
+
               const { data, error } = await supabase
                 .from("shopping_list_items")
                 .insert({
-                  list_id: selectedSubCard.listId,
+                  list_id: targetListId,
                   user_id: user!.id,
                   name: pendingGroceryItem,
                   meal_name: mealName,
