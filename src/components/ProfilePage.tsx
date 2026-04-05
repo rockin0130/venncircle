@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { User, Bell, Shield, Palette, HelpCircle, LogOut, ChevronRight, Calendar, ExternalLink, Unlink, Loader2, Check, Users, Pencil, Dumbbell, Heart, Clock, Sparkles, Copy } from "lucide-react";
+import { User, Bell, Shield, Palette, HelpCircle, LogOut, ChevronRight, Calendar, ExternalLink, Unlink, Loader2, Check, Users, Pencil, Dumbbell, Heart, Clock, Sparkles, Copy, Settings } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
 import { supabase } from "@/integrations/supabase/client";
