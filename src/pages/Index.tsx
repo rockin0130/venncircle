@@ -187,7 +187,7 @@ const Index = () => {
 
   const pages: Record<string, React.ReactNode> = {
     launcher: <LauncherPage onEnterGroup={handleEnterGroup} onOpenSettings={handleOpenSettings} />,
-    home: <HomePage onOpenSettings={handleOpenSettings} onNavigate={(page) => handleNavigateToFeature(page)} onOpenMore={() => setMoreOpen(true)} />,
+    home: <HomePage onOpenSettings={handleOpenSettings} onNavigate={(page) => handleNavigateToFeature(page)} />,
     "shared-interests": (
       <SharedInterestsPage
         onNavigateToFeature={handleNavigateToFeature}
@@ -278,7 +278,7 @@ const Index = () => {
         {showFloatingMoreButton && (
           <button
             onClick={() => setMoreOpen(true)}
-            className="fixed top-3 left-3 z-50 w-10 h-10 rounded-full bg-card/80 backdrop-blur-sm border border-border shadow-sm flex items-center justify-center text-foreground hover:bg-secondary transition-colors"
+            className="fixed top-3 right-3 z-50 w-10 h-10 rounded-full bg-card/80 backdrop-blur-sm border border-border shadow-sm flex items-center justify-center text-foreground hover:bg-secondary transition-colors"
             aria-label="More"
           >
             <MoreHorizontal size={20} />
@@ -286,7 +286,7 @@ const Index = () => {
         )}
 
         <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-          <SheetContent side="left" className="w-72 p-0 flex flex-col bg-card">
+          <SheetContent side="right" className="w-72 p-0 flex flex-col bg-card">
             <div className="flex-1 overflow-y-auto">
               <MorePage
                 navPages={navPages}
