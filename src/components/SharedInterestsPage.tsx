@@ -90,7 +90,7 @@ const MemberDots = ({ members }: { members: { display_name: string | null; user_
 
 type SplitMode = "equal" | "groups-expanded" | "feed-expanded";
 
-const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHub }: SharedInterestsPageProps) => {
+const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHub, onOpenMore }: SharedInterestsPageProps) => {
   const { groups, user } = useAuth();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
