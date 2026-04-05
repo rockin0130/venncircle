@@ -354,7 +354,7 @@ const ShoppingListPage = () => {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden px-5"
           >
-            <div className="flex gap-2 pb-3">
+            <div className="flex gap-2 pt-2 pb-3">
               <Input
                 value={manualItemText}
                 onChange={(e) => setManualItemText(e.target.value)}
