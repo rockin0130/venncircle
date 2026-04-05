@@ -111,6 +111,22 @@ const Index = () => {
       setChatGroup(null);
       setChatMode("list");
     }
+    // Feature gating: if current activeGroup doesn't support this feature, reset to null
+    const TAB_TO_PAGE_KEY: Record<string, string> = {
+      workout: "workout",
+      nutrition: "nutrition",
+      habits: "habits",
+      sobriety: "sobriety",
+      specialdays: "special_days",
+      calendar: "calendar",
+      shopping: "shopping",
+    };
+    const pageKey = TAB_TO_PAGE_KEY[tab];
+    if (pageKey && activeGroup && !(activeGroup as any)?._personal) {
+      if (!activeGroup.shared_pages?.includes(pageKey as any)) {
+        setActiveGroup(null);
+      }
+    }
     setActiveTab(tab);
   };
 
