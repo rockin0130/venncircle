@@ -84,8 +84,17 @@ const ProfilePage = ({ onNavigate, onOpenSettings }: ProfilePageProps) => {
 
   return (
     <div className="px-5 pb-24">
-      <header className="pt-12 pb-6">
+      <header className="pt-12 pb-6 flex items-center justify-between">
         <h1 className="text-[1.75rem] font-bold tracking-tight">Profile</h1>
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            aria-label="Open settings"
+            className="w-10 h-10 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary/30 flex items-center justify-center transition-all shadow-sm"
+          >
+            <Settings size={18} />
+          </button>
+        )}
       </header>
 
       {/* Profile Header Card */}
