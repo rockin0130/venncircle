@@ -34,7 +34,7 @@ import { Loader2, MoreHorizontal } from "lucide-react";
 
 const Index = () => {
   const { user, loading, profile, groups, activeGroup, setActiveGroup, refreshProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<FullTab>("home");
+  const [activeTab, setActiveTab] = useState<Tab>("home");
   const [navPages] = useState<Tab[]>(() => loadNavPages());
   const [chatGroup, setChatGroup] = useState<Group | null>(null);
   const [chatMode, setChatMode] = useState<"list" | "chat">("list");
