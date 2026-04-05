@@ -3,13 +3,6 @@ import { ChevronDown, ChevronRight, Check, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GroupMember } from "@/context/AuthContext";
 import { NudgePill } from "./ShoppingNudgeSheet";
-import {
-  OrganizePill,
-  SmartToggle,
-  AiBadge,
-  OrganizedView,
-  useOrganize,
-} from "./ShoppingOrganize";
 
 interface ShoppingListItem {
   id: string;
