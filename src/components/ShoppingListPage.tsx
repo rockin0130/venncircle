@@ -213,6 +213,58 @@ const ShoppingListPage = () => {
         </div>
       </div>
 
+      {/* Context toggle row */}
+      <div className="px-5 pb-2">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide scroll-smooth-touch py-1 -mx-1 px-1" style={{ WebkitOverflowScrolling: "touch" }}>
+          <button
+            onClick={() => setLocalContextId(PERSONAL_SENTINEL)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0 border ${
+              localContextId === PERSONAL_SENTINEL
+                ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
+            }`}
+          >
+            <span className="text-sm leading-none">👤</span>
+            <span>Mine</span>
+          </button>
+
+          {shoppingGroups.map((group) => {
+            const isActive = localContextId === group.id;
+            const isFamily = group.name.toLowerCase() === "family" || group.category === "home";
+            return (
+              <button
+                key={group.id}
+                onClick={() => setLocalContextId(group.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0 border ${
+                  isActive
+                    ? isFamily
+                      ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                      : "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                }`}
+              >
+                <span className="text-sm leading-none">{group.emoji}</span>
+                <span className="truncate max-w-[120px]">{group.name}</span>
+              </button>
+            );
+          })}
+
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0 border border-dashed border-primary/30 text-primary hover:bg-primary/5"
+          >
+            <Plus size={12} />
+            <span>Add Group</span>
+          </button>
+        </div>
+      </div>
+
+      <CreateGroupModal
+        open={showCreate}
+        onOpenChange={setShowCreate}
+        defaultPage="shopping"
+      />
+
       {/* Manual add input */}
       <AnimatePresence>
         {showManualAdd && (
