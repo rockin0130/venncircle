@@ -53,8 +53,6 @@ export async function cleanupOrphanedData(userId: string) {
     cleanups.push(cleanTable("tasks", userId, "calendar", isValidGroup, hasFeature));
     // Sobriety categories
     cleanups.push(cleanTable("sobriety_categories", userId, "sobriety", isValidGroup, hasFeature));
-    // Special days
-    cleanups.push(cleanTable("special_days", userId, "special_days", isValidGroup, hasFeature));
     // Shopping lists
     cleanups.push(cleanShoppingLists(userId, isValidGroup, hasFeature));
     // Calendars
@@ -65,7 +63,7 @@ export async function cleanupOrphanedData(userId: string) {
     // 4. Clean shared_group_ids arrays (remove references to non-existent groups)
     cleanups.push(cleanSharedGroupIds("habits", userId, validGroupIds, groupPageMap, "habits"));
     cleanups.push(cleanSharedGroupIds("sobriety_categories", userId, validGroupIds, groupPageMap, "sobriety"));
-    cleanups.push(cleanSharedGroupIds("special_days", userId, validGroupIds, groupPageMap, "special_days"));
+    
 
     await Promise.all(cleanups);
   } catch (err) {

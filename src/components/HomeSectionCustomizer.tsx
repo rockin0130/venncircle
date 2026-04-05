@@ -20,7 +20,7 @@ export const FIXED_SECTIONS: HomeSection[] = [
   { id: "nutrition", label: "Nutrition", icon: "🍎" },
   { id: "workout", label: "Today's Workout", icon: "💪" },
   { id: "sobriety", label: "Sobriety Tracker", icon: "🏆" },
-  { id: "special-days", label: "Special Days", icon: "❤️" },
+  
   { id: "shopping", label: "Shopping List", icon: "🛒" },
   { id: "study", label: "Study", icon: "📖" },
 ];

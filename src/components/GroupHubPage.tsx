@@ -18,7 +18,7 @@ const INTEREST_ROW_COLORS: Record<string, string> = {
   sobriety: "bg-[hsl(260,50%,95%)]",
   habits: "bg-[hsl(35,70%,93%)]",
   calendar: "bg-[hsl(220,15%,93%)]",
-  special_days: "bg-[hsl(340,60%,95%)]",
+  
   shopping: "bg-[hsl(170,50%,93%)]",
 };
 
@@ -55,7 +55,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   );
 
   const handleNavigate = (page: ShareablePage) => {
-    const tab = page === "special_days" ? "specialdays" : page;
+    const tab = page;
     onNavigateToFeature(tab, group.id);
   };
 

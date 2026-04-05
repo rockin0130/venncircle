@@ -13,7 +13,7 @@ import TaskActionMenu from "@/components/TaskActionMenu";
 import AddItemModal from "@/components/AddItemModal";
 import CongratsPopup from "@/components/CongratsPopup";
 import HomeSectionCustomizer, { loadSectionPrefs, saveSectionPrefs, buildAllSections } from "@/components/HomeSectionCustomizer";
-import { HomeWaterWidget, HomeWorkoutWidget, HomeSobrietyWidget, HomeHabitSectionWidget, HomeSpecialDaysWidget, HomeNutritionWidget, HomeShoppingWidget } from "@/components/HomeWidgets";
+import { HomeWaterWidget, HomeWorkoutWidget, HomeSobrietyWidget, HomeHabitSectionWidget, HomeNutritionWidget, HomeShoppingWidget } from "@/components/HomeWidgets";
 import HomeScheduledSection from "@/components/HomeScheduledSection";
 import type { HabitSectionMeta } from "@/lib/habitSections";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
@@ -61,11 +61,6 @@ const QUICK_ACCESS_FEATURES = [
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2c-3 0-6 3-6 8s3 12 6 12 6-7 6-12-3-8-6-8z" />
       <path d="M12 2c0 0 2-1 3 0s1 3 0 4" />
-    </svg>
-  )},
-  { id: "special-days", label: "Special Days", page: "specialdays", icon: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 16.4 5.7 21l2.3-7-6-4.6h7.6z" />
     </svg>
   )},
   { id: "study", label: "Study", page: "study", icon: (
@@ -118,7 +113,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   const [sectionOrder, setSectionOrder] = useState<string[]>([]);
   const [sectionVisible, setSectionVisible] = useState<Set<string>>(new Set());
   const [selectedSobrietyIds, setSelectedSobrietyIds] = useState<string[]>([]);
-  const [selectedSpecialDayIds, setSelectedSpecialDayIds] = useState<string[]>([]);
+  
   const [selectedHabitSubIds, setSelectedHabitSubIds] = useState<string[]>([]);
   const {
     habits, toggleHabit, addHabit, removeHabit, events, tasks, toggleTask, toggleEventCompletion, addTask, addEvent, removeEvent, removeTask, updateTask, rescheduleEvent,
@@ -135,7 +130,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
     setSectionOrder(prefs.order);
     setSectionVisible(prefs.visible);
     setSelectedSobrietyIds(prefs.selectedSobrietyIds);
-    setSelectedSpecialDayIds(prefs.selectedSpecialDayIds);
+    
     setSelectedHabitSubIds(prefs.selectedHabitSubIds);
   }, []);
 
@@ -143,15 +138,14 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
     order: string[],
     visible: Set<string>,
     sobrietyIds: string[],
-    specialDayIds: string[],
+    _specialDayIds: string[],
     habitSubIds: string[]
   ) => {
     setSectionOrder(order);
     setSectionVisible(visible);
     setSelectedSobrietyIds(sobrietyIds);
-    setSelectedSpecialDayIds(specialDayIds);
     setSelectedHabitSubIds(habitSubIds);
-    saveSectionPrefs(null, order, visible, sobrietyIds, specialDayIds, habitSubIds);
+    saveSectionPrefs(null, order, visible, sobrietyIds, [], habitSubIds);
   };
 
   const { listening, start: startListening, stop: stopListening, isSupported: speechSupported } = useSpeechToText({
@@ -852,7 +846,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
               case "nutrition":
               case "workout":
               case "sobriety":
-              case "special-days":
+              
               case "shopping":
               case "study":
                 // These render as Quick Access tiles, not standalone sections
@@ -871,7 +865,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
         order={sectionOrder}
         visible={sectionVisible}
         selectedSobrietyIds={selectedSobrietyIds}
-        selectedSpecialDayIds={selectedSpecialDayIds}
+        selectedSpecialDayIds={[]}
         selectedHabitSubIds={selectedHabitSubIds}
         onSave={handleSaveSections}
       />

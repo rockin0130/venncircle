@@ -61,7 +61,7 @@ const GroupManager = () => {
             emoji: selectedType.emoji,
             invite_code: result.invite_code || "",
             created_by: "",
-            shared_pages: ["calendar","workout","nutrition","habits","sobriety","special_days","shopping"],
+            shared_pages: ["calendar","workout","nutrition","habits","sobriety","shopping"],
             category: "home",
             members: [],
           };

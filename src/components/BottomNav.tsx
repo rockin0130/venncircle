@@ -2,7 +2,7 @@ import { Home, Compass, Sparkles, MessageCircle, User } from "lucide-react";
 
 export type Tab =
   | "home" | "shared-interests" | "ai" | "chat" | "profile"
-  | "workout" | "habits" | "sobriety" | "specialdays" | "nutrition"
+  | "workout" | "habits" | "sobriety" | "nutrition"
   | "calendar" | "shopping" | "study" | "more" | "settings";
 
 // Keep these exports for backward compat with MorePage etc.
@@ -12,7 +12,7 @@ export const ALL_PAGE_META: Record<string, { label: string; icon: typeof Home; d
   habits: { label: "Habits", icon: Home, desc: "Daily habit tracking and streaks" },
   nutrition: { label: "Nutrition", icon: Home, desc: "Track protein, meals & AI suggestions" },
   sobriety: { label: "Sobriety", icon: Home, desc: "Track sobriety milestones" },
-  specialdays: { label: "Special Days", icon: Home, desc: "Track anniversaries & milestones" },
+  
   shopping: { label: "Shopping", icon: Home, desc: "Shopping lists from meal plans" },
   study: { label: "Study", icon: Home, desc: "Track study sessions and focus time" },
 };

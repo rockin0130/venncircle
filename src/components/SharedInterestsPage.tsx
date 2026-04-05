@@ -29,7 +29,7 @@ const INTEREST_PILL_COLORS: Record<string, string> = {
   sobriety: "bg-[hsl(260,50%,92%)] text-[hsl(260,50%,35%)]",
   habits: "bg-[hsl(35,70%,90%)] text-[hsl(35,70%,30%)]",
   calendar: "bg-[hsl(220,15%,91%)] text-[hsl(220,15%,35%)]",
-  special_days: "bg-[hsl(340,60%,92%)] text-[hsl(340,60%,35%)]",
+  
   shopping: "bg-[hsl(170,50%,90%)] text-[hsl(170,50%,30%)]",
 };
 
