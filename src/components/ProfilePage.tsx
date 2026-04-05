@@ -317,7 +317,7 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
         <div className="flex items-center justify-between mb-2 px-0.5">
           <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>Friends</p>
           <button
-            onClick={() => onNavigate?.("launcher")}
+            onClick={() => onNavigate?.("shared-interests")}
             style={{ fontSize: 12, fontWeight: 500, color: "#6C47FF" }}
           >
             See all

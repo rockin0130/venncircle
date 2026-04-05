@@ -15,7 +15,7 @@ import SobrietyPage from "@/components/SobrietyPage";
 import SpecialDaysPage from "@/components/SpecialDaysPage";
 import SettingsPage from "@/components/SettingsPage";
 import ShoppingListPage from "@/components/ShoppingListPage";
-import LauncherPage from "@/components/LauncherPage";
+
 import AuthPage from "@/components/AuthPage";
 import ProfileSetupPage from "@/components/ProfileSetupPage";
 import SharedInterestsPage from "@/components/SharedInterestsPage";
