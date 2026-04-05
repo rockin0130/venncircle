@@ -469,14 +469,6 @@ const ShoppingListPage = () => {
               </p>
             )}
           </div>
-          <Button
-            size="sm"
-            onClick={() => setShowManualAdd(true)}
-            className="gap-1.5"
-          >
-            <Plus size={16} />
-            Add Item
-          </Button>
         </div>
       </div>
 
