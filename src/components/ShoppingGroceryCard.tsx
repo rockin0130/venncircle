@@ -81,7 +81,7 @@ const ShoppingGroceryCard = ({
           )}
           <ShoppingCart size={14} className="text-foreground" />
           <p className="text-sm font-semibold text-foreground">Grocery</p>
-          <OrganizePill loading={orgLoading} onClick={(e) => { e.stopPropagation(); organize(allItems); }} />
+          <OrganizePill loading={orgLoading} onClick={() => organize(allItems)} />
         </button>
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
