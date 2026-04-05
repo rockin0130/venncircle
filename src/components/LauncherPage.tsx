@@ -651,7 +651,7 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
                     </p>
                   )}
                   <div className="flex flex-wrap gap-1 mt-1.5">
-                    {invite.shared_pages.map((page) => (
+                    {invite.shared_pages.filter((p) => SHAREABLE_PAGES.includes(p)).map((page) => (
                       <span key={page} className="text-[10px] font-medium bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">
                         {PAGE_ICONS[page]} {PAGE_LABELS[page]}
                       </span>

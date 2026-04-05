@@ -148,7 +148,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
 
   // Re-resolve the group from context to get latest data
   const currentGroup = groups.find((g) => g.id === group.id) || group;
-  const currentEnabledPages = currentGroup.shared_pages || [];
+  const currentEnabledPages = (currentGroup.shared_pages || []).filter((p) => SHAREABLE_PAGES.includes(p));
   const currentActiveMembers = currentGroup.members.filter((m) => m.status === "active");
 
   return (
