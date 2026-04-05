@@ -619,6 +619,16 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate, onOpenMore }: 
       <header className="pt-10 pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-0.5 flex-1 min-w-0">
+            {onOpenMore && (
+              <button
+                onClick={onOpenMore}
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center hover:bg-secondary/60 active:scale-95 transition-all -ml-1"
+                style={{ color: "hsl(25, 25%, 45%)" }}
+                aria-label="More"
+              >
+                <MoreHorizontal size={20} />
+              </button>
+            )}
             <button onClick={() => shiftDate(-1)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary/60 active:scale-95 transition-all" style={{ color: "hsl(25, 30%, 45%)" }}>
               <ChevronLeft size={20} />
             </button>
