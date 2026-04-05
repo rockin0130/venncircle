@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Trash2, ShoppingCart, Check, X } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, Check, X, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, Group, GroupMember } from "@/context/AuthContext";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import CreateGroupModal from "@/components/CreateGroupModal";
 import ShoppingNudgeSheet, { NudgePill } from "@/components/ShoppingNudgeSheet";
 import ShoppingGroceryCard from "@/components/ShoppingGroceryCard";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ShoppingList {
   id: string;
