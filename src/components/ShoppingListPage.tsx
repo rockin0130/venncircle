@@ -321,7 +321,106 @@ const ShoppingListPage = () => {
     setNewItemText((prev) => ({ ...prev, [listId]: "" }));
   };
 
-  const mealPlanLists = lists.filter((l) => l.is_meal_plan);
+  const openCardAddSheet = (target: CardAddTarget) => {
+    setCardAddTarget(target);
+    setCardAddText("");
+    setShowNewGroupInput(false);
+    setNewGroupName("");
+
+    if (target.type === "grocery") {
+      // Build sub-card options from grocery lists
+      const groceryItems = items.filter((i) => target.lists.some((l) => l.id === i.list_id));
+      const opts: { listId: string; mealName: string | null; label: string }[] = [];
+      target.lists.forEach((gl) => {
+        // Add the list itself as an option (e.g. "Week of 4/6 – 4/12")
+        opts.push({ listId: gl.id, mealName: null, label: gl.label });
+        // Add meal sub-groups inside this list
+        const mealNames = new Set(
+          groceryItems.filter((i) => i.list_id === gl.id && i.meal_name).map((i) => i.meal_name!)
+        );
+        mealNames.forEach((mn) => {
+          opts.push({ listId: gl.id, mealName: mn, label: `${gl.label} → ${mn}` });
+        });
+      });
+      const otherOpt = { listId: "", mealName: null, label: "Other" };
+      setCardAddSubOptions([...opts, otherOpt]);
+      setCardAddSubCard(otherOpt);
+    } else {
+      setCardAddSubOptions([]);
+      setCardAddSubCard({ listId: "", mealName: null, label: "" });
+    }
+    setCardAddOpen(true);
+  };
+
+  const handleCardAddConfirm = async () => {
+    if (!user || !cardAddText.trim() || !cardAddTarget) return;
+    const itemName = cardAddText.trim();
+
+    if (cardAddTarget.type === "manual") {
+      await addItem(cardAddTarget.listId, itemName);
+    } else {
+      // Grocery — determine target
+      if (showNewGroupInput && newGroupName.trim()) {
+        // Create a new sub-card (shopping_list) with custom name
+        const insertData: any = {
+          user_id: user.id,
+          label: newGroupName.trim(),
+          is_meal_plan: true,
+        };
+        if (groupId) insertData.group_id = groupId;
+        const { data: newList, error: listErr } = await supabase
+          .from("shopping_lists")
+          .insert(insertData)
+          .select()
+          .single();
+        if (listErr || !newList) {
+          toast({ title: "Error creating list", variant: "destructive" });
+          return;
+        }
+        setLists((prev) => [...prev, newList as ShoppingList]);
+        await addItem(newList.id, itemName);
+      } else if (cardAddSubCard.label === "Other") {
+        // Create an "Other" sub-card
+        const insertData: any = {
+          user_id: user.id,
+          label: "Other",
+          is_meal_plan: true,
+        };
+        if (groupId) insertData.group_id = groupId;
+        const { data: newList, error: listErr } = await supabase
+          .from("shopping_lists")
+          .insert(insertData)
+          .select()
+          .single();
+        if (listErr || !newList) {
+          toast({ title: "Error creating list", variant: "destructive" });
+          return;
+        }
+        setLists((prev) => [...prev, newList as ShoppingList]);
+        await addItem(newList.id, itemName);
+      } else {
+        // Add to existing list with optional meal_name
+        const { data, error } = await supabase
+          .from("shopping_list_items")
+          .insert({
+            list_id: cardAddSubCard.listId,
+            user_id: user.id,
+            name: itemName,
+            meal_name: cardAddSubCard.mealName,
+          })
+          .select()
+          .single();
+        if (!error && data) {
+          setItems((prev) => [...prev, data as ShoppingListItem]);
+        }
+      }
+    }
+
+    setCardAddOpen(false);
+    setCardAddTarget(null);
+    setCardAddText("");
+  };
+
   const manualLists = lists.filter((l) => !l.is_meal_plan);
 
   // In Mine aggregate view, group manual lists by label
