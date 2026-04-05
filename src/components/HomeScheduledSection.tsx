@@ -104,6 +104,7 @@ interface Props {
   enabledHabitCategories?: string[];
   selectedDate?: Date;
   isViewingMemberName?: string;
+  showWater?: boolean;
 }
 
 const CATEGORY_TO_PERIOD: Record<string, Period> = {

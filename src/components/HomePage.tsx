@@ -740,21 +740,28 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
             switch (sectionId) {
               case "scheduled":
                 return (
-                  <HomeScheduledSection
-                    key={sectionId}
-                    allDayItems={allDayItems}
-                    allTimedItems={allTimedItems}
-                    isToday={isToday}
-                    isViewingPartner={isViewingPartner}
-                    onToggleTask={toggleTask}
-                    onToggleEvent={toggleEventCompletion}
-                    onToggleGcal={toggleGcalCompletion}
-                    onCongrats={() => setCongratsType("task")}
-                    onNavigate={onNavigate}
-                    enabledHabitCategories={effectiveHabitSubIds.filter(id => id.startsWith("habit:")).map(id => id.replace("habit:", ""))}
-                    selectedDate={selectedDate}
-                    isViewingMemberName={undefined}
-                  />
+                  <div key={sectionId}>
+                    <HomeScheduledSection
+                      allDayItems={allDayItems}
+                      allTimedItems={allTimedItems}
+                      isToday={isToday}
+                      isViewingPartner={isViewingPartner}
+                      onToggleTask={toggleTask}
+                      onToggleEvent={toggleEventCompletion}
+                      onToggleGcal={toggleGcalCompletion}
+                      onCongrats={() => setCongratsType("task")}
+                      onNavigate={onNavigate}
+                      enabledHabitCategories={effectiveHabitSubIds.filter(id => id.startsWith("habit:")).map(id => id.replace("habit:", ""))}
+                      selectedDate={selectedDate}
+                      isViewingMemberName={undefined}
+                      showWater={sectionVisible.has("water")}
+                    />
+                    {/* Quick Access Strip */}
+                    <QuickAccessStrip
+                      enabledSections={sectionVisible}
+                      onNavigate={onNavigate}
+                    />
+                  </div>
                 );
 
               case "todo":
