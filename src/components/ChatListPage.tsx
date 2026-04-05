@@ -19,9 +19,11 @@ interface ChatPreview {
 const ChatListPage = ({
   onOpenChat,
   onOpenSettings,
+  onOpenMore,
 }: {
   onOpenChat: (group: Group) => void;
   onOpenSettings?: () => void;
+  onOpenMore?: () => void;
 }) => {
   const { user, groups } = useAuth();
   const [previews, setPreviews] = useState<ChatPreview[]>([]);
