@@ -16,6 +16,7 @@ const settingsItems = [
 
 interface ProfilePageProps {
   onNavigate?: (tab: string) => void;
+  onOpenSettings?: () => void;
 }
 
 const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
