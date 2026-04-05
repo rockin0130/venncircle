@@ -143,11 +143,18 @@ const Index = () => {
     setActiveTab("ai");
   };
 
+  // Map tab names to ShareablePage keys for feature gating
+  const TAB_TO_PAGE: Record<string, string> = {
+    workout: "workout",
+    nutrition: "nutrition",
+    habits: "habits",
+    sobriety: "sobriety",
+    specialdays: "special_days",
+    calendar: "calendar",
+    shopping: "shopping",
+  };
+
   const handleNavigateToFeature = (feature: string, groupId?: string) => {
-    if (groupId) {
-      const group = groups.find((g) => g.id === groupId);
-      if (group) setActiveGroup(group);
-    }
     const tabMap: Record<string, Tab> = {
       workout: "workout",
       nutrition: "nutrition",
@@ -159,7 +166,20 @@ const Index = () => {
       shopping: "shopping",
     };
     const tab = tabMap[feature];
-    if (tab) setActiveTab(tab);
+    if (!tab) return;
+
+    if (groupId) {
+      const group = groups.find((g) => g.id === groupId);
+      const pageKey = TAB_TO_PAGE[tab] || feature;
+      // Only set active group if the group has this feature enabled
+      if (group && group.shared_pages?.includes(pageKey as any)) {
+        setActiveGroup(group);
+      } else {
+        // Group doesn't have this feature — fall back to personal
+        setActiveGroup(null);
+      }
+    }
+    setActiveTab(tab);
   };
 
   const handleCreateInterestGroup = () => {
