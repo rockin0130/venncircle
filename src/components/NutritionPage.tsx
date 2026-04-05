@@ -178,6 +178,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
   const [shopQueue, setShopQueue] = useState<{ ingredients: string[]; mealTitle: string; mealDate: string }[]>([]);
   const [shopChecked, setShopChecked] = useState<Record<number, boolean>>({});
   const [shopSaving, setShopSaving] = useState(false);
+  const [shopDestination, setShopDestination] = useState<{ open: boolean; groupName: string; selectedItems: string[]; mealTitle: string; weekStart: string; weekEnd: string; weekLabel: string } | null>(null);
 
   const dismissShopPrompt = () => {
     setShopPrompt(null);
