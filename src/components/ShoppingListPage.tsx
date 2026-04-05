@@ -632,6 +632,7 @@ const ShoppingListPage = () => {
             onNudge={() => setNudgeOpen(true)}
             isMineView={isMineView}
             listGroupLabelMap={listGroupLabelMap}
+            onAddToCard={() => openCardAddSheet({ type: "grocery", lists: mealPlanLists })}
           />
         )}
       </div>
