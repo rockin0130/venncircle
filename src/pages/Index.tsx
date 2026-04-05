@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
-import { motion, AnimatePresence, useMotionValue, PanInfo } from "framer-motion";
+import { useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import MorePage from "@/components/MorePage";
 import BottomNav, { type Tab, loadNavPages, saveNavPages, FIXED_NAV_PAGES, MAX_NAV_SLOTS } from "@/components/BottomNav";
@@ -15,7 +15,7 @@ import SobrietyPage from "@/components/SobrietyPage";
 import SpecialDaysPage from "@/components/SpecialDaysPage";
 import SettingsPage from "@/components/SettingsPage";
 import ShoppingListPage from "@/components/ShoppingListPage";
-import LauncherPage from "@/components/LauncherPage";
+
 import AuthPage from "@/components/AuthPage";
 import ProfileSetupPage from "@/components/ProfileSetupPage";
 import SharedInterestsPage from "@/components/SharedInterestsPage";
@@ -31,13 +31,10 @@ import { useNavStyle } from "@/hooks/useNavStyle";
 import { useWeekStart } from "@/hooks/useWeekStart";
 import { Loader2, MoreHorizontal } from "lucide-react";
 
-type FullTab = "launcher" | Tab;
-
-const SWIPE_THRESHOLD = 80;
 
 const Index = () => {
   const { user, loading, profile, groups, activeGroup, setActiveGroup, refreshProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<FullTab>("launcher");
+  const [activeTab, setActiveTab] = useState<Tab>("home");
   const [navPages] = useState<Tab[]>(() => loadNavPages());
   const [chatGroup, setChatGroup] = useState<Group | null>(null);
   const [chatMode, setChatMode] = useState<"list" | "chat">("list");
@@ -49,18 +46,6 @@ const Index = () => {
   const { navStyle, setNavStyle } = useNavStyle();
   const { weekStart, setWeekStart } = useWeekStart();
 
-  const swipeX = useMotionValue(0);
-
-  const resetHomeSwipeState = useCallback(() => {
-    swipeX.stop();
-    swipeX.set(0);
-  }, [swipeX]);
-
-  useEffect(() => {
-    if (activeTab !== "home") {
-      resetHomeSwipeState();
-    }
-  }, [activeTab, resetHomeSwipeState]);
 
   if (loading) {
     return (
@@ -86,7 +71,6 @@ const Index = () => {
   }
 
   const handleEnterGroup = (groupId: string | null) => {
-    resetHomeSwipeState();
     if (groupId) {
       const group = groups.find((g) => g.id === groupId);
       if (group) setActiveGroup(group);
@@ -94,13 +78,8 @@ const Index = () => {
       setActiveGroup(null);
     }
     setActiveTab("home");
-    requestAnimationFrame(resetHomeSwipeState);
   };
 
-  const handleBackToLauncher = () => {
-    resetHomeSwipeState();
-    setActiveTab("launcher");
-  };
 
   const handleOpenSettings = () => {
     setActiveTab("settings");
@@ -205,24 +184,15 @@ const Index = () => {
 
   const handleOpenGroupHub = (group: Group) => {
     setHubGroup(group);
-    setActiveTab("group-hub" as FullTab);
+    setActiveTab("group-hub" as Tab);
   };
 
   const handleBackFromHub = () => {
     setHubGroup(null);
-    setActiveTab("shared-interests" as FullTab);
-  };
-
-  const handleDragEnd = (_: any, info: PanInfo) => {
-    if (activeTab === "home" && (info.offset.x > SWIPE_THRESHOLD || info.velocity.x > 200)) {
-      handleBackToLauncher();
-      return;
-    }
-    resetHomeSwipeState();
+    setActiveTab("shared-interests" as Tab);
   };
 
   const pages: Record<string, React.ReactNode> = {
-    launcher: <LauncherPage onEnterGroup={handleEnterGroup} onOpenSettings={handleOpenSettings} />,
     home: <HomePage onOpenSettings={handleOpenSettings} onNavigate={(page) => handleNavigateToFeature(page)} />,
     "shared-interests": (
       <SharedInterestsPage
@@ -239,7 +209,7 @@ const Index = () => {
         onNavigateToFeature={handleNavigateToFeature}
       />
     ) : null,
-    profile: <ProfilePage onNavigate={(tab) => setActiveTab(tab as FullTab)} onOpenSettings={handleOpenSettings} onOpenMore={() => setMoreOpen(true)} />,
+    profile: <ProfilePage onNavigate={(tab) => handleTabChange(tab as Tab)} onOpenSettings={handleOpenSettings} onOpenMore={() => setMoreOpen(true)} />,
     workout: <WorkoutsPage onOpenMore={() => setMoreOpen(true)} />,
     nutrition: <NutritionPage onOpenMore={() => setMoreOpen(true)} />,
     habits: <HabitsPage onOpenMore={() => setMoreOpen(true)} />,
@@ -252,43 +222,24 @@ const Index = () => {
     settings: <SettingsPage />,
   };
 
-  const isInnerPage = activeTab !== "launcher";
-  const showBottomNav = isInnerPage && navStyle === "bottom";
-  const showDrawerButton = isInnerPage && navStyle === "drawer";
+  const showBottomNav = navStyle === "bottom";
+  const showDrawerButton = navStyle === "drawer";
   const showFloatingMoreButton = false;
 
   return (
     <AppProvider>
       <div className="flex flex-col w-full max-w-md mx-auto bg-background h-svh relative overflow-hidden">
         <AnimatePresence mode="wait">
-          {activeTab === "launcher" ? (
-            <motion.div
-              key="launcher"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="flex-1 overflow-y-auto scroll-smooth-touch relative"
-            >
-              {pages.launcher}
-            </motion.div>
-          ) : (
-            <motion.div
-              key={activeTab === "chat" ? `chat-${chatGroup?.id || "list"}` : activeTab}
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.97 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
-              drag={activeTab === "home" ? "x" : false}
-              dragConstraints={{ left: 0, right: 300 }}
-              dragElastic={0.15}
-              onDragEnd={handleDragEnd}
-              style={activeTab === "home" ? { x: swipeX } : undefined}
-              className={`flex-1 overflow-y-auto scroll-smooth-touch relative bg-background ${isInnerPage ? (showBottomNav ? "pb-24" : showDrawerButton ? "pb-20" : "pb-4") : ""}`}
-            >
-              {pages[activeTab]}
-            </motion.div>
-          )}
+          <motion.div
+            key={activeTab === "chat" ? `chat-${chatGroup?.id || "list"}` : activeTab}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className={`flex-1 overflow-y-auto scroll-smooth-touch relative bg-background ${showBottomNav ? "pb-24" : showDrawerButton ? "pb-20" : "pb-4"}`}
+          >
+            {pages[activeTab]}
+          </motion.div>
         </AnimatePresence>
 
         {activeTab === "home" && showBottomNav && (
