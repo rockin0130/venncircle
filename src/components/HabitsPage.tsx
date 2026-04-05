@@ -60,7 +60,7 @@ const USER_COLORS = [
 
 const getUserColor = (index: number) => USER_COLORS[index % USER_COLORS.length];
 
-const HabitsPage = ({ onOpenSettings }: { onOpenSettings?: () => void } = {}) => {
+const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => void; onOpenMore?: () => void } = {}) => {
   const {
     habits, filteredHabits, filteredPartnerHabits,
     toggleHabit, addHabit, removeHabit, addSharedHabit,
