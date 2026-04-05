@@ -113,7 +113,6 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
                         <span className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">
                           {mealChecked}/{mealItems.length}
                         </span>
-                        {isGroupView && onNudge && <NudgePill onClick={onNudge} />}
                       </div>
                     </button>
                     <AnimatePresence initial={false}>
