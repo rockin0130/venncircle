@@ -854,6 +854,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
               case "sobriety":
               case "special-days":
               case "shopping":
+              case "study":
                 // These render as Quick Access tiles, not standalone sections
                 return null;
 
