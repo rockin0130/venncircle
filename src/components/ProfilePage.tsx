@@ -1,12 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 import { Users, ChevronRight, Pencil, Dumbbell, Heart, Settings } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import EditProfileModal from "@/components/EditProfileModal";
 import { useFriendships } from "@/hooks/useFriendships";
-
 
 interface ProfilePageProps {
   onNavigate?: (tab: string) => void;
@@ -14,57 +11,11 @@ interface ProfilePageProps {
 }
 
 const ProfilePage = ({ onNavigate, onOpenSettings }: ProfilePageProps) => {
-  const { user, session, profile, signOut } = useAuth();
+  const { profile } = useAuth();
   const { filteredHabits, filteredWorkouts } = useAppContext();
   const { activeFriends } = useFriendships();
   const [showEditProfile, setShowEditProfile] = useState(false);
-  const [gcalConnected, setGcalConnected] = useState<boolean | null>(null);
-  const [gcalLoading, setGcalLoading] = useState(false);
 
-  // Check Google Calendar connection
-  useEffect(() => {
-    if (!user) { setGcalConnected(false); return; }
-    const check = async () => {
-      const { data } = await supabase
-        .from("google_calendar_tokens")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      setGcalConnected(!!data);
-    };
-    check();
-  }, [user]);
-
-  const handleConnectGoogleCalendar = async () => {
-    if (!user) return;
-    setGcalLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("google-calendar-auth-url", {});
-      if (error || !data?.url) throw error || new Error("No URL returned");
-      window.location.href = data.url;
-    } catch {
-      toast.error("Failed to start Google Calendar connection");
-      setGcalLoading(false);
-    }
-  };
-
-  const handleDisconnectGoogleCalendar = async () => {
-    setGcalLoading(true);
-    try {
-      const { error } = await supabase.functions.invoke("google-calendar-disconnect", {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      });
-      if (error) throw error;
-      setGcalConnected(false);
-      toast.success("Google Calendar disconnected");
-    } catch {
-      toast.error("Failed to disconnect Google Calendar");
-    }
-    setGcalLoading(false);
-  };
-
-  // Activity stats
-  const todayStr = new Date().toISOString().slice(0, 10);
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
   const weekAgoStr = weekAgo.toISOString().slice(0, 10);
@@ -141,7 +92,6 @@ const ProfilePage = ({ onNavigate, onOpenSettings }: ProfilePageProps) => {
         </div>
         <ChevronRight size={16} className="text-muted-foreground" />
       </button>
-
 
       <EditProfileModal open={showEditProfile} onOpenChange={setShowEditProfile} />
     </div>
