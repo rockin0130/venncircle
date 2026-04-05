@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, ShoppingCart, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ShoppingCart, Trash2, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GroupMember } from "@/context/AuthContext";
 import { NudgePill } from "./ShoppingNudgeSheet";
@@ -44,6 +44,7 @@ interface Props {
   onNudge?: () => void;
   isMineView?: boolean;
   listGroupLabelMap?: Record<string, string>;
+  onAddToCard?: () => void;
 }
 
 const ShoppingGroceryCard = ({
@@ -57,6 +58,7 @@ const ShoppingGroceryCard = ({
   onNudge,
   isMineView,
   listGroupLabelMap,
+  onAddToCard,
 }: Props) => {
   const [open, setOpen] = useState(true);
   const { loading: orgLoading, result: orgResult, viewMode, setViewMode, organize } = useOrganize();
@@ -67,11 +69,11 @@ const ShoppingGroceryCard = ({
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
       {/* Grocery card header */}
-      <button
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center justify-between w-full px-4 py-3 bg-secondary/30"
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between w-full px-4 py-3 bg-secondary/30">
+        <button
+          onClick={() => setOpen((prev) => !prev)}
+          className="flex items-center gap-2 flex-1 min-w-0"
+        >
           {open ? (
             <ChevronDown size={14} className="text-muted-foreground" />
           ) : (
@@ -79,15 +81,23 @@ const ShoppingGroceryCard = ({
           )}
           <ShoppingCart size={14} className="text-foreground" />
           <p className="text-sm font-semibold text-foreground">Grocery</p>
-          <OrganizePill loading={orgLoading} onClick={() => organize(allItems)} />
-        </div>
+          <OrganizePill loading={orgLoading} onClick={(e) => { e.stopPropagation(); organize(allItems); }} />
+        </button>
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
             {checkedItems}/{totalItems}
           </span>
           {isGroupView && !isMineView && onNudge && <NudgePill onClick={onNudge} />}
+          {onAddToCard && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onAddToCard(); }}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+            >
+              <Plus size={14} />
+            </button>
+          )}
         </div>
-      </button>
+      </div>
 
       <AnimatePresence initial={false}>
         {open && (
