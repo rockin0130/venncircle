@@ -54,6 +54,14 @@ const ShoppingListPage = () => {
 
   const groupId = localGroup?.id;
 
+  // User filter state for group sub-pills
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set([EVERYONE_SENTINEL]));
+
+  // Reset user filter when context changes
+  useEffect(() => {
+    setSelectedUserIds(new Set([EVERYONE_SENTINEL]));
+  }, [localContextId]);
+
   const fetchData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
