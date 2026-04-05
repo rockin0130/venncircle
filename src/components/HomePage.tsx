@@ -159,7 +159,13 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   const [selectedSobrietyIds, setSelectedSobrietyIds] = useState<string[]>([]);
   
   const [selectedHabitSubIds, setSelectedHabitSubIds] = useState<string[]>([]);
-  const [quickAccessPos, setQuickAccessPos] = useState<"above-scheduled" | "below-todo">("below-todo");
+  const [quickAccessPos, setQuickAccessPos] = useState<"above-scheduled" | "below-todo">(() => {
+    try {
+      const saved = localStorage.getItem("home_qa_position");
+      if (saved === "above-scheduled" || saved === "below-todo") return saved;
+    } catch {}
+    return "below-todo";
+  });
   const [wiggleMode, setWiggleMode] = useState(false);
   const {
     habits, toggleHabit, addHabit, removeHabit, events, tasks, toggleTask, toggleEventCompletion, addTask, addEvent, removeEvent, removeTask, updateTask, rescheduleEvent,
