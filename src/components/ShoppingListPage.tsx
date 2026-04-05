@@ -446,13 +446,13 @@ const ListSection = ({
       {orgResult && (
         <>
           <SmartToggle labels={orgResult.toggle_labels} viewMode={viewMode} onSwitch={setViewMode} />
-          {viewMode === "organized" && <AiBadge duplicatesMerged={orgResult.duplicates_merged} />}
+          {viewMode === "organized" && <AiBadge />}
         </>
       )}
 
       {/* Organized view */}
       {orgResult && viewMode === "organized" ? (
-        <OrganizedView result={orgResult} checkedIds={checkedIds} onToggle={onToggle} onDelete={onDelete} />
+        <OrganizedView result={orgResult} allItems={items} onToggle={onToggle} onDelete={onDelete} />
       ) : (
         /* Original view */
         <div className="divide-y divide-border/50">

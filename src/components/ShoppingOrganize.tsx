@@ -6,18 +6,12 @@ import { toast } from "@/hooks/use-toast";
 /* ── Types ── */
 interface OrganizedCategory {
   label: string;
-  items: {
-    name: string;
-    quantity: number;
-    merged: boolean;
-    original_ids: string[];
-  }[];
+  item_ids: string[];
 }
 
 export interface OrganizeResult {
   toggle_labels: [string, string];
   categories: OrganizedCategory[];
-  duplicates_merged: number;
 }
 
 export interface ShoppingItemBasic {
@@ -44,15 +38,18 @@ export function useOrganize() {
     if (items.length === 0) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-shopping-organize", {
-        body: { items: items.map((i) => ({ id: i.id, name: i.name })) },
+      const { data, error } = await supabase.functions.invoke("ai-nutrition", {
+        body: {
+          action: "organize_shopping",
+          items: items.map((i) => ({ id: i.id, name: i.name })),
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setResult(data as OrganizeResult);
       setViewMode("organized");
     } catch (e: any) {
-      toast({ title: e?.message || "Failed to organize", variant: "destructive" });
+      toast({ title: "Couldn't organize right now — try again", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -115,14 +112,14 @@ export const SmartToggle = ({
 );
 
 /* ── AI badge ── */
-export const AiBadge = ({ duplicatesMerged }: { duplicatesMerged: number }) => (
+export const AiBadge = () => (
   <div className="mx-4 mb-2">
     <span
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
       style={{ background: "#FAF5FF", color: "#6C47FF", border: "0.5px solid rgba(108,71,255,0.25)" }}
     >
       <VennIcon />
-      AI organized{duplicatesMerged > 0 ? ` · ${duplicatesMerged} duplicates merged` : ""}
+      AI organized
     </span>
   </div>
 );
@@ -130,23 +127,33 @@ export const AiBadge = ({ duplicatesMerged }: { duplicatesMerged: number }) => (
 /* ── Organized View ── */
 export const OrganizedView = ({
   result,
-  checkedIds,
+  allItems,
   onToggle,
   onDelete,
 }: {
   result: OrganizeResult;
-  checkedIds: Set<string>;
+  allItems: ShoppingItemBasic[];
   onToggle: (id: string, checked: boolean) => void;
   onDelete: (id: string) => void;
 }) => {
+  const itemMap = new Map(allItems.map((i) => [i.id, i]));
+
+  // Filter out empty categories (all items checked or missing)
   const visibleCategories = result.categories.filter((cat) =>
-    cat.items.some((item) => item.original_ids.some((id) => !checkedIds.has(id)))
+    cat.item_ids.some((id) => {
+      const item = itemMap.get(id);
+      return item && !item.checked;
+    })
   );
 
-  const checkedCategories = result.categories.filter(
+  // Categories where all items are checked
+  const doneCategories = result.categories.filter(
     (cat) =>
-      cat.items.some((item) => item.original_ids.some((id) => checkedIds.has(id))) &&
-      !visibleCategories.includes(cat)
+      cat.item_ids.every((id) => {
+        const item = itemMap.get(id);
+        return !item || item.checked;
+      }) &&
+      cat.item_ids.some((id) => itemMap.has(id))
   );
 
   return (
@@ -158,82 +165,52 @@ export const OrganizedView = ({
               {cat.label}
             </p>
           </div>
-          {cat.items
-            .filter((item) => item.original_ids.some((id) => !checkedIds.has(id)))
-            .map((item) => {
-              const primaryId = item.original_ids[0];
-              const isChecked = item.original_ids.every((id) => checkedIds.has(id));
-              return (
-                <div key={primaryId} className="flex items-center gap-3 px-4 py-2.5 group">
-                  <button
-                    onClick={() => {
-                      item.original_ids.forEach((id) => onToggle(id, checkedIds.has(id)));
-                    }}
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                      isChecked
-                        ? "bg-primary border-primary"
-                        : "border-muted-foreground/30 hover:border-primary/50"
-                    }`}
-                  >
-                    {isChecked && <Check size={12} className="text-primary-foreground" />}
-                  </button>
-                  <span className={`flex-1 text-sm transition-all ${isChecked ? "line-through text-muted-foreground/50" : "text-foreground"}`}>
-                    {item.name}
-                    {item.quantity > 1 && (
-                      <span className="ml-1.5 text-[10px] text-muted-foreground font-medium">×{item.quantity}</span>
-                    )}
-                    {item.merged && (
-                      <span
-                        className="ml-1.5 text-[9px] font-medium px-1 py-0.5 rounded"
-                        style={{ background: "#FAF5FF", color: "#6C47FF" }}
-                      >
-                        merged
-                      </span>
-                    )}
-                  </span>
-                  <button
-                    onClick={() => onDelete(primaryId)}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-destructive transition-all"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              );
-            })}
+          {cat.item_ids.map((id) => {
+            const item = itemMap.get(id);
+            if (!item || item.checked) return null;
+            return (
+              <div key={id} className="flex items-center gap-3 px-4 py-2.5 group">
+                <button
+                  onClick={() => onToggle(id, false)}
+                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all border-muted-foreground/30 hover:border-primary/50"
+                >
+                </button>
+                <span className="flex-1 text-sm text-foreground">{item.name}</span>
+                <button
+                  onClick={() => onDelete(id)}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-destructive transition-all"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            );
+          })}
         </div>
       ))}
 
-      {/* Show checked items from organized view */}
-      {checkedCategories.map((cat) => (
-        <div key={`checked-${cat.label}`}>
+      {/* Checked items */}
+      {doneCategories.map((cat) => (
+        <div key={`done-${cat.label}`}>
           <div className="px-4 py-1.5 bg-secondary/20">
             <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider line-through">
               {cat.label}
             </p>
           </div>
-          {cat.items
-            .filter((item) => item.original_ids.every((id) => checkedIds.has(id)))
-            .map((item) => {
-              const primaryId = item.original_ids[0];
-              return (
-                <div key={primaryId} className="flex items-center gap-3 px-4 py-2.5 group">
-                  <button
-                    onClick={() => {
-                      item.original_ids.forEach((id) => onToggle(id, true));
-                    }}
-                    className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 bg-primary border-primary"
-                  >
-                    <Check size={12} className="text-primary-foreground" />
-                  </button>
-                  <span className="flex-1 text-sm line-through text-muted-foreground/50">
-                    {item.name}
-                    {item.quantity > 1 && (
-                      <span className="ml-1.5 text-[10px] font-medium">×{item.quantity}</span>
-                    )}
-                  </span>
-                </div>
-              );
-            })}
+          {cat.item_ids.map((id) => {
+            const item = itemMap.get(id);
+            if (!item) return null;
+            return (
+              <div key={id} className="flex items-center gap-3 px-4 py-2.5 group">
+                <button
+                  onClick={() => onToggle(id, true)}
+                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 bg-primary border-primary"
+                >
+                  <Check size={12} className="text-primary-foreground" />
+                </button>
+                <span className="flex-1 text-sm line-through text-muted-foreground/50">{item.name}</span>
+              </div>
+            );
+          })}
         </div>
       ))}
     </div>
