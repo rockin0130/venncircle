@@ -214,8 +214,9 @@ const HomeScheduledSection = ({
     return map;
   }, [filteredHabits, enabledHabitCategories]);
 
+  // Ensure flexible always appears if water is enabled
   const activePeriods = (["morning", "afternoon", "evening", "flexible"] as Period[]).filter(
-    p => periodMap[p].length > 0 || habitsByPeriod[p].length > 0
+    p => periodMap[p].length > 0 || habitsByPeriod[p].length > 0 || (p === "flexible" && showWater)
   );
 
   // Progress (include habits in count)
