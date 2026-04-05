@@ -50,7 +50,7 @@ const ShoppingListPage = () => {
   const [items, setItems] = useState<ShoppingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [newItemText, setNewItemText] = useState<Record<string, string>>({});
-  const [showManualAdd, setShowManualAdd] = useState(false);
+  
   const [manualItemText, setManualItemText] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [nudgeOpen, setNudgeOpen] = useState(false);
@@ -249,7 +249,7 @@ const ShoppingListPage = () => {
     if (!manualItemText.trim()) return;
     const itemName = manualItemText.trim();
     setManualItemText("");
-    setShowManualAdd(false);
+    
 
     const existingCategories = lists
       .filter((l) => !l.is_meal_plan)
@@ -469,14 +469,6 @@ const ShoppingListPage = () => {
               </p>
             )}
           </div>
-          <Button
-            size="sm"
-            onClick={() => setShowManualAdd(true)}
-            className="gap-1.5"
-          >
-            <Plus size={16} />
-            Add Item
-          </Button>
         </div>
       </div>
 
@@ -532,42 +524,44 @@ const ShoppingListPage = () => {
         defaultPage="shopping"
       />
 
-      {/* Manual add input */}
-      <AnimatePresence>
-        {showManualAdd && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden px-5"
-          >
-            <div className="flex gap-2 pt-2 pb-3">
-              <Input
-                value={manualItemText}
-                onChange={(e) => setManualItemText(e.target.value)}
-                placeholder="e.g. Eggs, Milk, Bread..."
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleManualAdd();
-                }}
-                autoFocus
-              />
-              <Button size="icon" onClick={handleManualAdd} variant="default">
-                <Check size={16} />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => {
-                  setShowManualAdd(false);
-                  setManualItemText("");
-                }}
-              >
-                <X size={16} />
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Inline add bar */}
+      <div className="px-5 pb-3">
+        <div
+          className="flex items-center gap-2.5 w-full bg-card border border-border rounded-xl px-3.5 py-2.5 cursor-text"
+          onClick={() => {
+            const inp = document.getElementById("shopping-inline-add") as HTMLInputElement;
+            inp?.focus();
+          }}
+        >
+          {/* Venn diagram icon */}
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="shrink-0">
+            <circle cx="7.5" cy="10" r="5.5" stroke="#6C47FF" strokeWidth="1.5" fill="none" opacity="0.7" />
+            <circle cx="12.5" cy="10" r="5.5" stroke="#6C47FF" strokeWidth="1.5" fill="none" opacity="0.7" />
+          </svg>
+          <input
+            id="shopping-inline-add"
+            type="text"
+            value={manualItemText}
+            onChange={(e) => setManualItemText(e.target.value)}
+            placeholder="Add an item..."
+            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleManualAdd();
+            }}
+          />
+          {manualItemText.trim() && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleManualAdd();
+              }}
+              className="p-1 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Check size={14} />
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="px-4 pb-8 space-y-4 flex-1">
         {lists.length === 0 && (
