@@ -22,7 +22,7 @@ interface PartnerProfile {
   email: string | null;
 }
 
-export const SHAREABLE_PAGES = ["calendar", "workout", "nutrition", "habits", "sobriety", "special_days", "shopping"] as const;
+export const SHAREABLE_PAGES = ["calendar", "workout", "nutrition", "habits", "sobriety", "special_days", "shopping", "study"] as const;
 export type ShareablePage = typeof SHAREABLE_PAGES[number];
 
 export const PAGE_LABELS: Record<ShareablePage, string> = {
@@ -33,6 +33,7 @@ export const PAGE_LABELS: Record<ShareablePage, string> = {
   sobriety: "Sobriety",
   special_days: "Special Days",
   shopping: "Shopping",
+  study: "Study",
 };
 
 export const PAGE_ICONS: Record<ShareablePage, string> = {
@@ -43,6 +44,7 @@ export const PAGE_ICONS: Record<ShareablePage, string> = {
   sobriety: "🏆",
   special_days: "❤️",
   shopping: "🛒",
+  study: "📖",
 };
 
 export interface Group {
