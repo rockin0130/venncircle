@@ -92,7 +92,7 @@ function getUserColor(index: number) {
   return USER_COLORS[index % USER_COLORS.length];
 }
 
-const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
+const NutritionPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => void; onOpenMore?: () => void }) => {
   const { user, activeGroup, partner, profile, groups } = useAuth();
   const { hasOther, otherName } = useGroupContext();
 
