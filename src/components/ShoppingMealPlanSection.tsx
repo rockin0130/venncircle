@@ -3,6 +3,13 @@ import { ChevronDown, ChevronRight, Check, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GroupMember } from "@/context/AuthContext";
 import { NudgePill } from "./ShoppingNudgeSheet";
+import {
+  OrganizePill,
+  SmartToggle,
+  AiBadge,
+  OrganizedView,
+  useOrganize,
+} from "./ShoppingOrganize";
 
 interface ShoppingListItem {
   id: string;
@@ -41,6 +48,9 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
 
   const totalItems = items.length;
   const checkedItems = items.filter(i => i.checked).length;
+  const checkedIds = new Set(items.filter(i => i.checked).map(i => i.id));
+
+  const { loading: orgLoading, result: orgResult, viewMode, setViewMode, organize } = useOrganize();
 
   const mealGroups: Record<string, ShoppingListItem[]> = {};
   const ungrouped: ShoppingListItem[] = [];
@@ -71,6 +81,7 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
         <div className="flex items-center gap-2">
           {weekOpen ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronRight size={14} className="text-muted-foreground" />}
           <p className="text-sm font-semibold text-foreground">🍽️ {list.label}</p>
+          <OrganizePill loading={orgLoading} onClick={() => organize(items)} />
         </div>
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
@@ -94,51 +105,65 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
             exit={{ height: 0 }}
             className="overflow-hidden"
           >
-            <div className="divide-y divide-border/50">
-              {mealNames.map(mealName => {
-                const mealItems = mealGroups[mealName];
-                const mealChecked = mealItems.filter(i => i.checked).length;
-                const open = isMealOpen(mealName);
+            {/* Smart toggle — only after organizing */}
+            {orgResult && (
+              <>
+                <SmartToggle labels={orgResult.toggle_labels} viewMode={viewMode} onSwitch={setViewMode} />
+                {viewMode === "organized" && <AiBadge duplicatesMerged={orgResult.duplicates_merged} />}
+              </>
+            )}
 
-                return (
-                  <div key={mealName}>
-                    <button
-                      onClick={() => toggleMeal(mealName)}
-                      className="flex items-center justify-between w-full px-4 py-2 bg-secondary/10 hover:bg-secondary/20 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        {open ? <ChevronDown size={12} className="text-muted-foreground" /> : <ChevronRight size={12} className="text-muted-foreground" />}
-                        <span className="text-xs font-semibold text-foreground">{mealName}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">
-                          {mealChecked}/{mealItems.length}
-                        </span>
-                        {isGroupView && onNudge && <NudgePill onClick={onNudge} />}
-                      </div>
-                    </button>
-                    <AnimatePresence initial={false}>
-                      {open && (
-                        <motion.div
-                          initial={{ height: 0 }}
-                          animate={{ height: "auto" }}
-                          exit={{ height: 0 }}
-                          className="overflow-hidden"
-                        >
-                          {mealItems.map(item => (
-                            <ItemRow key={item.id} item={item} onToggle={onToggle} onDelete={onDelete} />
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                );
-              })}
+            {/* Organized view */}
+            {orgResult && viewMode === "organized" ? (
+              <OrganizedView result={orgResult} checkedIds={checkedIds} onToggle={onToggle} onDelete={onDelete} />
+            ) : (
+              /* Original view */
+              <div className="divide-y divide-border/50">
+                {mealNames.map(mealName => {
+                  const mealItems = mealGroups[mealName];
+                  const mealChecked = mealItems.filter(i => i.checked).length;
+                  const open = isMealOpen(mealName);
 
-              {ungrouped.map(item => (
-                <ItemRow key={item.id} item={item} onToggle={onToggle} onDelete={onDelete} />
-              ))}
-            </div>
+                  return (
+                    <div key={mealName}>
+                      <button
+                        onClick={() => toggleMeal(mealName)}
+                        className="flex items-center justify-between w-full px-4 py-2 bg-secondary/10 hover:bg-secondary/20 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          {open ? <ChevronDown size={12} className="text-muted-foreground" /> : <ChevronRight size={12} className="text-muted-foreground" />}
+                          <span className="text-xs font-semibold text-foreground">{mealName}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">
+                            {mealChecked}/{mealItems.length}
+                          </span>
+                          {isGroupView && onNudge && <NudgePill onClick={onNudge} />}
+                        </div>
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {open && (
+                          <motion.div
+                            initial={{ height: 0 }}
+                            animate={{ height: "auto" }}
+                            exit={{ height: 0 }}
+                            className="overflow-hidden"
+                          >
+                            {mealItems.map(item => (
+                              <ItemRow key={item.id} item={item} onToggle={onToggle} onDelete={onDelete} />
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
+
+                {ungrouped.map(item => (
+                  <ItemRow key={item.id} item={item} onToggle={onToggle} onDelete={onDelete} />
+                ))}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
