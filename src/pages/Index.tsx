@@ -202,7 +202,7 @@ const Index = () => {
         onNavigateToFeature={handleNavigateToFeature}
       />
     ) : null,
-    profile: <ProfilePage onNavigate={(tab) => setActiveTab(tab as FullTab)} onOpenSettings={handleOpenSettings} />,
+    profile: <ProfilePage onNavigate={(tab) => setActiveTab(tab as FullTab)} onOpenSettings={handleOpenSettings} onOpenMore={() => setMoreOpen(true)} />,
     workout: <WorkoutsPage />,
     nutrition: <NutritionPage />,
     habits: <HabitsPage />,
@@ -218,7 +218,7 @@ const Index = () => {
   const isInnerPage = activeTab !== "launcher";
   const showBottomNav = isInnerPage && navStyle === "bottom";
   const showDrawerButton = isInnerPage && navStyle === "drawer";
-  const showFloatingMoreButton = isInnerPage && navStyle === "bottom" && !["home", "ai", "settings", "launcher"].includes(activeTab);
+  const showFloatingMoreButton = isInnerPage && navStyle === "bottom" && !["home", "profile", "ai", "settings", "launcher"].includes(activeTab);
 
   return (
     <AppProvider>
