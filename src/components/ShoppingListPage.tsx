@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import CreateGroupModal from "@/components/CreateGroupModal";
+import ShoppingUserFilter, { EVERYONE_SENTINEL } from "@/components/ShoppingUserFilter";
 
 interface ShoppingList {
   id: string;
