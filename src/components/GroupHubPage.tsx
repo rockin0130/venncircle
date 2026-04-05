@@ -34,6 +34,14 @@ const MEMBER_COLORS = [
   "bg-[hsl(190,45%,55%)]",
 ];
 
+const COVER_GRADIENTS = [
+  "from-[hsl(210,30%,88%)] to-[hsl(220,25%,82%)]",
+  "from-[hsl(260,25%,88%)] to-[hsl(270,20%,82%)]",
+  "from-[hsl(35,30%,88%)] to-[hsl(25,25%,82%)]",
+  "from-[hsl(170,25%,87%)] to-[hsl(180,20%,82%)]",
+  "from-[hsl(340,25%,88%)] to-[hsl(350,20%,82%)]",
+];
+
 interface FeedPost {
   id: string;
   user_id: string;
@@ -63,11 +71,16 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [localCoverUrl, setLocalCoverUrl] = useState<string | null>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const isOwner = user?.id === group.created_by;
   const currentGroup = groups.find((g) => g.id === group.id) || group;
   const currentEnabledPages = (currentGroup.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)) as ShareablePage[];
   const currentActiveMembers = currentGroup.members.filter((m) => m.status === "active");
+  const coverUrl = localCoverUrl || currentGroup.cover_image_url || null;
+  const coverGradientIdx = currentGroup.name.charCodeAt(0) % COVER_GRADIENTS.length;
 
   const availableInterests = useMemo(
     () => SHAREABLE_PAGES.filter((p) => !currentEnabledPages.includes(p)),
@@ -83,22 +96,12 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
       .order("created_at", { ascending: false })
       .limit(50);
 
-    if (error) {
-      console.error("Error fetching posts:", error);
-      return;
-    }
+    if (error) { console.error("Error fetching posts:", error); return; }
+    if (!postsData || postsData.length === 0) { setPosts([]); setLoadingPosts(false); return; }
 
-    if (!postsData || postsData.length === 0) {
-      setPosts([]);
-      setLoadingPosts(false);
-      return;
-    }
-
-    // Get unique user IDs and fetch profiles
     const userIds = [...new Set(postsData.map((p: any) => p.user_id))];
     const { data: profiles } = await supabase.rpc("get_profiles_by_ids", { _user_ids: userIds });
 
-    // Check which posts the current user has liked
     const postIds = postsData.map((p: any) => p.id);
     const { data: myLikes } = await supabase
       .from("group_feed_likes")
@@ -111,12 +114,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
 
     const enrichedPosts: FeedPost[] = postsData.map((p: any) => {
       const profile = profileMap.get(p.user_id);
-      return {
-        ...p,
-        user_display_name: profile?.display_name || "Member",
-        user_avatar_url: profile?.avatar_url,
-        liked_by_me: likedPostIds.has(p.id),
-      };
+      return { ...p, user_display_name: profile?.display_name || "Member", user_avatar_url: profile?.avatar_url, liked_by_me: likedPostIds.has(p.id) };
     });
 
     setPosts(enrichedPosts);
@@ -125,65 +123,37 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
 
   useEffect(() => {
     fetchPosts();
-
-    // Realtime subscription
     const channel = supabase
       .channel(`feed-${currentGroup.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "group_feed_posts", filter: `group_id=eq.${currentGroup.id}` }, () => {
-        fetchPosts();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "group_feed_posts", filter: `group_id=eq.${currentGroup.id}` }, () => { fetchPosts(); })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [currentGroup.id]);
 
-  const handleNavigate = (page: ShareablePage) => {
-    onNavigateToFeature(page, currentGroup.id);
-  };
+  const handleNavigate = (page: ShareablePage) => { onNavigateToFeature(page, currentGroup.id); };
 
   const handleAddInterest = async (page: ShareablePage) => {
     const newPages = [...currentEnabledPages, page];
     const result = await updateGroupSharedPages(currentGroup.id, newPages);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success(`${PAGE_LABELS[page]} added`);
-      await refreshGroups();
-    }
+    if (result.error) toast.error(result.error);
+    else { toast.success(`${PAGE_LABELS[page]} added`); await refreshGroups(); }
     setAddInterestOpen(false);
   };
 
   const handleRemoveInterest = async (page: ShareablePage) => {
-    if (currentEnabledPages.length <= 1) {
-      toast.error("Group must have at least one interest");
-      return;
-    }
+    if (currentEnabledPages.length <= 1) { toast.error("Group must have at least one interest"); return; }
     const newPages = currentEnabledPages.filter((p) => p !== page);
     const result = await updateGroupSharedPages(currentGroup.id, newPages);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success(`${PAGE_LABELS[page]} removed`);
-      await refreshGroups();
-    }
+    if (result.error) toast.error(result.error);
+    else { toast.success(`${PAGE_LABELS[page]} removed`); await refreshGroups(); }
   };
 
   const handleSaveName = async () => {
-    if (!nameInput.trim() || nameInput.trim() === currentGroup.name) {
-      setEditingName(false);
-      return;
-    }
+    if (!nameInput.trim() || nameInput.trim() === currentGroup.name) { setEditingName(false); return; }
     setSavingName(true);
-    const { error } = await supabase
-      .from("groups")
-      .update({ name: nameInput.trim() })
-      .eq("id", currentGroup.id);
-    if (error) {
-      toast.error("Failed to rename group");
-    } else {
-      toast.success("Group renamed");
-      await refreshGroups();
-    }
+    const { error } = await supabase.from("groups").update({ name: nameInput.trim() }).eq("id", currentGroup.id);
+    if (error) toast.error("Failed to rename group");
+    else { toast.success("Group renamed"); await refreshGroups(); }
     setSavingName(false);
     setEditingName(false);
   };
@@ -191,39 +161,22 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   const handleLeave = async () => {
     setLeaving(true);
     const result = await leaveGroup(currentGroup.id);
-    if (result.error) {
-      toast.error(result.error);
-      setLeaving(false);
-    } else {
-      toast.success("Left group");
-      await refreshGroups();
-      onBack();
-    }
+    if (result.error) { toast.error(result.error); setLeaving(false); }
+    else { toast.success("Left group"); await refreshGroups(); onBack(); }
   };
 
   const handleDelete = async () => {
     setDeleting(true);
     try {
       const { data, error } = await supabase.rpc("delete_group", { _group_id: currentGroup.id });
-      if (error) {
-        toast.error(`Failed to delete group: ${error.message}`);
-        setDeleting(false);
-        return;
-      }
+      if (error) { toast.error(`Failed to delete group: ${error.message}`); setDeleting(false); return; }
       const result = data as any;
-      if (result?.error) {
-        toast.error(result.error);
-        setDeleting(false);
-        return;
-      }
+      if (result?.error) { toast.error(result.error); setDeleting(false); return; }
       toast.success("Group deleted");
       setSettingsOpen(false);
       await refreshGroups();
       onBack();
-    } catch (err: any) {
-      toast.error("Failed to delete group");
-      setDeleting(false);
-    }
+    } catch { toast.error("Failed to delete group"); setDeleting(false); }
   };
 
   const handleLike = async (postId: string, currentlyLiked: boolean) => {
@@ -234,55 +187,106 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
       await supabase.from("group_feed_likes").insert({ post_id: postId, user_id: user?.id || "" });
       await supabase.from("group_feed_posts").update({ likes_count: (posts.find(p => p.id === postId)?.likes_count || 0) + 1 }).eq("id", postId);
     }
-    // Optimistic update
-    setPosts(prev => prev.map(p => p.id === postId ? {
-      ...p,
-      liked_by_me: !currentlyLiked,
-      likes_count: currentlyLiked ? Math.max(0, p.likes_count - 1) : p.likes_count + 1,
-    } : p));
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, liked_by_me: !currentlyLiked, likes_count: currentlyLiked ? Math.max(0, p.likes_count - 1) : p.likes_count + 1 } : p));
   };
 
-  const handleMemberTap = (member: any) => {
-    setSelectedMember(member);
-    setMemberSheetOpen(true);
+  const handleMemberTap = (member: any) => { setSelectedMember(member); setMemberSheetOpen(true); };
+
+  const handleCoverUpload = async (file: File) => {
+    setUploadingCover(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const filePath = `${currentGroup.id}/cover.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("group-covers").upload(filePath, file, { upsert: true, cacheControl: "60" });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("group-covers").getPublicUrl(filePath);
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+      const { error: updateError } = await supabase.from("groups").update({ cover_image_url: publicUrl }).eq("id", currentGroup.id);
+      if (updateError) throw updateError;
+      setLocalCoverUrl(publicUrl);
+      await refreshGroups();
+      toast.success("Cover photo updated");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to upload cover photo");
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
+  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleCoverUpload(file);
+    e.target.value = "";
   };
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Header */}
-      <header className="px-4 pt-12 pb-3 flex-shrink-0 border-b border-border/40">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              onClick={onBack}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary/60 transition-colors shrink-0"
-            >
-              <ArrowLeft size={20} className="text-foreground" />
-            </button>
-            <div className="min-w-0">
-              <h1 className="text-lg font-bold text-foreground truncate">{currentGroup.name}</h1>
-              <p className="text-xs text-muted-foreground">
-                {currentActiveMembers.length} member{currentActiveMembers.length !== 1 ? "s" : ""}
-              </p>
-            </div>
+      {/* Hidden file input for cover */}
+      <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFileChange} />
+
+      {/* Cover Photo */}
+      <div className="relative w-full flex-shrink-0" style={{ height: 110 }}>
+        {coverUrl ? (
+          <>
+            <img src={coverUrl} alt="" className="w-full h-full object-cover" />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.45))" }} />
+          </>
+        ) : (
+          <div
+            className={`w-full h-full bg-gradient-to-br ${COVER_GRADIENTS[coverGradientIdx]} flex flex-col items-center justify-center gap-1 cursor-pointer`}
+            onClick={() => isOwner && coverInputRef.current?.click()}
+          >
+            <Camera size={18} className="text-muted-foreground/50" />
+            <span className="text-[10px] text-muted-foreground/50 font-medium">Add cover photo</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-white border border-[rgba(0,0,0,0.08)]"
-              style={{ borderWidth: "0.5px" }}
-            >
-              <Settings size={14} className="text-muted-foreground" />
-            </button>
-            <button
-              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-white border border-[rgba(0,0,0,0.08)]"
-              style={{ borderWidth: "0.5px" }}
-            >
-              <MoreHorizontal size={14} className="text-muted-foreground" />
-            </button>
-          </div>
+        )}
+
+        {/* Floating back arrow — top left */}
+        <button
+          onClick={onBack}
+          className="absolute top-10 left-3 w-7 h-7 rounded-full flex items-center justify-center z-10"
+          style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(8px)" }}
+        >
+          <ArrowLeft size={15} className="text-white" />
+        </button>
+
+        {/* Edit cover pill — top right, admin only */}
+        {isOwner && coverUrl && (
+          <button
+            onClick={() => coverInputRef.current?.click()}
+            className="absolute top-10 right-3 px-2.5 py-1 rounded-full text-[10px] font-medium text-white z-10 flex items-center gap-1"
+            style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(8px)" }}
+          >
+            {uploadingCover ? <Loader2 size={10} className="animate-spin" /> : <Camera size={10} />}
+            Edit cover
+          </button>
+        )}
+
+        {/* Group name + member count — bottom left */}
+        <div className="absolute bottom-2.5 left-3 z-10">
+          <h1 className="text-[15px] font-bold text-white leading-tight drop-shadow-sm">{currentGroup.name}</h1>
+          <p className="text-[11px] text-white/70 font-medium">
+            {currentActiveMembers.length} member{currentActiveMembers.length !== 1 ? "s" : ""}
+          </p>
         </div>
-      </header>
+
+        {/* Gear + More — bottom right */}
+        <div className="absolute bottom-2.5 right-3 flex items-center gap-1.5 z-10">
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="w-7 h-7 rounded-full flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(8px)" }}
+          >
+            <Settings size={13} className="text-white" />
+          </button>
+          <button
+            className="w-7 h-7 rounded-full flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(8px)" }}
+          >
+            <MoreHorizontal size={13} className="text-white" />
+          </button>
+        </div>
+      </div>
 
       <div className="flex-1 overflow-y-auto">
         {/* Member Story Rings */}
@@ -292,18 +296,13 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
               const isMe = m.user_id === user?.id;
               const name = isMe ? "Mine" : (m.display_name || "Member").split(" ")[0];
               return (
-                <button
-                  key={m.user_id}
-                  onClick={() => handleMemberTap(m)}
-                  className="flex flex-col items-center gap-1 shrink-0"
-                >
+                <button key={m.user_id} onClick={() => handleMemberTap(m)} className="flex flex-col items-center gap-1 shrink-0">
                   <div className="relative">
                     <div className="w-14 h-14 rounded-full p-[2px] border-2 border-muted-foreground/30">
                       <div className={`w-full h-full rounded-full ${MEMBER_COLORS[i % MEMBER_COLORS.length]} flex items-center justify-center text-sm font-bold text-white`}>
                         {(m.display_name || "?")[0].toUpperCase()}
                       </div>
                     </div>
-                    {/* Online dot placeholder */}
                     <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[hsl(142,70%,45%)] border-2 border-background" />
                   </div>
                   <span className="text-[11px] text-muted-foreground font-medium truncate max-w-[56px]">{name}</span>
@@ -317,11 +316,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
         <div className="px-4 pb-3">
           <div className="flex gap-3 overflow-x-auto scrollbar-none">
             {currentEnabledPages.map((page) => (
-              <button
-                key={page}
-                onClick={() => handleNavigate(page)}
-                className="flex flex-col items-center gap-1.5 shrink-0"
-              >
+              <button key={page} onClick={() => handleNavigate(page)} className="flex flex-col items-center gap-1.5 shrink-0">
                 <div className={`w-12 h-12 rounded-xl ${INTEREST_ICON_COLORS[page] || "bg-muted"} flex items-center justify-center text-lg`}>
                   {PAGE_ICONS[page] || "📋"}
                 </div>
@@ -331,8 +326,11 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
           </div>
         </div>
 
+        {/* Divider line */}
+        <div className="mx-4" style={{ height: "0.5px", background: "rgba(0,0,0,0.08)" }} />
+
         {/* Compose Box */}
-        <div className="px-4 pb-3">
+        <div className="px-4 py-3">
           <GroupFeedCompose
             groupId={currentGroup.id}
             userId={user?.id || ""}
@@ -380,19 +378,13 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
       {/* Add Interest Dialog */}
       <Dialog open={addInterestOpen} onOpenChange={setAddInterestOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Add Interest</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Add Interest</DialogTitle></DialogHeader>
           <div className="space-y-2 py-2">
             {availableInterests.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">All interests are already enabled</p>
             ) : (
               availableInterests.map((page) => (
-                <button
-                  key={page}
-                  onClick={() => handleAddInterest(page)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary/20 transition-all"
-                >
+                <button key={page} onClick={() => handleAddInterest(page)} className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary/20 transition-all">
                   <div className={`w-7 h-7 rounded-lg ${INTEREST_ICON_COLORS[page] || "bg-muted"} flex items-center justify-center text-sm`}>
                     {PAGE_ICONS[page] || "📋"}
                   </div>
@@ -404,36 +396,21 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
         </DialogContent>
       </Dialog>
 
-      {/* Settings Dialog — preserved from original */}
+      {/* Settings Dialog */}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent className="max-w-sm max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Group Settings</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Group Settings</DialogTitle></DialogHeader>
           <div className="space-y-5 py-2">
             {/* Group Name */}
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</label>
               {editingName ? (
                 <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="text"
-                    value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
-                    autoFocus
-                  />
-                  <button
-                    onClick={handleSaveName}
-                    disabled={savingName}
-                    className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center"
-                  >
+                  <input type="text" value={nameInput} onChange={(e) => setNameInput(e.target.value)} className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground" autoFocus />
+                  <button onClick={handleSaveName} disabled={savingName} className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
                     {savingName ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                   </button>
-                  <button
-                    onClick={() => { setEditingName(false); setNameInput(currentGroup.name); }}
-                    className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"
-                  >
+                  <button onClick={() => { setEditingName(false); setNameInput(currentGroup.name); }} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
                     <X size={14} className="text-muted-foreground" />
                   </button>
                 </div>
@@ -441,9 +418,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
                 <div className="flex items-center justify-between mt-1">
                   <p className="text-sm font-medium text-foreground">{currentGroup.name}</p>
                   {isOwner && (
-                    <button onClick={() => setEditingName(true)} className="text-muted-foreground hover:text-foreground">
-                      <Pencil size={14} />
-                    </button>
+                    <button onClick={() => setEditingName(true)} className="text-muted-foreground hover:text-foreground"><Pencil size={14} /></button>
                   )}
                 </div>
               )}
@@ -451,9 +426,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
 
             {/* Members */}
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Members ({currentActiveMembers.length})
-              </label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Members ({currentActiveMembers.length})</label>
               <div className="space-y-2 mt-2">
                 {currentActiveMembers.map((m) => (
                   <div key={m.user_id} className="flex items-center gap-2 p-2 rounded-lg bg-secondary/30">
@@ -473,18 +446,8 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Invite Code</label>
               <div className="flex items-center gap-2 mt-1">
-                <code className="px-3 py-2 rounded-lg bg-secondary text-sm font-mono text-foreground flex-1">
-                  {currentGroup.invite_code}
-                </code>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(currentGroup.invite_code);
-                    toast.success("Copied!");
-                  }}
-                  className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold"
-                >
-                  Copy
-                </button>
+                <code className="px-3 py-2 rounded-lg bg-secondary text-sm font-mono text-foreground flex-1">{currentGroup.invite_code}</code>
+                <button onClick={() => { navigator.clipboard.writeText(currentGroup.invite_code); toast.success("Copied!"); }} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold">Copy</button>
               </div>
             </div>
 
@@ -499,12 +462,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
                       <span className="text-sm text-foreground">{PAGE_LABELS[page]}</span>
                     </div>
                     {currentEnabledPages.length > 1 && (
-                      <button
-                        onClick={() => handleRemoveInterest(page)}
-                        className="text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <X size={14} />
-                      </button>
+                      <button onClick={() => handleRemoveInterest(page)} className="text-muted-foreground hover:text-destructive transition-colors"><X size={14} /></button>
                     )}
                   </div>
                 ))}
@@ -516,49 +474,22 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
               {!isOwner && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <button className="w-full flex items-center gap-2 p-3 rounded-xl text-destructive hover:bg-destructive/5 transition-colors text-sm font-medium">
-                      <LogOut size={16} />
-                      Leave Group
-                    </button>
+                    <button className="w-full flex items-center gap-2 p-3 rounded-xl text-destructive hover:bg-destructive/5 transition-colors text-sm font-medium"><LogOut size={16} />Leave Group</button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Leave group?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        You'll lose access to shared data in this group. You can rejoin later with an invite.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleLeave} disabled={leaving}>
-                        {leaving ? "Leaving..." : "Leave"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
+                    <AlertDialogHeader><AlertDialogTitle>Leave group?</AlertDialogTitle><AlertDialogDescription>You'll lose access to shared data in this group. You can rejoin later with an invite.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleLeave} disabled={leaving}>{leaving ? "Leaving..." : "Leave"}</AlertDialogAction></AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
               )}
-
               {isOwner && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <button className="w-full flex items-center gap-2 p-3 rounded-xl text-destructive hover:bg-destructive/5 transition-colors text-sm font-medium">
-                      <Trash2 size={16} />
-                      Delete Group
-                    </button>
+                    <button className="w-full flex items-center gap-2 p-3 rounded-xl text-destructive hover:bg-destructive/5 transition-colors text-sm font-medium"><Trash2 size={16} />Delete Group</button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete group?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will permanently delete the group and remove all members. This cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive hover:bg-destructive/90">
-                        {deleting ? "Deleting..." : "Delete"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
+                    <AlertDialogHeader><AlertDialogTitle>Delete group?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the group and remove all members. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive hover:bg-destructive/90">{deleting ? "Deleting..." : "Delete"}</AlertDialogAction></AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
               )}
