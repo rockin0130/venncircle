@@ -149,6 +149,58 @@ Prioritize meals for the unlogged meal types. Make suggestions varied and practi
       });
     }
 
+    if (body.action === "categorize_item") {
+      const itemName = body.item_name;
+      const existingCategories = body.existing_categories || [];
+      if (!itemName) {
+        return new Response(JSON.stringify({ error: "item_name required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [
+            {
+              role: "system",
+              content: `You categorize shopping items. Given an item name and a list of existing category names, decide which category it belongs to.
+
+Rules:
+- If the item clearly fits an existing category, return that exact category name.
+- Common grocery/food items (produce, dairy, meat, pantry staples, beverages, condiments, spices, etc.) should always map to "Grocery".
+- If the item doesn't fit any existing category AND is not grocery, pick a short, natural category name (e.g. "Pharmacy", "Clothing", "Electronics", "Books & Media", "Home & Garden", "Pet Supplies", "Office", "Beauty").
+- If genuinely ambiguous, use "Others".
+- Also return an appropriate emoji icon for the category.
+- Also return is_grocery: true if the category is "Grocery".
+
+Return ONLY valid JSON: { "category": "string", "icon": "emoji", "is_grocery": boolean }`,
+            },
+            {
+              role: "user",
+              content: `Item: "${itemName}"\nExisting categories: ${JSON.stringify(existingCategories)}`,
+            },
+          ],
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (!response.ok) throw new Error(`AI error: ${response.status}`);
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || "{}";
+      const parsed = JSON.parse(content);
+
+      return new Response(JSON.stringify(parsed), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (body.action === "organize_shopping") {
       const items = body.items;
       if (!Array.isArray(items) || items.length === 0) {
