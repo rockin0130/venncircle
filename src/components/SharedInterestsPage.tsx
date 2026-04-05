@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Plus, ChevronRight, Maximize2, Minimize2, MoreHorizontal } from "lucide-react";
-import { useAuth, Group, ShareablePage, PAGE_LABELS } from "@/context/AuthContext";
+import { useAuth, Group, ShareablePage, PAGE_LABELS, SHAREABLE_PAGES } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
 interface FeedItem {
@@ -284,7 +284,7 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
                         <MemberDots members={activeMembers} />
                       </div>
                       <div className="flex flex-wrap gap-1 max-w-[160px] justify-end shrink-0">
-                        {(group.shared_pages || []).slice(0, 4).map((page) => (
+                        {(group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).slice(0, 4).map((page) => (
                           <span
                             key={page}
                             className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
@@ -292,9 +292,9 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
                             {PAGE_LABELS[page as ShareablePage] || page}
                           </span>
                         ))}
-                        {(group.shared_pages || []).length > 4 && (
+                        {(group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).length > 4 && (
                           <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                            +{group.shared_pages.length - 4}
+                            +{(group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).length - 4}
                           </span>
                         )}
                       </div>
