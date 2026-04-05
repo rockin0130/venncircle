@@ -7,6 +7,7 @@ import { Group, useAuth, PAGE_LABELS, PAGE_ICONS, ShareablePage, SHAREABLE_PAGES
 import { useFriendships } from "@/hooks/useFriendships";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import GroupFeedPost from "@/components/GroupFeedPost";
 
 interface LauncherPageProps {
   onEnterGroup: (groupId: string | null) => void;
