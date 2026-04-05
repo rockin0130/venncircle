@@ -7,15 +7,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import CreateGroupModal from "@/components/CreateGroupModal";
-import ShoppingMealPlanSection from "@/components/ShoppingMealPlanSection";
 import ShoppingNudgeSheet, { NudgePill } from "@/components/ShoppingNudgeSheet";
-import {
-  OrganizePill,
-  SmartToggle,
-  AiBadge,
-  OrganizedView,
-  useOrganize,
-} from "@/components/ShoppingOrganize";
+import ShoppingGroceryCard from "@/components/ShoppingGroceryCard";
 
 interface ShoppingList {
   id: string;
