@@ -277,13 +277,32 @@ const Index = () => {
 
         {showFloatingMoreButton && (
           <button
-            onClick={() => setActiveTab("more")}
+            onClick={() => setMoreOpen(true)}
             className="fixed top-3 left-3 z-50 w-10 h-10 rounded-full bg-card/80 backdrop-blur-sm border border-border shadow-sm flex items-center justify-center text-foreground hover:bg-secondary transition-colors"
             aria-label="More"
           >
             <MoreHorizontal size={20} />
           </button>
         )}
+
+        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+          <SheetContent side="left" className="w-72 p-0 flex flex-col bg-card">
+            <div className="flex-1 overflow-y-auto">
+              <MorePage
+                navPages={navPages}
+                onNavigate={(tab) => { handleTabChange(tab); setMoreOpen(false); }}
+                onAddToNav={() => {}}
+                onRemoveFromNav={() => {}}
+                onReplaceInNav={() => {}}
+                onOpenSettings={() => { handleOpenSettings(); setMoreOpen(false); }}
+                navStyle={navStyle}
+                onNavStyleChange={setNavStyle}
+                weekStart={weekStart}
+                onWeekStartChange={setWeekStart}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {showDrawerButton && (
           <DrawerMenuButton onClick={() => setDrawerOpen(true)} />
