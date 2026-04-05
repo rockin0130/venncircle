@@ -13,7 +13,7 @@ import TaskActionMenu from "@/components/TaskActionMenu";
 import AddItemModal from "@/components/AddItemModal";
 import CongratsPopup from "@/components/CongratsPopup";
 import HomeSectionCustomizer, { loadSectionPrefs, saveSectionPrefs, buildAllSections } from "@/components/HomeSectionCustomizer";
-import { HomeWaterWidget, HomeWorkoutWidget, HomeSobrietyWidget, HomeHabitSectionWidget, HomeSpecialDaysWidget, HomeNutritionWidget, HomeShoppingWidget } from "@/components/HomeWidgets";
+import { HomeWaterWidget, HomeWorkoutWidget, HomeSobrietyWidget, HomeHabitSectionWidget, HomeNutritionWidget, HomeShoppingWidget } from "@/components/HomeWidgets";
 import HomeScheduledSection from "@/components/HomeScheduledSection";
 import type { HabitSectionMeta } from "@/lib/habitSections";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
