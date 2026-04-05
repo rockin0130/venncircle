@@ -70,6 +70,10 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
   const [localCoverMap, setLocalCoverMap] = useState<Record<string, string>>({});
   const [uploadingGroupId, setUploadingGroupId] = useState<string | null>(null);
   const [addFriendOpen, setAddFriendOpen] = useState(false);
+  const [groupsExpanded, setGroupsExpanded] = useState(false);
+  const [activityExpanded, setActivityExpanded] = useState(false);
+  const [activityPosts, setActivityPosts] = useState<any[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(true);
   const pendingGroupIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
