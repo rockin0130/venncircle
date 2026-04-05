@@ -37,7 +37,7 @@ const SWIPE_THRESHOLD = 80;
 
 const Index = () => {
   const { user, loading, profile, groups, activeGroup, setActiveGroup, refreshProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<FullTab>("launcher");
+  const [activeTab, setActiveTab] = useState<FullTab>("home");
   const [navPages] = useState<Tab[]>(() => loadNavPages());
   const [chatGroup, setChatGroup] = useState<Group | null>(null);
   const [chatMode, setChatMode] = useState<"list" | "chat">("list");
