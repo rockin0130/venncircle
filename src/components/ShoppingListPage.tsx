@@ -526,6 +526,63 @@ const ShoppingListPage = () => {
         onOpenChange={setNudgeOpen}
         groupMembers={groupMembers}
       />
+
+      {/* Grocery sub-card picker */}
+      <Dialog open={groceryPickerOpen} onOpenChange={(open) => {
+        if (!open) {
+          setGroceryPickerOpen(false);
+          setPendingGroceryItem(null);
+        }
+      }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="text-base">Add to…</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1 max-h-60 overflow-y-auto -mx-1 px-1">
+            {grocerySubCardOptions.map((opt, idx) => {
+              const isSelected = selectedSubCard.listId === opt.listId && selectedSubCard.mealName === opt.mealName;
+              return (
+                <button
+                  key={`${opt.listId}-${opt.mealName ?? "other"}-${idx}`}
+                  onClick={() => setSelectedSubCard(opt)}
+                  className={`flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm transition-all ${
+                    isSelected
+                      ? "bg-primary/10 text-primary font-semibold border border-primary/30"
+                      : "text-foreground hover:bg-secondary/50 border border-transparent"
+                  }`}
+                >
+                  <ChevronRight size={12} className={isSelected ? "text-primary" : "text-muted-foreground"} />
+                  <span className="truncate">{opt.label}</span>
+                  {isSelected && <Check size={14} className="ml-auto text-primary shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+          <Button
+            className="w-full mt-2"
+            onClick={async () => {
+              if (!pendingGroceryItem || !selectedSubCard.listId) return;
+              const { data, error } = await supabase
+                .from("shopping_list_items")
+                .insert({
+                  list_id: selectedSubCard.listId,
+                  user_id: user!.id,
+                  name: pendingGroceryItem,
+                  meal_name: selectedSubCard.mealName,
+                })
+                .select()
+                .single();
+              if (!error && data) {
+                setItems((prev) => [...prev, data as ShoppingListItem]);
+              }
+              setGroceryPickerOpen(false);
+              setPendingGroceryItem(null);
+            }}
+          >
+            Confirm
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
