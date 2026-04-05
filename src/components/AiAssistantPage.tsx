@@ -75,7 +75,7 @@ const ACTION_LABELS: Record<string, string> = {
 // Thread auto-split: 30 minutes of inactivity = new thread
 const THREAD_SPLIT_MS = 30 * 60 * 1000;
 
-const AiAssistantPage = ({ onBack }: { onBack?: () => void }) => {
+const AiAssistantPage = ({ onBack, onOpenMore }: { onBack?: () => void; onOpenMore?: () => void }) => {
   const { user, profile, groups, activeGroup } = useAuth();
   const appContext = useAppContext();
   const [messages, setMessages] = useState<AiMessage[]>([]);
