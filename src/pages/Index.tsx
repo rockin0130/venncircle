@@ -31,9 +31,6 @@ import { useNavStyle } from "@/hooks/useNavStyle";
 import { useWeekStart } from "@/hooks/useWeekStart";
 import { Loader2, MoreHorizontal } from "lucide-react";
 
-type FullTab = Tab;
-
-const SWIPE_THRESHOLD = 80;
 
 const Index = () => {
   const { user, loading, profile, groups, activeGroup, setActiveGroup, refreshProfile } = useAuth();
