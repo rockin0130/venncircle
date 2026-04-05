@@ -243,9 +243,8 @@ const Index = () => {
     settings: <SettingsPage />,
   };
 
-  const isInnerPage = activeTab !== "launcher";
-  const showBottomNav = isInnerPage && navStyle === "bottom";
-  const showDrawerButton = isInnerPage && navStyle === "drawer";
+  const showBottomNav = navStyle === "bottom";
+  const showDrawerButton = navStyle === "drawer";
   const showFloatingMoreButton = false;
 
   return (
