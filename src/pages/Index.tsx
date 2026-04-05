@@ -144,7 +144,7 @@ const Index = () => {
     if (chatGroup && chatMode === "chat") {
       return <ChatPage group={chatGroup} onBack={handleBackToList} />;
     }
-    return <ChatListPage onOpenChat={handleOpenChat} />;
+    return <ChatListPage onOpenChat={handleOpenChat} onOpenMore={() => setMoreOpen(true)} />;
   };
 
   const handleDrawerNavigate = (tab: Tab | "settings") => {
