@@ -817,26 +817,26 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                       isViewingMemberName={undefined}
                       showWater={sectionVisible.has("water")}
                     />
-                    {/* Quick Access Strip */}
-                    <QuickAccessStrip
-                      enabledSections={sectionVisible}
-                      onNavigate={onNavigate}
-                    />
                   </div>
                 );
 
               case "todo":
                 return (
-                  <TodoListSection
-                    key={sectionId}
-                    tasks={todoTasks}
-                    onToggle={isViewingPartner ? undefined : toggleTask}
-                    onCongrats={() => setCongratsType("task")}
-                    readOnly={isViewingPartner}
-                    addTask={addTask}
-                    selectedDate={selectedDate}
-                    memberFilters={[]}
-                  />
+                  <div key={sectionId}>
+                    <TodoListSection
+                      tasks={todoTasks}
+                      onToggle={isViewingPartner ? undefined : toggleTask}
+                      onCongrats={() => setCongratsType("task")}
+                      readOnly={isViewingPartner}
+                      addTask={addTask}
+                      selectedDate={selectedDate}
+                      memberFilters={[]}
+                    />
+                    <QuickAccessStrip
+                      enabledSections={sectionVisible}
+                      onNavigate={onNavigate}
+                    />
+                  </div>
                 );
 
               case "water":
