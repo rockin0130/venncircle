@@ -12,7 +12,7 @@ import ChatListPage from "@/components/ChatListPage";
 import ChatPage from "@/components/ChatPage";
 import AiAssistantPage from "@/components/AiAssistantPage";
 import SobrietyPage from "@/components/SobrietyPage";
-import SpecialDaysPage from "@/components/SpecialDaysPage";
+
 import SettingsPage from "@/components/SettingsPage";
 import ShoppingListPage from "@/components/ShoppingListPage";
 import StudyPage from "@/components/StudyPage";
@@ -97,7 +97,6 @@ const Index = () => {
       nutrition: "nutrition",
       habits: "habits",
       sobriety: "sobriety",
-      specialdays: "special_days",
       calendar: "calendar",
       shopping: "shopping",
       study: "study",
@@ -146,7 +145,7 @@ const Index = () => {
     nutrition: "nutrition",
     habits: "habits",
     sobriety: "sobriety",
-    specialdays: "special_days",
+    
     calendar: "calendar",
     shopping: "shopping",
     study: "study",
@@ -158,8 +157,6 @@ const Index = () => {
       nutrition: "nutrition",
       habits: "habits",
       sobriety: "sobriety",
-      special_days: "specialdays",
-      specialdays: "specialdays",
       calendar: "calendar",
       shopping: "shopping",
       study: "study",
@@ -224,7 +221,7 @@ const Index = () => {
     nutrition: <NutritionPage onOpenMore={() => setMoreOpen(true)} />,
     habits: <HabitsPage onOpenMore={() => setMoreOpen(true)} />,
     sobriety: <SobrietyPage onOpenMore={() => setMoreOpen(true)} />,
-    specialdays: <SpecialDaysPage onOpenMore={() => setMoreOpen(true)} />,
+    
     shopping: <ShoppingListPage onOpenMore={() => setMoreOpen(true)} />,
     calendar: <CalendarPage onOpenMore={() => setMoreOpen(true)} />,
     study: <StudyPage onOpenMore={() => setMoreOpen(true)} />,
@@ -253,19 +250,6 @@ const Index = () => {
           </motion.div>
         </AnimatePresence>
 
-        {activeTab === "home" && showBottomNav && (
-          <button
-            onClick={() => handleNavigateToFeature("specialdays")}
-            className="fixed left-4 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[60] w-11 h-11 rounded-full border border-border bg-card/95 backdrop-blur-sm shadow-md flex items-center justify-center text-primary hover:bg-secondary/80 active:scale-95 transition-all"
-            aria-label="Special Days"
-            title="Special Days"
-          >
-            <svg width="22" height="18" viewBox="0 0 22 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <circle cx="8" cy="9" r="7" stroke="currentColor" strokeWidth="1.8" fill="none" opacity="0.78" />
-              <circle cx="14" cy="9" r="7" stroke="currentColor" strokeWidth="1.8" fill="none" opacity="0.78" />
-            </svg>
-          </button>
-        )}
 
         {showBottomNav && (
           <BottomNav

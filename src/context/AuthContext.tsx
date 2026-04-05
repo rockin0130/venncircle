@@ -22,7 +22,7 @@ interface PartnerProfile {
   email: string | null;
 }
 
-export const SHAREABLE_PAGES = ["calendar", "workout", "nutrition", "habits", "sobriety", "special_days", "shopping", "study"] as const;
+export const SHAREABLE_PAGES = ["calendar", "workout", "nutrition", "habits", "sobriety", "shopping", "study"] as const;
 export type ShareablePage = typeof SHAREABLE_PAGES[number];
 
 export const PAGE_LABELS: Record<ShareablePage, string> = {
