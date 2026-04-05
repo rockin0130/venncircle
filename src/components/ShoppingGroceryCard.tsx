@@ -42,6 +42,8 @@ interface Props {
   isGroupView: boolean;
   groupMembers: GroupMember[];
   onNudge?: () => void;
+  isMineView?: boolean;
+  listGroupLabelMap?: Record<string, string>;
 }
 
 const ShoppingGroceryCard = ({
@@ -53,6 +55,8 @@ const ShoppingGroceryCard = ({
   isGroupView,
   groupMembers,
   onNudge,
+  isMineView,
+  listGroupLabelMap,
 }: Props) => {
   const [open, setOpen] = useState(true);
   const { loading: orgLoading, result: orgResult, viewMode, setViewMode, organize } = useOrganize();
@@ -81,7 +85,7 @@ const ShoppingGroceryCard = ({
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
             {checkedItems}/{totalItems}
           </span>
-          {isGroupView && onNudge && <NudgePill onClick={onNudge} />}
+          {isGroupView && !isMineView && onNudge && <NudgePill onClick={onNudge} />}
         </div>
       </button>
 
@@ -118,6 +122,7 @@ const ShoppingGroceryCard = ({
                     isGroupView={isGroupView}
                     groupMembers={groupMembers}
                     onNudge={onNudge}
+                    groupLabel={isMineView ? listGroupLabelMap?.[list.id] : undefined}
                   />
                 ))}
               </div>
