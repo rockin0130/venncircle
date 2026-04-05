@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, Plus, Settings, Users, Loader2, X, Check, Camera, Compass, UserPlus } from "lucide-react";
+import { ChevronRight, Plus, Settings, Users, Loader2, X, Check, Camera, Compass, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
 import AddFriendModal from "@/components/AddFriendModal";
 import FriendRow from "@/components/FriendRow";
 import { Group, useAuth, PAGE_LABELS, PAGE_ICONS, ShareablePage, SHAREABLE_PAGES } from "@/context/AuthContext";
