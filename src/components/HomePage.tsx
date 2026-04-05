@@ -35,6 +35,67 @@ interface ClarificationState {
   conversationHistory: { role: string; content: string }[];
 }
 
+const QUICK_ACCESS_FEATURES = [
+  { id: "workout", label: "Workout", page: "workout", icon: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6.5 6.5a2 2 0 1 1 0 4" /><path d="M17.5 6.5a2 2 0 1 0 0 4" />
+      <line x1="6.5" y1="8.5" x2="17.5" y2="8.5" />
+      <line x1="3" y1="8.5" x2="6.5" y2="8.5" /><line x1="17.5" y1="8.5" x2="21" y2="8.5" />
+      <line x1="3" y1="6" x2="3" y2="11" /><line x1="21" y1="6" x2="21" y2="11" />
+    </svg>
+  )},
+  { id: "sobriety", label: "Sobriety", page: "sobriety", icon: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="6" />
+      <path d="M9 14l-2 8" /><path d="M15 14l2 8" />
+      <path d="M8 22h8" />
+    </svg>
+  )},
+  { id: "shopping", label: "Shopping", page: "shopping", icon: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+    </svg>
+  )},
+  { id: "nutrition", label: "Nutrition", page: "nutrition", icon: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2c-3 0-6 3-6 8s3 12 6 12 6-7 6-12-3-8-6-8z" />
+      <path d="M12 2c0 0 2-1 3 0s1 3 0 4" />
+    </svg>
+  )},
+  { id: "special-days", label: "Special Days", page: "specialdays", icon: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 16.4 5.7 21l2.3-7-6-4.6h7.6z" />
+    </svg>
+  )},
+];
+
+const QuickAccessStrip = ({ enabledSections, onNavigate }: { enabledSections: Set<string>; onNavigate?: (page: string) => void }) => {
+  const tiles = QUICK_ACCESS_FEATURES.filter(f => enabledSections.has(f.id));
+  if (tiles.length === 0) return null;
+
+  return (
+    <section className="mb-6">
+      <div className="bg-card rounded-xl border border-border p-3 shadow-card">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+          {tiles.map(tile => (
+            <button
+              key={tile.id}
+              onClick={() => onNavigate?.(tile.page)}
+              className="flex flex-col items-center gap-1.5 min-w-[60px] px-2 py-1.5 rounded-xl hover:bg-secondary/60 active:scale-95 transition-all"
+            >
+              <div className="w-11 h-11 rounded-xl bg-secondary/60 flex items-center justify-center text-foreground">
+                {tile.icon}
+              </div>
+              <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">{tile.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLauncher?: () => void; onOpenSettings?: () => void; onNavigate?: (page: string) => void }) => {
   const { profile, partner, groups, user } = useAuth();
   // Home page is ALWAYS the logged-in user's aggregate view — never influenced by global group selection
@@ -740,21 +801,28 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
             switch (sectionId) {
               case "scheduled":
                 return (
-                  <HomeScheduledSection
-                    key={sectionId}
-                    allDayItems={allDayItems}
-                    allTimedItems={allTimedItems}
-                    isToday={isToday}
-                    isViewingPartner={isViewingPartner}
-                    onToggleTask={toggleTask}
-                    onToggleEvent={toggleEventCompletion}
-                    onToggleGcal={toggleGcalCompletion}
-                    onCongrats={() => setCongratsType("task")}
-                    onNavigate={onNavigate}
-                    enabledHabitCategories={effectiveHabitSubIds.filter(id => id.startsWith("habit:")).map(id => id.replace("habit:", ""))}
-                    selectedDate={selectedDate}
-                    isViewingMemberName={undefined}
-                  />
+                  <div key={sectionId}>
+                    <HomeScheduledSection
+                      allDayItems={allDayItems}
+                      allTimedItems={allTimedItems}
+                      isToday={isToday}
+                      isViewingPartner={isViewingPartner}
+                      onToggleTask={toggleTask}
+                      onToggleEvent={toggleEventCompletion}
+                      onToggleGcal={toggleGcalCompletion}
+                      onCongrats={() => setCongratsType("task")}
+                      onNavigate={onNavigate}
+                      enabledHabitCategories={effectiveHabitSubIds.filter(id => id.startsWith("habit:")).map(id => id.replace("habit:", ""))}
+                      selectedDate={selectedDate}
+                      isViewingMemberName={undefined}
+                      showWater={sectionVisible.has("water")}
+                    />
+                    {/* Quick Access Strip */}
+                    <QuickAccessStrip
+                      enabledSections={sectionVisible}
+                      onNavigate={onNavigate}
+                    />
+                  </div>
                 );
 
               case "todo":
@@ -772,46 +840,16 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                 );
 
               case "water":
-                return (
-                  <section key={sectionId} className="mb-6">
-                    <HomeWaterWidget selectedDate={selectedDate} />
-                  </section>
-                );
+                // Water is now rendered inside the Scheduled section's Flexible period
+                return null;
 
               case "nutrition":
-                return (
-                  <section key={sectionId} className="mb-6">
-                    <HomeNutritionWidget selectedDate={selectedDate} />
-                  </section>
-                );
-
               case "workout":
-                return (
-                  <section key={sectionId} className="mb-6">
-                    <HomeWorkoutWidget selectedDate={selectedDate} />
-                  </section>
-                );
-
               case "sobriety":
-                return (
-                  <section key={sectionId} className="mb-6">
-                    <HomeSobrietyWidget selectedDate={selectedDate} selectedTrackerIds={selectedSobrietyIds} />
-                  </section>
-                );
-
               case "special-days":
-                return (
-                  <section key={sectionId} className="mb-6">
-                    <HomeSpecialDaysWidget selectedDate={selectedDate} selectedDayIds={selectedSpecialDayIds} />
-                  </section>
-                );
-
               case "shopping":
-                return (
-                  <section key={sectionId} className="mb-6">
-                    <HomeShoppingWidget />
-                  </section>
-                );
+                // These render as Quick Access tiles, not standalone sections
+                return null;
 
               default:
                 return null;

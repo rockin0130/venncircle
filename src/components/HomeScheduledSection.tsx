@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight } from "lucide-react";
+import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight, Droplets } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
 import { formatTime } from "@/lib/formatTime";
+import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 
 type UnifiedScheduledItem = {
@@ -104,6 +106,7 @@ interface Props {
   enabledHabitCategories?: string[];
   selectedDate?: Date;
   isViewingMemberName?: string;
+  showWater?: boolean;
 }
 
 const CATEGORY_TO_PERIOD: Record<string, Period> = {
@@ -115,6 +118,87 @@ const CATEGORY_TO_PERIOD: Record<string, Period> = {
 
 const fmtDateStr = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Compact inline water widget for inside the Scheduled card */
+const InlineWaterWidget = ({ selectedDate, isToday }: { selectedDate?: Date; isToday: boolean }) => {
+  const { waterIntake, waterGoal, setWaterIntake } = useAppContext();
+  const { user } = useAuth();
+  const [dateIntake, setDateIntake] = useState(0);
+  const [dateGoal, setDateGoal] = useState(3);
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    const sel = fmtDateStr(selectedDate);
+    const today = fmtDateStr(new Date());
+    if (sel === today) {
+      setDateIntake(waterIntake);
+      setDateGoal(waterGoal);
+      return;
+    }
+    if (!user) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from("water_tracking")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("date", sel)
+        .maybeSingle();
+      if (data) {
+        setDateIntake(Number(data.intake));
+        setDateGoal(Number(data.goal));
+      } else {
+        setDateIntake(0);
+        setDateGoal(waterGoal);
+      }
+    };
+    load();
+  }, [selectedDate, user, waterIntake, waterGoal]);
+
+  const intake = isToday ? waterIntake : dateIntake;
+  const goal = isToday ? waterGoal : dateGoal;
+  const percent = goal > 0 ? Math.min((intake / goal) * 100, 100) : 0;
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-3 mb-2">
+      <div className="flex items-center gap-3">
+        <Droplets size={16} className="text-primary flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold">Water Intake</span>
+            <span className="text-[11px] font-bold text-primary">{intake.toFixed(1)}L / {goal}L</span>
+          </div>
+          {isToday ? (
+            <Slider
+              value={[intake]}
+              min={0}
+              max={goal}
+              step={0.1}
+              onValueChange={([val]) => setWaterIntake(val)}
+              className="my-0.5"
+            />
+          ) : (
+            <div className="h-1.5 bg-secondary rounded-full overflow-hidden my-0.5">
+              <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${percent}%` }} />
+            </div>
+          )}
+        </div>
+        {isToday && (
+          <div className="flex gap-1 flex-shrink-0">
+            {[0.25, 0.5].map((amt) => (
+              <button
+                key={amt}
+                onClick={() => setWaterIntake(Math.round(Math.min(intake + amt, goal) * 10) / 10)}
+                className="px-1.5 py-1 rounded-md bg-primary/10 text-primary text-[9px] font-semibold hover:bg-primary/20 active:scale-95 transition-all"
+              >
+                +{amt * 1000}ml
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const HomeScheduledSection = ({
   allDayItems,
@@ -129,6 +213,7 @@ const HomeScheduledSection = ({
   enabledHabitCategories = [],
   selectedDate,
   isViewingMemberName,
+  showWater = false,
 }: Props) => {
   const { groups, activeGroup, user } = useAuth();
   const { filteredHabits, toggleHabit, getHabitStreak } = useAppContext();
@@ -211,8 +296,9 @@ const HomeScheduledSection = ({
     return map;
   }, [filteredHabits, enabledHabitCategories]);
 
+  // Ensure flexible always appears if water is enabled
   const activePeriods = (["morning", "afternoon", "evening", "flexible"] as Period[]).filter(
-    p => periodMap[p].length > 0 || habitsByPeriod[p].length > 0
+    p => periodMap[p].length > 0 || habitsByPeriod[p].length > 0 || (p === "flexible" && showWater)
   );
 
   // Progress (include habits in count)
@@ -315,7 +401,7 @@ const HomeScheduledSection = ({
           const items = periodMap[period];
           const periodHabits = habitsByPeriod[period];
           const config = PERIOD_CONFIG[period];
-          const totalCount = items.length + periodHabits.length;
+          const totalCount = items.length + periodHabits.length + (period === "flexible" && showWater ? 1 : 0);
           return (
             <div key={period}>
               {/* Period separator */}
@@ -325,6 +411,11 @@ const HomeScheduledSection = ({
                 <span className="text-[10px] text-muted-foreground/60">({totalCount})</span>
                 <div className="flex-1 h-px bg-border ml-1" />
               </div>
+
+              {/* Water widget pinned as first item in Flexible */}
+              {period === "flexible" && showWater && (
+                <InlineWaterWidget selectedDate={selectedDate} isToday={isToday} />
+              )}
 
               {/* Habits card at top of period */}
               {periodHabits.length > 0 && (
