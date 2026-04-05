@@ -48,6 +48,9 @@ const ShoppingListPage = () => {
   const [manualItemText, setManualItemText] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [nudgeOpen, setNudgeOpen] = useState(false);
+  const [groceryPickerOpen, setGroceryPickerOpen] = useState(false);
+  const [pendingGroceryItem, setPendingGroceryItem] = useState<string | null>(null);
+  const [selectedSubCard, setSelectedSubCard] = useState<{ listId: string; mealName: string | null }>({ listId: "", mealName: null });
 
   const [localContextId, setLocalContextId] = useState<string>(PERSONAL_SENTINEL);
 
