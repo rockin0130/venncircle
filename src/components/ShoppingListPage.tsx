@@ -612,11 +612,7 @@ const ShoppingListPage = () => {
               onToggle={toggleItem}
               onDelete={deleteItem}
               onDeleteList={deleteList}
-              newItemText={newItemText[list.id] || ""}
-              onNewItemTextChange={(t) =>
-                setNewItemText((prev) => ({ ...prev, [list.id]: t }))
-              }
-              onAddItem={() => handleInlineAdd(list.id)}
+              onAddToCard={() => openCardAddSheet({ type: "manual", listId: list.id, label: list.label })}
               isGroupView={isGroupView}
               onNudge={() => setNudgeOpen(true)}
             />
