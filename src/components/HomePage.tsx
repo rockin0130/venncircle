@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
-import { Plus, Sparkles, Clock, Check, Loader2, MoreVertical, Trash2, ChevronLeft, ChevronRight, Mic, MicOff, Volume2, Users, ArrowLeft, EyeOff, Eye, Settings, LayoutGrid, ListTodo, CalendarDays, Bell, Search, ChevronRightIcon } from "lucide-react";
+import { Plus, Sparkles, Clock, Check, Loader2, MoreVertical, Trash2, ChevronLeft, ChevronRight, Mic, MicOff, Volume2, Users, ArrowLeft, EyeOff, Eye, Settings, LayoutGrid, ListTodo, CalendarDays, Bell, Search, ChevronRightIcon, MoreHorizontal } from "lucide-react";
 import NotificationCenter from "@/components/NotificationCenter";
 import UniversalSearch from "@/components/UniversalSearch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -96,7 +96,7 @@ const QuickAccessStrip = ({ enabledSections, onNavigate }: { enabledSections: Se
   );
 };
 
-const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLauncher?: () => void; onOpenSettings?: () => void; onNavigate?: (page: string) => void }) => {
+const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate, onOpenMore }: { onBackToLauncher?: () => void; onOpenSettings?: () => void; onNavigate?: (page: string) => void; onOpenMore?: () => void }) => {
   const { profile, partner, groups, user } = useAuth();
   // Home page is ALWAYS the logged-in user's aggregate view — never influenced by global group selection
   const filter: Filter = "mine";
@@ -619,6 +619,16 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
       <header className="pt-10 pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-0.5 flex-1 min-w-0">
+            {onOpenMore && (
+              <button
+                onClick={onOpenMore}
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center hover:bg-secondary/60 active:scale-95 transition-all -ml-1"
+                style={{ color: "hsl(25, 25%, 45%)" }}
+                aria-label="More"
+              >
+                <MoreHorizontal size={20} />
+              </button>
+            )}
             <button onClick={() => shiftDate(-1)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary/60 active:scale-95 transition-all" style={{ color: "hsl(25, 30%, 45%)" }}>
               <ChevronLeft size={20} />
             </button>

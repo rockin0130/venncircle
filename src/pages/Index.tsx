@@ -187,7 +187,7 @@ const Index = () => {
 
   const pages: Record<string, React.ReactNode> = {
     launcher: <LauncherPage onEnterGroup={handleEnterGroup} onOpenSettings={handleOpenSettings} />,
-    home: <HomePage onOpenSettings={handleOpenSettings} onNavigate={(page) => handleNavigateToFeature(page)} />,
+    home: <HomePage onOpenSettings={handleOpenSettings} onNavigate={(page) => handleNavigateToFeature(page)} onOpenMore={() => setMoreOpen(true)} />,
     "shared-interests": (
       <SharedInterestsPage
         onNavigateToFeature={handleNavigateToFeature}
@@ -218,7 +218,7 @@ const Index = () => {
   const isInnerPage = activeTab !== "launcher";
   const showBottomNav = isInnerPage && navStyle === "bottom";
   const showDrawerButton = isInnerPage && navStyle === "drawer";
-  const showFloatingMoreButton = isInnerPage && navStyle === "bottom" && !["ai", "settings", "launcher"].includes(activeTab);
+  const showFloatingMoreButton = isInnerPage && navStyle === "bottom" && !["home", "ai", "settings", "launcher"].includes(activeTab);
 
   return (
     <AppProvider>
