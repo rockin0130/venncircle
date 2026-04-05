@@ -754,9 +754,7 @@ interface ListSectionProps {
   onToggle: (id: string, checked: boolean) => void;
   onDelete: (id: string) => void;
   onDeleteList: (id: string) => void;
-  newItemText: string;
-  onNewItemTextChange: (text: string) => void;
-  onAddItem: () => void;
+  onAddToCard: () => void;
   isGroupView: boolean;
   onNudge: () => void;
   isMineView?: boolean;
