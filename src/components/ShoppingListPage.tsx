@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, Trash2, ShoppingCart, Check, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth, Group } from "@/context/AuthContext";
+import { useAuth, Group, GroupMember } from "@/context/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import CreateGroupModal from "@/components/CreateGroupModal";
 import ShoppingUserFilter, { EVERYONE_SENTINEL } from "@/components/ShoppingUserFilter";
+import ShoppingMealPlanSection from "@/components/ShoppingMealPlanSection";
+import ShoppingItemAssignee from "@/components/ShoppingItemAssignee";
 
 interface ShoppingList {
   id: string;
@@ -25,6 +27,8 @@ interface ShoppingListItem {
   name: string;
   checked: boolean;
   created_at: string;
+  meal_name?: string | null;
+  assignee_user_ids?: string[];
 }
 
 const PERSONAL_SENTINEL = "__personal__";
@@ -39,7 +43,6 @@ const ShoppingListPage = () => {
   const [manualItemText, setManualItemText] = useState("");
   const [showCreate, setShowCreate] = useState(false);
 
-  // Page-local context — never bleeds to other pages
   const [localContextId, setLocalContextId] = useState<string>(PERSONAL_SENTINEL);
 
   const shoppingGroups = useMemo(
@@ -53,11 +56,15 @@ const ShoppingListPage = () => {
   );
 
   const groupId = localGroup?.id;
+  const isGroupView = !!localGroup;
 
-  // User filter state for group sub-pills
+  const groupMembers: GroupMember[] = useMemo(
+    () => localGroup?.members?.filter((m: GroupMember) => m.status === "active") || [],
+    [localGroup]
+  );
+
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set([EVERYONE_SENTINEL]));
 
-  // Reset user filter when context changes
   useEffect(() => {
     setSelectedUserIds(new Set([EVERYONE_SENTINEL]));
   }, [localContextId]);
@@ -75,7 +82,6 @@ const ShoppingListPage = () => {
 
     if (groupId) {
       listQuery = listQuery.eq("group_id", groupId);
-      // Filter by selected users unless "Everyone" is selected
       if (!isEveryone) {
         listQuery = listQuery.in("user_id", [...selectedUserIds]);
       }
@@ -169,6 +175,18 @@ const ShoppingListPage = () => {
     toast({ title: "List deleted" });
   };
 
+  const assignItem = async (itemId: string, userIds: string[]) => {
+    const { error } = await supabase
+      .from("shopping_list_items")
+      .update({ assignee_user_ids: userIds })
+      .eq("id", itemId);
+    if (!error) {
+      setItems((prev) =>
+        prev.map((i) => (i.id === itemId ? { ...i, assignee_user_ids: userIds } : i))
+      );
+    }
+  };
+
   const handleManualAdd = async () => {
     if (!manualItemText.trim()) return;
     const listId = await getOrCreateManualList();
@@ -185,7 +203,6 @@ const ShoppingListPage = () => {
     setNewItemText((prev) => ({ ...prev, [listId]: "" }));
   };
 
-  // Separate meal plan lists from manual lists
   const mealPlanLists = lists.filter((l) => l.is_meal_plan);
   const manualLists = lists.filter((l) => !l.is_meal_plan);
 
@@ -347,23 +364,24 @@ const ShoppingListPage = () => {
               setNewItemText((prev) => ({ ...prev, [list.id]: t }))
             }
             onAddItem={() => handleInlineAdd(list.id)}
+            isGroupView={isGroupView}
+            groupMembers={groupMembers}
+            onAssign={assignItem}
           />
         ))}
 
-        {/* Weekly meal plan lists */}
+        {/* Weekly meal plan lists — collapsible week/meal structure */}
         {mealPlanLists.map((list) => (
-          <ListSection
+          <ShoppingMealPlanSection
             key={list.id}
             list={list}
             items={items.filter((i) => i.list_id === list.id)}
             onToggle={toggleItem}
             onDelete={deleteItem}
             onDeleteList={deleteList}
-            newItemText={newItemText[list.id] || ""}
-            onNewItemTextChange={(t) =>
-              setNewItemText((prev) => ({ ...prev, [list.id]: t }))
-            }
-            onAddItem={() => handleInlineAdd(list.id)}
+            isGroupView={isGroupView}
+            groupMembers={groupMembers}
+            onAssign={assignItem}
           />
         ))}
       </div>
@@ -372,7 +390,11 @@ const ShoppingListPage = () => {
 };
 
 interface ListSectionProps {
-  list: ShoppingList;
+  list: {
+    id: string;
+    label: string;
+    is_meal_plan: boolean;
+  };
   items: ShoppingListItem[];
   onToggle: (id: string, checked: boolean) => void;
   onDelete: (id: string) => void;
@@ -380,6 +402,19 @@ interface ListSectionProps {
   newItemText: string;
   onNewItemTextChange: (text: string) => void;
   onAddItem: () => void;
+  isGroupView: boolean;
+  groupMembers: GroupMember[];
+  onAssign: (itemId: string, userIds: string[]) => void;
+}
+
+interface ShoppingListItem {
+  id: string;
+  list_id: string;
+  name: string;
+  checked: boolean;
+  created_at: string;
+  meal_name?: string | null;
+  assignee_user_ids?: string[];
 }
 
 const ListSection = ({
@@ -391,13 +426,15 @@ const ListSection = ({
   newItemText,
   onNewItemTextChange,
   onAddItem,
+  isGroupView,
+  groupMembers,
+  onAssign,
 }: ListSectionProps) => {
   const unchecked = items.filter((i) => !i.checked);
   const checked = items.filter((i) => i.checked);
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
-      {/* Section header */}
       <div className="flex items-center justify-between px-4 py-3 bg-secondary/30">
         <div>
           <p className="text-sm font-semibold text-foreground">
@@ -417,7 +454,6 @@ const ListSection = ({
         </div>
       </div>
 
-      {/* Items */}
       <div className="divide-y divide-border/50">
         {unchecked.map((item) => (
           <ShoppingItem
@@ -425,10 +461,12 @@ const ListSection = ({
             item={item}
             onToggle={onToggle}
             onDelete={onDelete}
+            isGroupView={isGroupView}
+            groupMembers={groupMembers}
+            onAssign={onAssign}
           />
         ))}
 
-        {/* Inline add */}
         <div className="flex items-center gap-2 px-4 py-2">
           <Plus size={14} className="text-muted-foreground shrink-0" />
           <input
@@ -442,7 +480,6 @@ const ListSection = ({
           />
         </div>
 
-        {/* Checked items */}
         {checked.length > 0 && (
           <>
             <div className="px-4 py-1.5 bg-secondary/20">
@@ -456,6 +493,9 @@ const ListSection = ({
                 item={item}
                 onToggle={onToggle}
                 onDelete={onDelete}
+                isGroupView={isGroupView}
+                groupMembers={groupMembers}
+                onAssign={onAssign}
               />
             ))}
           </>
@@ -469,10 +509,16 @@ const ShoppingItem = ({
   item,
   onToggle,
   onDelete,
+  isGroupView,
+  groupMembers,
+  onAssign,
 }: {
   item: ShoppingListItem;
   onToggle: (id: string, checked: boolean) => void;
   onDelete: (id: string) => void;
+  isGroupView: boolean;
+  groupMembers: GroupMember[];
+  onAssign: (itemId: string, userIds: string[]) => void;
 }) => (
   <div className="flex items-center gap-3 px-4 py-2.5 group">
     <button
@@ -494,6 +540,13 @@ const ShoppingItem = ({
     >
       {item.name}
     </span>
+    {isGroupView && (
+      <ShoppingItemAssignee
+        assigneeUserIds={item.assignee_user_ids || []}
+        groupMembers={groupMembers}
+        onAssign={(userIds) => onAssign(item.id, userIds)}
+      />
+    )}
     <button
       onClick={() => onDelete(item.id)}
       className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-destructive transition-all"
