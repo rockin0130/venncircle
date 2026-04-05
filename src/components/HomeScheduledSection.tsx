@@ -399,6 +399,31 @@ const HomeScheduledSection = ({
         <Progress value={progressPercent} className="h-1.5" />
       </div>
 
+      {/* All day strip */}
+      {allDayUnified.length > 0 && (
+        <div className="mb-3">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5 block">All day</span>
+          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+            {allDayUnified.map(item => {
+              const tag = getContextTag(item);
+              return (
+                <div
+                  key={`${item.kind}-${item.id}`}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-border bg-card text-xs font-medium"
+                >
+                  <span className="truncate max-w-[140px]">{item.title}</span>
+                  {tag.label !== "Mine" && (
+                    <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full", tag.bg, tag.text)}>
+                      {tag.label}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Period sections */}
       <div className="space-y-4">
         {activePeriods.map(period => {
