@@ -164,13 +164,85 @@ const ShoppingListPage = () => {
     toast({ title: "List deleted" });
   };
 
+  const getOrCreateCategoryList = async (category: string, icon: string, isMealPlan: boolean): Promise<string | null> => {
+    if (!user) return null;
+
+    // For grocery items, find an existing meal plan list
+    if (isMealPlan) {
+      const existing = lists.find((l) => l.is_meal_plan);
+      if (existing) return existing.id;
+    } else {
+      // Find existing list with matching label
+      const existing = lists.find((l) => !l.is_meal_plan && l.label === category);
+      if (existing) return existing.id;
+    }
+
+    // Create a new list for this category
+    const insertData: any = {
+      user_id: user.id,
+      label: isMealPlan ? "Grocery" : category,
+      is_meal_plan: isMealPlan,
+    };
+    if (groupId) insertData.group_id = groupId;
+
+    const { data, error } = await supabase
+      .from("shopping_lists")
+      .insert(insertData)
+      .select()
+      .single();
+    if (error || !data) {
+      toast({ title: "Error creating list", variant: "destructive" });
+      return null;
+    }
+    setLists((prev) => [data as ShoppingList, ...prev]);
+    return data.id;
+  };
+
   const handleManualAdd = async () => {
     if (!manualItemText.trim()) return;
-    const listId = await getOrCreateManualList();
-    if (!listId) return;
-    await addItem(listId, manualItemText);
+    const itemName = manualItemText.trim();
     setManualItemText("");
     setShowManualAdd(false);
+
+    // Collect existing category names for AI context
+    const existingCategories = lists
+      .filter((l) => !l.is_meal_plan)
+      .map((l) => l.label);
+    if (lists.some((l) => l.is_meal_plan)) existingCategories.push("Grocery");
+
+    // Fire-and-forget AI categorization — add item immediately to avoid blocking
+    let targetListId: string | null = null;
+
+    try {
+      const { data: catData } = await supabase.functions.invoke("ai-nutrition", {
+        body: {
+          action: "categorize_item",
+          item_name: itemName,
+          existing_categories: existingCategories,
+        },
+      });
+
+      if (catData && !catData.error) {
+        const { category, icon, is_grocery } = catData as { category: string; icon: string; is_grocery: boolean };
+
+        if (is_grocery) {
+          targetListId = await getOrCreateCategoryList("Grocery", "🛒", true);
+        } else if (category && category !== "My Items") {
+          targetListId = await getOrCreateCategoryList(category, icon || "📦", false);
+        }
+      }
+    } catch {
+      // AI failed silently — fall back to My Items
+    }
+
+    // Fallback: My Items
+    if (!targetListId) {
+      targetListId = await getOrCreateManualList();
+    }
+
+    if (targetListId) {
+      await addItem(targetListId, itemName);
+    }
   };
 
   const handleInlineAdd = async (listId: string) => {
