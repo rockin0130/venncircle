@@ -156,13 +156,7 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
   }, [user, allGroups]);
 
   const handleGroupTap = (group: Group) => {
-    if (group.shared_pages.length === 1) {
-      const page = group.shared_pages[0];
-      const tab = page === "special_days" ? "specialdays" : page;
-      onNavigateToFeature?.(tab, group.id);
-    } else {
-      onOpenGroupHub?.(group);
-    }
+    onOpenGroupHub?.(group);
   };
 
   const toggleExpand = (section: "groups" | "feed") => {
