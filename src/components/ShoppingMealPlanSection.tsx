@@ -76,7 +76,6 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
             {checkedItems}/{totalItems}
           </span>
-          {isGroupView && onNudge && <NudgePill onClick={onNudge} />}
           <button
             onClick={(e) => { e.stopPropagation(); onDeleteList(list.id); }}
             className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
