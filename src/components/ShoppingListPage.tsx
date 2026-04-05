@@ -100,7 +100,7 @@ const ShoppingListPage = () => {
     }
 
     setLoading(false);
-  }, [user, groupId]);
+  }, [user, groupId, selectedUserIds]);
 
   useEffect(() => {
     fetchData();
