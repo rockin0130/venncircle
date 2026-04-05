@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, Trash2, ShoppingCart, Check, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, Group } from "@/context/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import CreateGroupModal from "@/components/CreateGroupModal";
 
 interface ShoppingList {
   id: string;
@@ -14,6 +15,7 @@ interface ShoppingList {
   date_range_end: string | null;
   is_meal_plan: boolean;
   created_at: string;
+  group_id?: string | null;
 }
 
 interface ShoppingListItem {
@@ -24,16 +26,32 @@ interface ShoppingListItem {
   created_at: string;
 }
 
+const PERSONAL_SENTINEL = "__personal__";
+
 const ShoppingListPage = () => {
-  const { user, activeGroup } = useAuth();
+  const { user, groups } = useAuth();
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [items, setItems] = useState<ShoppingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [newItemText, setNewItemText] = useState<Record<string, string>>({});
   const [showManualAdd, setShowManualAdd] = useState(false);
   const [manualItemText, setManualItemText] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
 
-  const groupId = activeGroup?.id;
+  // Page-local context — never bleeds to other pages
+  const [localContextId, setLocalContextId] = useState<string>(PERSONAL_SENTINEL);
+
+  const shoppingGroups = useMemo(
+    () => groups.filter((g) => g.shared_pages?.includes("shopping")),
+    [groups]
+  );
+
+  const localGroup = useMemo(
+    () => (localContextId === PERSONAL_SENTINEL ? null : shoppingGroups.find((g) => g.id === localContextId) || null),
+    [localContextId, shoppingGroups]
+  );
+
+  const groupId = localGroup?.id;
 
   const fetchData = useCallback(async () => {
     if (!user) return;
