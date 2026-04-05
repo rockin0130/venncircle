@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
+import { cleanupOrphanedData } from "@/lib/cleanupOrphanedData";
 
 interface Profile {
   id: string;
@@ -472,10 +473,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // Run orphaned data cleanup once per session
+  const cleanupRanRef = useRef(false);
+
   // Load groups when user is available
   useEffect(() => {
     if (user) {
-      fetchGroups();
+      fetchGroups().then(() => {
+        if (!cleanupRanRef.current) {
+          cleanupRanRef.current = true;
+          cleanupOrphanedData(user.id);
+        }
+      });
     }
   }, [user, fetchGroups]);
 
