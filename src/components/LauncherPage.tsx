@@ -245,6 +245,33 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
     };
   }, [user, groups.length]);
 
+  // Fetch recent activity from all groups
+  useEffect(() => {
+    if (!user || visibleGroups.length === 0) { setActivityPosts([]); setLoadingActivity(false); return; }
+    const groupIds = visibleGroups.map(g => g.id);
+    const fetchActivity = async () => {
+      const { data: postsData } = await supabase
+        .from("group_feed_posts")
+        .select("*")
+        .in("group_id", groupIds)
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (!postsData || postsData.length === 0) { setActivityPosts([]); setLoadingActivity(false); return; }
+      const userIds = [...new Set(postsData.map((p: any) => p.user_id))];
+      const { data: profiles } = await supabase.rpc("get_profiles_by_ids", { _user_ids: userIds });
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+      const groupMap = new Map(visibleGroups.map(g => [g.id, g]));
+      const enriched = postsData.map((p: any) => {
+        const prof = profileMap.get(p.user_id);
+        const grp = groupMap.get(p.group_id);
+        return { ...p, user_display_name: prof?.display_name || "Member", user_avatar_url: prof?.avatar_url, group_name: grp?.name || "Group" };
+      });
+      setActivityPosts(enriched);
+      setLoadingActivity(false);
+    };
+    fetchActivity();
+  }, [user, visibleGroups]);
+
   const handleCoverUpload = async (groupId: string, file: File) => {
     setUploadingGroupId(groupId);
     try {
