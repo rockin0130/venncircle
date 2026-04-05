@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import CreateGroupModal from "@/components/CreateGroupModal";
+import ShoppingUserFilter, { EVERYONE_SENTINEL } from "@/components/ShoppingUserFilter";
 
 interface ShoppingList {
   id: string;
@@ -53,20 +54,33 @@ const ShoppingListPage = () => {
 
   const groupId = localGroup?.id;
 
+  // User filter state for group sub-pills
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set([EVERYONE_SENTINEL]));
+
+  // Reset user filter when context changes
+  useEffect(() => {
+    setSelectedUserIds(new Set([EVERYONE_SENTINEL]));
+  }, [localContextId]);
+
   const fetchData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
 
+    const isEveryone = selectedUserIds.has(EVERYONE_SENTINEL);
+
     let listQuery = supabase
       .from("shopping_lists")
       .select("*")
-      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (groupId) {
       listQuery = listQuery.eq("group_id", groupId);
+      // Filter by selected users unless "Everyone" is selected
+      if (!isEveryone) {
+        listQuery = listQuery.in("user_id", [...selectedUserIds]);
+      }
     } else {
-      listQuery = listQuery.is("group_id", null);
+      listQuery = listQuery.eq("user_id", user.id).is("group_id", null);
     }
 
     const { data: listsData } = await listQuery;
@@ -86,7 +100,7 @@ const ShoppingListPage = () => {
     }
 
     setLoading(false);
-  }, [user, groupId]);
+  }, [user, groupId, selectedUserIds]);
 
   useEffect(() => {
     fetchData();
@@ -263,6 +277,12 @@ const ShoppingListPage = () => {
         open={showCreate}
         onOpenChange={setShowCreate}
         defaultPage="shopping"
+      />
+
+      <ShoppingUserFilter
+        localGroup={localGroup}
+        selectedUserIds={selectedUserIds}
+        onSelectionChange={setSelectedUserIds}
       />
 
       {/* Manual add input */}
