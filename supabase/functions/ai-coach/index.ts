@@ -1447,6 +1447,7 @@ async function executeAppActions(client: any, userId: string, groupId: string, a
                 list_id: listId,
                 user_id: userId,
                 name: typeof name === "string" ? name : String(name),
+                meal_name: action.meal_title || null,
               }));
               const { error: itemsError } = await client.from("shopping_list_items").insert(rows);
               if (itemsError) {
