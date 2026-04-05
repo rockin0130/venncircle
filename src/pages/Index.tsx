@@ -213,21 +213,6 @@ const Index = () => {
     chat: renderChatView(),
     ai: <AiAssistantPage />,
     settings: <SettingsPage />,
-    more: (
-      <MorePage
-        navPages={navPages}
-        onNavigate={handleTabChange}
-        onAddToNav={() => {}}
-        onRemoveFromNav={() => {}}
-        onReplaceInNav={() => {}}
-        onOpenSettings={handleOpenSettings}
-        navStyle={navStyle}
-        onNavStyleChange={setNavStyle}
-        weekStart={weekStart}
-        onWeekStartChange={setWeekStart}
-        onBack={() => setActiveTab("home")}
-      />
-    ),
   };
 
   const isInnerPage = activeTab !== "launcher";
