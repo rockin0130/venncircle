@@ -777,9 +777,7 @@ const ListSection = ({
   onToggle,
   onDelete,
   onDeleteList,
-  newItemText,
-  onNewItemTextChange,
-  onAddItem,
+  onAddToCard,
   isGroupView,
   onNudge,
   isMineView,
@@ -802,6 +800,12 @@ const ListSection = ({
           </span>
           {isGroupView && <NudgePill onClick={onNudge} />}
           <button
+            onClick={onAddToCard}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+          >
+            <Plus size={14} />
+          </button>
+          <button
             onClick={() => onDeleteList(list.id)}
             className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
           >
@@ -820,19 +824,6 @@ const ListSection = ({
             groupLabel={isMineView ? listGroupLabelMap?.[item.list_id] : undefined}
           />
         ))}
-
-        <div className="flex items-center gap-2 px-4 py-2">
-          <Plus size={14} className="text-muted-foreground shrink-0" />
-          <input
-            value={newItemText}
-            onChange={(e) => onNewItemTextChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onAddItem();
-            }}
-            placeholder="Add item..."
-            className="flex-1 text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
-          />
-        </div>
 
         {checked.length > 0 && (
           <>
