@@ -7,9 +7,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import CreateGroupModal from "@/components/CreateGroupModal";
-import ShoppingUserFilter, { EVERYONE_SENTINEL } from "@/components/ShoppingUserFilter";
 import ShoppingMealPlanSection from "@/components/ShoppingMealPlanSection";
-import ShoppingItemAssignee from "@/components/ShoppingItemAssignee";
+import ShoppingNudgeSheet, { NudgePill } from "@/components/ShoppingNudgeSheet";
 
 interface ShoppingList {
   id: string;
@@ -42,6 +41,7 @@ const ShoppingListPage = () => {
   const [showManualAdd, setShowManualAdd] = useState(false);
   const [manualItemText, setManualItemText] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [nudgeOpen, setNudgeOpen] = useState(false);
 
   const [localContextId, setLocalContextId] = useState<string>(PERSONAL_SENTINEL);
 
@@ -63,17 +63,9 @@ const ShoppingListPage = () => {
     [localGroup]
   );
 
-  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set([EVERYONE_SENTINEL]));
-
-  useEffect(() => {
-    setSelectedUserIds(new Set([EVERYONE_SENTINEL]));
-  }, [localContextId]);
-
   const fetchData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-
-    const isEveryone = selectedUserIds.has(EVERYONE_SENTINEL);
 
     let listQuery = supabase
       .from("shopping_lists")
@@ -82,9 +74,6 @@ const ShoppingListPage = () => {
 
     if (groupId) {
       listQuery = listQuery.eq("group_id", groupId);
-      if (!isEveryone) {
-        listQuery = listQuery.in("user_id", [...selectedUserIds]);
-      }
     } else {
       listQuery = listQuery.eq("user_id", user.id).is("group_id", null);
     }
@@ -106,7 +95,7 @@ const ShoppingListPage = () => {
     }
 
     setLoading(false);
-  }, [user, groupId, selectedUserIds]);
+  }, [user, groupId]);
 
   useEffect(() => {
     fetchData();
@@ -173,18 +162,6 @@ const ShoppingListPage = () => {
     setLists((prev) => prev.filter((l) => l.id !== listId));
     setItems((prev) => prev.filter((i) => i.list_id !== listId));
     toast({ title: "List deleted" });
-  };
-
-  const assignItem = async (itemId: string, userIds: string[]) => {
-    const { error } = await supabase
-      .from("shopping_list_items")
-      .update({ assignee_user_ids: userIds })
-      .eq("id", itemId);
-    if (!error) {
-      setItems((prev) =>
-        prev.map((i) => (i.id === itemId ? { ...i, assignee_user_ids: userIds } : i))
-      );
-    }
   };
 
   const handleManualAdd = async () => {
@@ -296,12 +273,6 @@ const ShoppingListPage = () => {
         defaultPage="shopping"
       />
 
-      <ShoppingUserFilter
-        localGroup={localGroup}
-        selectedUserIds={selectedUserIds}
-        onSelectionChange={setSelectedUserIds}
-      />
-
       {/* Manual add input */}
       <AnimatePresence>
         {showManualAdd && (
@@ -365,12 +336,11 @@ const ShoppingListPage = () => {
             }
             onAddItem={() => handleInlineAdd(list.id)}
             isGroupView={isGroupView}
-            groupMembers={groupMembers}
-            onAssign={assignItem}
+            onNudge={() => setNudgeOpen(true)}
           />
         ))}
 
-        {/* Weekly meal plan lists — collapsible week/meal structure */}
+        {/* Weekly meal plan lists */}
         {mealPlanLists.map((list) => (
           <ShoppingMealPlanSection
             key={list.id}
@@ -381,10 +351,16 @@ const ShoppingListPage = () => {
             onDeleteList={deleteList}
             isGroupView={isGroupView}
             groupMembers={groupMembers}
-            onAssign={assignItem}
+            onNudge={() => setNudgeOpen(true)}
           />
         ))}
       </div>
+
+      <ShoppingNudgeSheet
+        open={nudgeOpen}
+        onOpenChange={setNudgeOpen}
+        groupMembers={groupMembers}
+      />
     </div>
   );
 };
@@ -403,8 +379,7 @@ interface ListSectionProps {
   onNewItemTextChange: (text: string) => void;
   onAddItem: () => void;
   isGroupView: boolean;
-  groupMembers: GroupMember[];
-  onAssign: (itemId: string, userIds: string[]) => void;
+  onNudge: () => void;
 }
 
 interface ShoppingListItem {
@@ -427,8 +402,7 @@ const ListSection = ({
   onNewItemTextChange,
   onAddItem,
   isGroupView,
-  groupMembers,
-  onAssign,
+  onNudge,
 }: ListSectionProps) => {
   const unchecked = items.filter((i) => !i.checked);
   const checked = items.filter((i) => i.checked);
@@ -445,6 +419,7 @@ const ListSection = ({
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
             {checked.length}/{items.length}
           </span>
+          {isGroupView && <NudgePill onClick={onNudge} />}
           <button
             onClick={() => onDeleteList(list.id)}
             className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
@@ -461,9 +436,6 @@ const ListSection = ({
             item={item}
             onToggle={onToggle}
             onDelete={onDelete}
-            isGroupView={isGroupView}
-            groupMembers={groupMembers}
-            onAssign={onAssign}
           />
         ))}
 
@@ -493,9 +465,6 @@ const ListSection = ({
                 item={item}
                 onToggle={onToggle}
                 onDelete={onDelete}
-                isGroupView={isGroupView}
-                groupMembers={groupMembers}
-                onAssign={onAssign}
               />
             ))}
           </>
@@ -509,16 +478,10 @@ const ShoppingItem = ({
   item,
   onToggle,
   onDelete,
-  isGroupView,
-  groupMembers,
-  onAssign,
 }: {
   item: ShoppingListItem;
   onToggle: (id: string, checked: boolean) => void;
   onDelete: (id: string) => void;
-  isGroupView: boolean;
-  groupMembers: GroupMember[];
-  onAssign: (itemId: string, userIds: string[]) => void;
 }) => (
   <div className="flex items-center gap-3 px-4 py-2.5 group">
     <button
@@ -540,13 +503,6 @@ const ShoppingItem = ({
     >
       {item.name}
     </span>
-    {isGroupView && (
-      <ShoppingItemAssignee
-        assigneeUserIds={item.assignee_user_ids || []}
-        groupMembers={groupMembers}
-        onAssign={(userIds) => onAssign(item.id, userIds)}
-      />
-    )}
     <button
       onClick={() => onDelete(item.id)}
       className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-destructive transition-all"
