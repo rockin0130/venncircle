@@ -63,7 +63,11 @@ const ShoppingListPage = () => {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (groupId) listQuery = listQuery.eq("group_id", groupId);
+    if (groupId) {
+      listQuery = listQuery.eq("group_id", groupId);
+    } else {
+      listQuery = listQuery.is("group_id", null);
+    }
 
     const { data: listsData } = await listQuery;
     const fetchedLists = (listsData || []) as ShoppingList[];
