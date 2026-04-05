@@ -149,6 +149,7 @@ const Index = () => {
     specialdays: "special_days",
     calendar: "calendar",
     shopping: "shopping",
+    study: "study",
   };
 
   const handleNavigateToFeature = (feature: string, groupId?: string) => {
