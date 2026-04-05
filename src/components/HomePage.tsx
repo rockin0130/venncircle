@@ -77,10 +77,10 @@ const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress
   isWiggling?: boolean;
   onLongPress?: () => void;
 }) => {
-  const tiles = QUICK_ACCESS_FEATURES.filter(f => enabledSections.has(f.id));
-  if (tiles.length === 0) return null;
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearLp = () => { if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; } };
+  const tiles = QUICK_ACCESS_FEATURES.filter(f => enabledSections.has(f.id));
+  if (tiles.length === 0) return null;
 
   return (
     <section
