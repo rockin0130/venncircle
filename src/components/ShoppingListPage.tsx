@@ -340,12 +340,11 @@ const ShoppingListPage = () => {
           />
         ))}
 
-        {/* Weekly meal plan lists */}
-        {mealPlanLists.map((list) => (
-          <ShoppingMealPlanSection
-            key={list.id}
-            list={list}
-            items={items.filter((i) => i.list_id === list.id)}
+        {/* Grocery card wrapping all meal plan lists */}
+        {mealPlanLists.length > 0 && (
+          <ShoppingGroceryCard
+            lists={mealPlanLists}
+            allItems={items.filter((i) => mealPlanLists.some((l) => l.id === i.list_id))}
             onToggle={toggleItem}
             onDelete={deleteItem}
             onDeleteList={deleteList}
@@ -353,7 +352,7 @@ const ShoppingListPage = () => {
             groupMembers={groupMembers}
             onNudge={() => setNudgeOpen(true)}
           />
-        ))}
+        )}
       </div>
 
       <ShoppingNudgeSheet
