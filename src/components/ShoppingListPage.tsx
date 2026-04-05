@@ -51,6 +51,7 @@ const ShoppingListPage = () => {
   const [groceryPickerOpen, setGroceryPickerOpen] = useState(false);
   const [pendingGroceryItem, setPendingGroceryItem] = useState<string | null>(null);
   const [selectedSubCard, setSelectedSubCard] = useState<{ listId: string; mealName: string | null }>({ listId: "", mealName: null });
+  const [grocerySubCardOptions, setGrocerySubCardOptions] = useState<{ listId: string; mealName: string | null; label: string }[]>([]);
 
   const [localContextId, setLocalContextId] = useState<string>(PERSONAL_SENTINEL);
 
