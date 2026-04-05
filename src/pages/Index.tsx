@@ -286,7 +286,7 @@ const Index = () => {
         )}
 
         <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-          <SheetContent side="left" className="w-72 p-0 flex flex-col bg-card">
+          <SheetContent side="right" className="w-72 p-0 flex flex-col bg-card">
             <div className="flex-1 overflow-y-auto">
               <MorePage
                 navPages={navPages}
