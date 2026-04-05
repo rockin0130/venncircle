@@ -97,10 +97,6 @@ const Index = () => {
     requestAnimationFrame(resetHomeSwipeState);
   };
 
-  const handleBackToLauncher = () => {
-    resetHomeSwipeState();
-    setActiveTab("launcher");
-  };
 
   const handleOpenSettings = () => {
     setActiveTab("settings");
