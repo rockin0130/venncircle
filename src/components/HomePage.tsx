@@ -772,46 +772,16 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                 );
 
               case "water":
-                return (
-                  <section key={sectionId} className="mb-6">
-                    <HomeWaterWidget selectedDate={selectedDate} />
-                  </section>
-                );
+                // Water is now rendered inside the Scheduled section's Flexible period
+                return null;
 
               case "nutrition":
-                return (
-                  <section key={sectionId} className="mb-6">
-                    <HomeNutritionWidget selectedDate={selectedDate} />
-                  </section>
-                );
-
               case "workout":
-                return (
-                  <section key={sectionId} className="mb-6">
-                    <HomeWorkoutWidget selectedDate={selectedDate} />
-                  </section>
-                );
-
               case "sobriety":
-                return (
-                  <section key={sectionId} className="mb-6">
-                    <HomeSobrietyWidget selectedDate={selectedDate} selectedTrackerIds={selectedSobrietyIds} />
-                  </section>
-                );
-
               case "special-days":
-                return (
-                  <section key={sectionId} className="mb-6">
-                    <HomeSpecialDaysWidget selectedDate={selectedDate} selectedDayIds={selectedSpecialDayIds} />
-                  </section>
-                );
-
               case "shopping":
-                return (
-                  <section key={sectionId} className="mb-6">
-                    <HomeShoppingWidget />
-                  </section>
-                );
+                // These render as Quick Access tiles, not standalone sections
+                return null;
 
               default:
                 return null;
