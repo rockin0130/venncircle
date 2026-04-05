@@ -149,6 +149,61 @@ Prioritize meals for the unlogged meal types. Make suggestions varied and practi
       });
     }
 
+    if (body.action === "organize_shopping") {
+      const items = body.items;
+      if (!Array.isArray(items) || items.length === 0) {
+        return new Response(JSON.stringify({ error: "Items array required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const itemList = items.map((i: { id: string; name: string }) => `- ${i.name} (id: ${i.id})`).join("\n");
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            {
+              role: "system",
+              content: `You are a shopping list organizer. Given a list of items with IDs, you must:
+1. Determine what type of list this is (grocery, clothing, electronics, general, etc.)
+2. Choose two smart toggle labels: LEFT = original/ungrouped view name, RIGHT = your organized view name. Must be contextually relevant. Examples: grocery → "By meal" / "By aisle", clothing → "By outfit" / "By type", general → "Original" / "Organized".
+3. Group items into logical categories relevant to the list type.
+4. Within each category, place duplicate or similar items next to each other (stacked). Do NOT merge them — keep every original item as its own entry with its own ID.
+Return ONLY valid JSON with this exact structure:
+{
+  "toggle_labels": ["Left Label", "Right Label"],
+  "categories": [
+    {
+      "label": "Category Name",
+      "item_ids": ["id1", "id2", "id3"]
+    }
+  ]
+}
+Every original item ID must appear exactly once across all categories. item_ids should be ordered so that similar/duplicate items are adjacent.`,
+            },
+            { role: "user", content: `Organize these items:\n${itemList}` },
+          ],
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (!response.ok) throw new Error(`AI error: ${response.status}`);
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || "{}";
+      const parsed = JSON.parse(content);
+
+      return new Response(JSON.stringify(parsed), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Unknown action" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
