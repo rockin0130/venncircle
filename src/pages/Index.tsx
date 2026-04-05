@@ -229,6 +229,7 @@ const Index = () => {
         onNavigateToFeature={handleNavigateToFeature}
         onCreateGroup={handleCreateInterestGroup}
         onOpenGroupHub={handleOpenGroupHub}
+        onOpenMore={() => setMoreOpen(true)}
       />
     ),
     "group-hub": hubGroup ? (
