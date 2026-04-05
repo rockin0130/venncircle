@@ -247,6 +247,31 @@ const ShoppingListPage = () => {
         const { category, icon, is_grocery } = catData as { category: string; icon: string; is_grocery: boolean };
 
         if (is_grocery) {
+          const existingGroceryLists = lists.filter((l) => l.is_meal_plan);
+          if (existingGroceryLists.length > 0) {
+            // Build sub-card options from existing grocery lists
+            const groceryItems = items.filter((i) => existingGroceryLists.some((l) => l.id === i.list_id));
+            const subCardOptions: { listId: string; mealName: string | null; label: string }[] = [];
+
+            existingGroceryLists.forEach((gl) => {
+              subCardOptions.push({ listId: gl.id, mealName: null, label: gl.label });
+              const mealNames = new Set(
+                groceryItems.filter((i) => i.list_id === gl.id && i.meal_name).map((i) => i.meal_name!)
+              );
+              mealNames.forEach((mn) => {
+                subCardOptions.push({ listId: gl.id, mealName: mn, label: mn });
+              });
+            });
+
+            // Add "Other" option — uses first grocery list with no meal_name
+            const otherOption = { listId: existingGroceryLists[0].id, mealName: null as string | null, label: "Other" };
+
+            setPendingGroceryItem(itemName);
+            setGrocerySubCardOptions([...subCardOptions, otherOption]);
+            setSelectedSubCard(otherOption);
+            setGroceryPickerOpen(true);
+            return;
+          }
           targetListId = await getOrCreateCategoryList("Grocery", "🛒", true);
         } else if (category && category !== "My Items") {
           targetListId = await getOrCreateCategoryList(category, icon || "📦", false);
