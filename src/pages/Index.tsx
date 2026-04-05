@@ -251,34 +251,16 @@ const Index = () => {
     <AppProvider>
       <div className="flex flex-col w-full max-w-md mx-auto bg-background h-svh relative overflow-hidden">
         <AnimatePresence mode="wait">
-          {activeTab === "launcher" ? (
-            <motion.div
-              key="launcher"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="flex-1 overflow-y-auto scroll-smooth-touch relative"
-            >
-              {pages.launcher}
-            </motion.div>
-          ) : (
-            <motion.div
-              key={activeTab === "chat" ? `chat-${chatGroup?.id || "list"}` : activeTab}
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.97 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
-              drag={activeTab === "home" ? "x" : false}
-              dragConstraints={{ left: 0, right: 300 }}
-              dragElastic={0.15}
-              onDragEnd={handleDragEnd}
-              style={activeTab === "home" ? { x: swipeX } : undefined}
-              className={`flex-1 overflow-y-auto scroll-smooth-touch relative bg-background ${isInnerPage ? (showBottomNav ? "pb-24" : showDrawerButton ? "pb-20" : "pb-4") : ""}`}
-            >
-              {pages[activeTab]}
-            </motion.div>
-          )}
+          <motion.div
+            key={activeTab === "chat" ? `chat-${chatGroup?.id || "list"}` : activeTab}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className={`flex-1 overflow-y-auto scroll-smooth-touch relative bg-background ${showBottomNav ? "pb-24" : showDrawerButton ? "pb-20" : "pb-4"}`}
+          >
+            {pages[activeTab]}
+          </motion.div>
         </AnimatePresence>
 
         {activeTab === "home" && showBottomNav && (
