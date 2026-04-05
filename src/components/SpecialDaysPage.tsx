@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Heart, Search, X, SlidersHorizontal, Check } from "lucide-react";
+import { Plus, Heart, Search, X, SlidersHorizontal, Check, MoreHorizontal } from "lucide-react";
 import PageGroupSelector from "@/components/PageGroupSelector";
 import { motion, AnimatePresence } from "framer-motion";
 import SettingsButton from "@/components/SettingsButton";

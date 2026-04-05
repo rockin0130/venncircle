@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Trash2, ShoppingCart, Check, X, ChevronRight } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, Check, X, ChevronRight, MoreHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, Group, GroupMember } from "@/context/AuthContext";
 import { Input } from "@/components/ui/input";

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Clock, Flame, Check, Trash2, ChevronDown, ChevronUp, Loader2, X, Dumbbell, AlertTriangle, Target, ArrowRight, RotateCcw, Calendar as CalIcon, Plus, Pencil, Settings, Heart, Gauge, Mountain, Footprints, Smartphone, ImageIcon, History, CloudDownload, Bell, ClipboardList } from "lucide-react";
+import { Clock, Flame, Check, Trash2, ChevronDown, ChevronUp, Loader2, X, Dumbbell, AlertTriangle, Target, ArrowRight, RotateCcw, Calendar as CalIcon, Plus, Pencil, Settings, Heart, Gauge, Mountain, Footprints, Smartphone, ImageIcon, History, CloudDownload, Bell, ClipboardList, MoreHorizontal } from "lucide-react";
 import CustomWorkoutBuilder from "@/components/CustomWorkoutBuilder";
 import WorkoutAiSuggest from "@/components/WorkoutAiSuggest";
 import GroupBadge from "@/components/GroupBadge";

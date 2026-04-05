@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, GroupMember } from "@/context/AuthContext";
 import { format, differenceInDays, subDays, parseISO, startOfDay, addDays } from "date-fns";
-import { Plus, DollarSign, Lock, Check, Calendar, Flame } from "lucide-react";
+import { Plus, DollarSign, Lock, Check, Calendar, Flame, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EVERYONE_SENTINEL } from "@/components/SobrietyUserFilter";

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import GroupBadge from "@/components/GroupBadge";
-import { Plus, Flame, Check, Bell, Eye, EyeOff } from "lucide-react";
+import { Plus, Flame, Check, Bell, Eye, EyeOff, MoreHorizontal } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { useAuth, GroupMember } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";

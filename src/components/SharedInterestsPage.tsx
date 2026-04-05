@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Plus, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
+import { Plus, ChevronRight, Maximize2, Minimize2, MoreHorizontal } from "lucide-react";
 import { useAuth, Group, ShareablePage, PAGE_LABELS } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
