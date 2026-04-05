@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Plus, ChevronRight, Maximize2, Minimize2, MoreHorizontal } from "lucide-react";
+import { Plus, Maximize2, Minimize2, MoreHorizontal, Camera } from "lucide-react";
 import { useAuth, Group, ShareablePage, PAGE_LABELS, SHAREABLE_PAGES } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -270,35 +270,69 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
               <div className="space-y-2">
                 {allGroups.map((group, gi) => {
                   const activeMembers = group.members.filter((m) => m.status === "active");
+                  const validPages = (group.shared_pages || [])
+                    .filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p))
+                    .slice(0, 4) as ShareablePage[];
+                  const extraPages = Math.max(
+                    (group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).length - 4,
+                    0
+                  );
+                  const coverUrl = group.cover_image_url || null;
+
                   return (
                     <button
                       key={group.id}
                       onClick={() => handleGroupTap(group)}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary/20 transition-all active:scale-[0.99] text-left"
+                      className="w-full h-[76px] flex overflow-hidden text-left bg-card"
+                      style={{
+                        borderRadius: 14,
+                        border: "0.5px solid rgba(0,0,0,0.07)",
+                      }}
                     >
-                      <div className={`w-9 h-9 rounded-lg ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex items-center justify-center shrink-0`}>
-                        <span className="text-xs font-bold text-foreground/80">{getInitials(group.name)}</span>
+                      <div className="flex-1 min-w-0 px-3 py-2.5 flex flex-col justify-center bg-card">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="text-[13px] font-medium text-foreground truncate">{group.name}</p>
+                          <div className="shrink-0">
+                            <MemberDots members={activeMembers} />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {validPages.map((page) => (
+                            <span
+                              key={page}
+                              className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
+                            >
+                              {PAGE_LABELS[page] || page}
+                            </span>
+                          ))}
+                          {extraPages > 0 && (
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                              +{extraPages}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{group.name}</p>
-                        <MemberDots members={activeMembers} />
-                      </div>
-                      <div className="flex flex-wrap gap-1 max-w-[160px] justify-end shrink-0">
-                        {(group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).slice(0, 4).map((page) => (
-                          <span
-                            key={page}
-                            className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
+
+                      <div
+                        className="w-[100px] shrink-0 overflow-hidden"
+                        style={{ borderRadius: "0 14px 14px 0" }}
+                      >
+                        {coverUrl ? (
+                          <img
+                            src={coverUrl}
+                            alt=""
+                            className="w-full h-full object-cover block"
+                          />
+                        ) : (
+                          <div
+                            className={`w-full h-full ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex flex-col items-center justify-center gap-0.5`}
                           >
-                            {PAGE_LABELS[page as ShareablePage] || page}
-                          </span>
-                        ))}
-                        {(group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).length > 4 && (
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                            +{(group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).length - 4}
-                          </span>
+                            <Camera size={12} className="text-muted-foreground/50" />
+                            <span className="text-[8px] font-medium text-muted-foreground/70">Add photo</span>
+                          </div>
                         )}
                       </div>
-                      <ChevronRight size={16} className="text-muted-foreground shrink-0" />
                     </button>
                   );
                 })}
