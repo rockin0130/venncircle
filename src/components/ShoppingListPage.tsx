@@ -59,6 +59,23 @@ const ShoppingListPage = () => {
   const [selectedSubCard, setSelectedSubCard] = useState<{ listId: string; mealName: string | null; label: string }>({ listId: "", mealName: null, label: "" });
   const [grocerySubCardOptions, setGrocerySubCardOptions] = useState<{ listId: string; mealName: string | null; label: string }[]>([]);
 
+  // Card-level add sheet state
+  type CardAddTarget = {
+    type: "manual";
+    listId: string;
+    label: string;
+  } | {
+    type: "grocery";
+    lists: ShoppingList[];
+  };
+  const [cardAddOpen, setCardAddOpen] = useState(false);
+  const [cardAddTarget, setCardAddTarget] = useState<CardAddTarget | null>(null);
+  const [cardAddText, setCardAddText] = useState("");
+  const [cardAddSubCard, setCardAddSubCard] = useState<{ listId: string; mealName: string | null; label: string }>({ listId: "", mealName: null, label: "" });
+  const [cardAddSubOptions, setCardAddSubOptions] = useState<{ listId: string; mealName: string | null; label: string }[]>([]);
+  const [showNewGroupInput, setShowNewGroupInput] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+
   const [localContextId, setLocalContextId] = useState<string>(PERSONAL_SENTINEL);
 
   const isMineView = localContextId === PERSONAL_SENTINEL;
