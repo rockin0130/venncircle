@@ -1,10 +1,13 @@
-import { useState, useMemo } from "react";
-import { ArrowLeft, Settings, ChevronRight, Plus, Trash2, LogOut, Pencil, X, Check, Loader2 } from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { ArrowLeft, Settings, ChevronRight, Plus, Trash2, LogOut, Pencil, X, Check, Loader2, MoreHorizontal, Heart, MessageCircle, Share2, Image, Activity, Smile, Camera } from "lucide-react";
 import { useAuth, Group, ShareablePage, SHAREABLE_PAGES, PAGE_LABELS, PAGE_ICONS } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import GroupFeedCompose from "@/components/GroupFeedCompose";
+import GroupFeedPost from "@/components/GroupFeedPost";
 
 interface GroupHubPageProps {
   group: Group;
@@ -12,27 +15,40 @@ interface GroupHubPageProps {
   onNavigateToFeature: (tab: string, groupId: string) => void;
 }
 
-const INTEREST_ROW_COLORS: Record<string, string> = {
-  workout: "bg-[hsl(210,70%,95%)]",
+const INTEREST_ICON_COLORS: Record<string, string> = {
+  workout: "bg-[hsl(10,70%,95%)]",
   nutrition: "bg-[hsl(90,40%,92%)]",
   sobriety: "bg-[hsl(260,50%,95%)]",
   habits: "bg-[hsl(35,70%,93%)]",
   calendar: "bg-[hsl(220,15%,93%)]",
-  
   shopping: "bg-[hsl(170,50%,93%)]",
+  study: "bg-[hsl(200,50%,93%)]",
 };
 
 const MEMBER_COLORS = [
-  "bg-[hsl(210,55%,75%)]",
-  "bg-[hsl(340,50%,78%)]",
-  "bg-[hsl(160,40%,72%)]",
-  "bg-[hsl(35,55%,75%)]",
-  "bg-[hsl(260,40%,78%)]",
-  "bg-[hsl(190,45%,72%)]",
+  "bg-[hsl(260,45%,60%)]",
+  "bg-[hsl(340,50%,65%)]",
+  "bg-[hsl(160,40%,55%)]",
+  "bg-[hsl(35,55%,60%)]",
+  "bg-[hsl(210,55%,60%)]",
+  "bg-[hsl(190,45%,55%)]",
 ];
 
-const getInitials = (name: string) =>
-  name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+interface FeedPost {
+  id: string;
+  user_id: string;
+  content: string;
+  post_type: string;
+  interest_tag: string | null;
+  photos: string[];
+  stats: any;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+  user_display_name?: string;
+  user_avatar_url?: string | null;
+  liked_by_me?: boolean;
+}
 
 const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps) => {
   const { user, leaveGroup, updateGroupSharedPages, inviteToGroup, refreshGroups, groups } = useAuth();
@@ -43,25 +59,91 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   const [savingName, setSavingName] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [memberSheetOpen, setMemberSheetOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
 
   const isOwner = user?.id === group.created_by;
-  const activeMembers = group.members.filter((m) => m.status === "active");
-  const enabledPages = group.shared_pages || [];
+  const currentGroup = groups.find((g) => g.id === group.id) || group;
+  const currentEnabledPages = (currentGroup.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)) as ShareablePage[];
+  const currentActiveMembers = currentGroup.members.filter((m) => m.status === "active");
 
-  // Available interests to add (not already enabled)
   const availableInterests = useMemo(
-    () => SHAREABLE_PAGES.filter((p) => !enabledPages.includes(p)),
-    [enabledPages]
+    () => SHAREABLE_PAGES.filter((p) => !currentEnabledPages.includes(p)),
+    [currentEnabledPages]
   );
 
+  // Fetch posts
+  const fetchPosts = async () => {
+    const { data: postsData, error } = await supabase
+      .from("group_feed_posts")
+      .select("*")
+      .eq("group_id", currentGroup.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("Error fetching posts:", error);
+      return;
+    }
+
+    if (!postsData || postsData.length === 0) {
+      setPosts([]);
+      setLoadingPosts(false);
+      return;
+    }
+
+    // Get unique user IDs and fetch profiles
+    const userIds = [...new Set(postsData.map((p: any) => p.user_id))];
+    const { data: profiles } = await supabase.rpc("get_profiles_by_ids", { _user_ids: userIds });
+
+    // Check which posts the current user has liked
+    const postIds = postsData.map((p: any) => p.id);
+    const { data: myLikes } = await supabase
+      .from("group_feed_likes")
+      .select("post_id")
+      .eq("user_id", user?.id || "")
+      .in("post_id", postIds);
+
+    const likedPostIds = new Set((myLikes || []).map((l: any) => l.post_id));
+    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+    const enrichedPosts: FeedPost[] = postsData.map((p: any) => {
+      const profile = profileMap.get(p.user_id);
+      return {
+        ...p,
+        user_display_name: profile?.display_name || "Member",
+        user_avatar_url: profile?.avatar_url,
+        liked_by_me: likedPostIds.has(p.id),
+      };
+    });
+
+    setPosts(enrichedPosts);
+    setLoadingPosts(false);
+  };
+
+  useEffect(() => {
+    fetchPosts();
+
+    // Realtime subscription
+    const channel = supabase
+      .channel(`feed-${currentGroup.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "group_feed_posts", filter: `group_id=eq.${currentGroup.id}` }, () => {
+        fetchPosts();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [currentGroup.id]);
+
   const handleNavigate = (page: ShareablePage) => {
-    const tab = page;
-    onNavigateToFeature(tab, group.id);
+    onNavigateToFeature(page, currentGroup.id);
   };
 
   const handleAddInterest = async (page: ShareablePage) => {
-    const newPages = [...enabledPages, page];
-    const result = await updateGroupSharedPages(group.id, newPages);
+    const newPages = [...currentEnabledPages, page];
+    const result = await updateGroupSharedPages(currentGroup.id, newPages);
     if (result.error) {
       toast.error(result.error);
     } else {
@@ -72,12 +154,12 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   };
 
   const handleRemoveInterest = async (page: ShareablePage) => {
-    if (enabledPages.length <= 1) {
+    if (currentEnabledPages.length <= 1) {
       toast.error("Group must have at least one interest");
       return;
     }
-    const newPages = enabledPages.filter((p) => p !== page);
-    const result = await updateGroupSharedPages(group.id, newPages);
+    const newPages = currentEnabledPages.filter((p) => p !== page);
+    const result = await updateGroupSharedPages(currentGroup.id, newPages);
     if (result.error) {
       toast.error(result.error);
     } else {
@@ -87,7 +169,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   };
 
   const handleSaveName = async () => {
-    if (!nameInput.trim() || nameInput.trim() === group.name) {
+    if (!nameInput.trim() || nameInput.trim() === currentGroup.name) {
       setEditingName(false);
       return;
     }
@@ -95,7 +177,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
     const { error } = await supabase
       .from("groups")
       .update({ name: nameInput.trim() })
-      .eq("id", group.id);
+      .eq("id", currentGroup.id);
     if (error) {
       toast.error("Failed to rename group");
     } else {
@@ -108,7 +190,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
 
   const handleLeave = async () => {
     setLeaving(true);
-    const result = await leaveGroup(group.id);
+    const result = await leaveGroup(currentGroup.id);
     if (result.error) {
       toast.error(result.error);
       setLeaving(false);
@@ -122,9 +204,8 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const { data, error } = await supabase.rpc("delete_group", { _group_id: group.id });
+      const { data, error } = await supabase.rpc("delete_group", { _group_id: currentGroup.id });
       if (error) {
-        console.error("Delete group DB error:", error);
         toast.error(`Failed to delete group: ${error.message}`);
         setDeleting(false);
         return;
@@ -140,21 +221,36 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
       await refreshGroups();
       onBack();
     } catch (err: any) {
-      console.error("Delete group error:", err);
       toast.error("Failed to delete group");
       setDeleting(false);
     }
   };
 
-  // Re-resolve the group from context to get latest data
-  const currentGroup = groups.find((g) => g.id === group.id) || group;
-  const currentEnabledPages = (currentGroup.shared_pages || []).filter((p) => SHAREABLE_PAGES.includes(p));
-  const currentActiveMembers = currentGroup.members.filter((m) => m.status === "active");
+  const handleLike = async (postId: string, currentlyLiked: boolean) => {
+    if (currentlyLiked) {
+      await supabase.from("group_feed_likes").delete().eq("post_id", postId).eq("user_id", user?.id || "");
+      await supabase.from("group_feed_posts").update({ likes_count: Math.max(0, (posts.find(p => p.id === postId)?.likes_count || 1) - 1) }).eq("id", postId);
+    } else {
+      await supabase.from("group_feed_likes").insert({ post_id: postId, user_id: user?.id || "" });
+      await supabase.from("group_feed_posts").update({ likes_count: (posts.find(p => p.id === postId)?.likes_count || 0) + 1 }).eq("id", postId);
+    }
+    // Optimistic update
+    setPosts(prev => prev.map(p => p.id === postId ? {
+      ...p,
+      liked_by_me: !currentlyLiked,
+      likes_count: currentlyLiked ? Math.max(0, p.likes_count - 1) : p.likes_count + 1,
+    } : p));
+  };
+
+  const handleMemberTap = (member: any) => {
+    setSelectedMember(member);
+    setMemberSheetOpen(true);
+  };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <header className="px-5 pt-12 pb-4 flex-shrink-0">
+      <header className="px-4 pt-12 pb-3 flex-shrink-0 border-b border-border/40">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <button
@@ -164,69 +260,122 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
               <ArrowLeft size={20} className="text-foreground" />
             </button>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{currentGroup.emoji}</span>
-                <h1 className="text-lg font-bold text-foreground truncate">{currentGroup.name}</h1>
-              </div>
-              <p className="text-xs text-muted-foreground ml-7">
+              <h1 className="text-lg font-bold text-foreground truncate">{currentGroup.name}</h1>
+              <p className="text-xs text-muted-foreground">
                 {currentActiveMembers.length} member{currentActiveMembers.length !== 1 ? "s" : ""}
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-secondary/60 transition-colors shrink-0"
-          >
-            <Settings size={18} className="text-muted-foreground" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-white border border-[rgba(0,0,0,0.08)]"
+              style={{ borderWidth: "0.5px" }}
+            >
+              <Settings size={14} className="text-muted-foreground" />
+            </button>
+            <button
+              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-white border border-[rgba(0,0,0,0.08)]"
+              style={{ borderWidth: "0.5px" }}
+            >
+              <MoreHorizontal size={14} className="text-muted-foreground" />
+            </button>
+          </div>
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-6">
-        {/* Members row */}
-        <div className="flex items-center gap-1 mb-5">
-          {currentActiveMembers.map((m, i) => (
-            <div
-              key={m.user_id}
-              className={`w-8 h-8 rounded-full ${MEMBER_COLORS[i % MEMBER_COLORS.length]} flex items-center justify-center text-[11px] font-bold text-white -ml-1 first:ml-0 ring-2 ring-background`}
-              title={m.display_name || "Member"}
-            >
-              {(m.display_name || "?")[0].toUpperCase()}
-            </div>
-          ))}
+      <div className="flex-1 overflow-y-auto">
+        {/* Member Story Rings */}
+        <div className="px-4 py-3">
+          <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1">
+            {currentActiveMembers.map((m, i) => {
+              const isMe = m.user_id === user?.id;
+              const name = isMe ? "Mine" : (m.display_name || "Member").split(" ")[0];
+              return (
+                <button
+                  key={m.user_id}
+                  onClick={() => handleMemberTap(m)}
+                  className="flex flex-col items-center gap-1 shrink-0"
+                >
+                  <div className="relative">
+                    <div className="w-14 h-14 rounded-full p-[2px] border-2 border-muted-foreground/30">
+                      <div className={`w-full h-full rounded-full ${MEMBER_COLORS[i % MEMBER_COLORS.length]} flex items-center justify-center text-sm font-bold text-white`}>
+                        {(m.display_name || "?")[0].toUpperCase()}
+                      </div>
+                    </div>
+                    {/* Online dot placeholder */}
+                    <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[hsl(142,70%,45%)] border-2 border-background" />
+                  </div>
+                  <span className="text-[11px] text-muted-foreground font-medium truncate max-w-[56px]">{name}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Interest rows */}
-        <section className="space-y-2">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Interests</h2>
-          {currentEnabledPages.map((page) => (
-            <button
-              key={page}
-              onClick={() => handleNavigate(page)}
-              className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary/20 transition-all active:scale-[0.99]"
-            >
-              <div className={`w-7 h-7 rounded-lg ${INTEREST_ROW_COLORS[page] || "bg-muted"} flex items-center justify-center text-sm`}>
-                {PAGE_ICONS[page] || "📋"}
-              </div>
-              <span className="flex-1 text-sm font-medium text-foreground text-left">
-                {PAGE_LABELS[page] || page}
-              </span>
-              <ChevronRight size={16} className="text-muted-foreground" />
-            </button>
-          ))}
+        {/* Interest Strip */}
+        <div className="px-4 pb-3">
+          <div className="flex gap-3 overflow-x-auto scrollbar-none">
+            {currentEnabledPages.map((page) => (
+              <button
+                key={page}
+                onClick={() => handleNavigate(page)}
+                className="flex flex-col items-center gap-1.5 shrink-0"
+              >
+                <div className={`w-12 h-12 rounded-xl ${INTEREST_ICON_COLORS[page] || "bg-muted"} flex items-center justify-center text-lg`}>
+                  {PAGE_ICONS[page] || "📋"}
+                </div>
+                <span className="text-[11px] text-muted-foreground font-medium">{PAGE_LABELS[page]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
-          {/* Add interest row */}
-          <button
-            onClick={() => setAddInterestOpen(true)}
-            className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-border hover:border-primary/30 transition-all"
-          >
-            <div className="w-7 h-7 rounded-lg border border-dashed border-muted-foreground/30 flex items-center justify-center">
-              <Plus size={14} className="text-muted-foreground" />
+        {/* Compose Box */}
+        <div className="px-4 pb-3">
+          <GroupFeedCompose
+            groupId={currentGroup.id}
+            userId={user?.id || ""}
+            userDisplayName={user?.id ? currentActiveMembers.find(m => m.user_id === user.id)?.display_name || "" : ""}
+            onPostCreated={fetchPosts}
+          />
+        </div>
+
+        {/* Feed */}
+        <div className="px-4 pb-6 space-y-3">
+          {loadingPosts ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 size={24} className="animate-spin text-muted-foreground" />
             </div>
-            <span className="text-sm font-medium text-muted-foreground">Add interest</span>
-          </button>
-        </section>
+          ) : posts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-sm text-muted-foreground">No posts yet. Share something with the group!</p>
+            </div>
+          ) : (
+            posts.map((post) => (
+              <GroupFeedPost
+                key={post.id}
+                post={post}
+                onLike={() => handleLike(post.id, !!post.liked_by_me)}
+                memberColors={MEMBER_COLORS}
+                members={currentActiveMembers}
+              />
+            ))
+          )}
+        </div>
       </div>
+
+      {/* Member Activity Sheet */}
+      <Sheet open={memberSheetOpen} onOpenChange={setMemberSheetOpen}>
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[60vh]">
+          <SheetHeader>
+            <SheetTitle>{selectedMember?.user_id === user?.id ? "My" : `${selectedMember?.display_name || "Member"}'s`} Recent Activity</SheetTitle>
+          </SheetHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground text-center py-8">No recent activity to show</p>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Add Interest Dialog */}
       <Dialog open={addInterestOpen} onOpenChange={setAddInterestOpen}>
@@ -244,7 +393,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
                   onClick={() => handleAddInterest(page)}
                   className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary/20 transition-all"
                 >
-                  <div className={`w-7 h-7 rounded-lg ${INTEREST_ROW_COLORS[page] || "bg-muted"} flex items-center justify-center text-sm`}>
+                  <div className={`w-7 h-7 rounded-lg ${INTEREST_ICON_COLORS[page] || "bg-muted"} flex items-center justify-center text-sm`}>
                     {PAGE_ICONS[page] || "📋"}
                   </div>
                   <span className="text-sm font-medium text-foreground">{PAGE_LABELS[page]}</span>
@@ -255,7 +404,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
         </DialogContent>
       </Dialog>
 
-      {/* Settings Dialog */}
+      {/* Settings Dialog — preserved from original */}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent className="max-w-sm max-h-[80vh] overflow-y-auto">
           <DialogHeader>
