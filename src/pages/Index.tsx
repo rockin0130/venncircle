@@ -46,18 +46,6 @@ const Index = () => {
   const { navStyle, setNavStyle } = useNavStyle();
   const { weekStart, setWeekStart } = useWeekStart();
 
-  const swipeX = useMotionValue(0);
-
-  const resetHomeSwipeState = useCallback(() => {
-    swipeX.stop();
-    swipeX.set(0);
-  }, [swipeX]);
-
-  useEffect(() => {
-    if (activeTab !== "home") {
-      resetHomeSwipeState();
-    }
-  }, [activeTab, resetHomeSwipeState]);
 
   if (loading) {
     return (
