@@ -27,7 +27,7 @@ const FEATURE_ITEMS: { id: Tab | "settings"; label: string; icon: typeof Home }[
   { id: "nutrition", label: "Nutrition", icon: Apple },
   { id: "habits", label: "Habits", icon: Heart },
   { id: "sobriety", label: "Sobriety", icon: Clock },
-  { id: "specialdays", label: "Special Days", icon: Sparkles },
+  
   { id: "shopping", label: "Shopping List", icon: ShoppingCart },
 ];
 

@@ -31,7 +31,6 @@ export const PAGE_LABELS: Record<ShareablePage, string> = {
   nutrition: "Nutrition",
   habits: "Habits",
   sobriety: "Sobriety",
-  special_days: "Special Days",
   shopping: "Shopping",
   study: "Study",
 };
@@ -42,7 +41,6 @@ export const PAGE_ICONS: Record<ShareablePage, string> = {
   nutrition: "🍎",
   habits: "🔥",
   sobriety: "🏆",
-  special_days: "❤️",
   shopping: "🛒",
   study: "📖",
 };
