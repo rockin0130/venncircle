@@ -8,7 +8,6 @@ export type Tab =
 // Keep these exports for backward compat with MorePage etc.
 export const ALL_PAGE_META: Record<string, { label: string; icon: typeof Home; desc: string }> = {
   calendar: { label: "Calendar", icon: Home, desc: "View and manage your schedule" },
-  chat: { label: "Chat", icon: MessageCircle, desc: "Group messaging and media" },
   workout: { label: "Workout", icon: Home, desc: "Track workouts and exercise plans" },
   habits: { label: "Habits", icon: Home, desc: "Daily habit tracking and streaks" },
   nutrition: { label: "Nutrition", icon: Home, desc: "Track protein, meals & AI suggestions" },
