@@ -274,6 +274,12 @@ const ShoppingListPage = () => {
         defaultPage="shopping"
       />
 
+      <ShoppingUserFilter
+        localGroup={localGroup}
+        selectedUserIds={selectedUserIds}
+        onSelectionChange={setSelectedUserIds}
+      />
+
       {/* Manual add input */}
       <AnimatePresence>
         {showManualAdd && (
