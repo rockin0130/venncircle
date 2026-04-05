@@ -562,13 +562,15 @@ const ShoppingListPage = () => {
             className="w-full mt-2"
             onClick={async () => {
               if (!pendingGroceryItem || !selectedSubCard.listId) return;
+              const isOther = selectedSubCard.label === "Other";
+              const mealName = isOther ? "Other" : selectedSubCard.mealName;
               const { data, error } = await supabase
                 .from("shopping_list_items")
                 .insert({
                   list_id: selectedSubCard.listId,
                   user_id: user!.id,
                   name: pendingGroceryItem,
-                  meal_name: selectedSubCard.mealName,
+                  meal_name: mealName,
                 })
                 .select()
                 .single();
