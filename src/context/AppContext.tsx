@@ -1789,9 +1789,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const filteredEvents = useMemo(() => filterByGroup(events), [events, filterByGroup]);
   const filteredTasks = useMemo(() => filterByGroup(tasks), [tasks, filterByGroup]);
   const filteredWorkoutsRaw = useMemo(() => filterByGroup(workouts), [workouts, filterByGroup]);
-  // Deduplicate linked workouts in "All" view (activeGroup === null)
+  // Deduplicate linked workouts in ALL views — personal, group, and "All"
+  // When a workout is shared with multiple groups, multiple DB rows exist linked by linkedWorkoutId.
+  // We always show only one card per linked set so the user never sees duplicates.
   const filteredWorkouts = useMemo(() => {
-    if (activeGroup !== null) return filteredWorkoutsRaw;
     const seen = new Set<string>();
     return filteredWorkoutsRaw.filter((w) => {
       if (!w.linkedWorkoutId) return true;
@@ -1799,7 +1800,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       seen.add(w.linkedWorkoutId);
       return true;
     });
-  }, [filteredWorkoutsRaw, activeGroup]);
+  }, [filteredWorkoutsRaw]);
 
   // Group-filtered partner data — applies the same activeGroup filter so cross-user views are consistent
   const filteredPartnerHabits = useMemo(() => {
