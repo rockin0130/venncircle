@@ -7,12 +7,6 @@ import { toast } from "sonner";
 import EditProfileModal from "@/components/EditProfileModal";
 import { useFriendships } from "@/hooks/useFriendships";
 
-const settingsItems = [
-  { icon: Bell, label: "Notifications", desc: "Reminders & alerts" },
-  { icon: Shield, label: "Privacy", desc: "Data & sharing" },
-  { icon: Palette, label: "Appearance", desc: "Theme & display" },
-  { icon: HelpCircle, label: "Help & Support", desc: "FAQ & contact" },
-];
 
 interface ProfilePageProps {
   onNavigate?: (tab: string) => void;
