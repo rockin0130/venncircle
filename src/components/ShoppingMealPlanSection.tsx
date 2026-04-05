@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Check, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import ShoppingItemAssignee from "./ShoppingItemAssignee";
 import { GroupMember } from "@/context/AuthContext";
+import { NudgePill } from "./ShoppingNudgeSheet";
 
 interface ShoppingListItem {
   id: string;
@@ -32,17 +32,16 @@ interface Props {
   onDeleteList: (id: string) => void;
   isGroupView: boolean;
   groupMembers: GroupMember[];
-  onAssign: (itemId: string, userIds: string[]) => void;
+  onNudge?: () => void;
 }
 
-const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList, isGroupView, groupMembers, onAssign }: Props) => {
+const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList, isGroupView, onNudge }: Props) => {
   const [weekOpen, setWeekOpen] = useState(true);
   const [openMeals, setOpenMeals] = useState<Record<string, boolean>>({});
 
   const totalItems = items.length;
   const checkedItems = items.filter(i => i.checked).length;
 
-  // Group items by meal_name
   const mealGroups: Record<string, ShoppingListItem[]> = {};
   const ungrouped: ShoppingListItem[] = [];
 
@@ -65,7 +64,6 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
-      {/* Week header */}
       <button
         onClick={() => setWeekOpen(prev => !prev)}
         className="flex items-center justify-between w-full px-4 py-3 bg-secondary/30"
@@ -78,6 +76,7 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
           <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
             {checkedItems}/{totalItems}
           </span>
+          {isGroupView && onNudge && <NudgePill onClick={onNudge} />}
           <button
             onClick={(e) => { e.stopPropagation(); onDeleteList(list.id); }}
             className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
@@ -96,7 +95,6 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
             className="overflow-hidden"
           >
             <div className="divide-y divide-border/50">
-              {/* Nested meal cards */}
               {mealNames.map(mealName => {
                 const mealItems = mealGroups[mealName];
                 const mealChecked = mealItems.filter(i => i.checked).length;
@@ -112,9 +110,12 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
                         {open ? <ChevronDown size={12} className="text-muted-foreground" /> : <ChevronRight size={12} className="text-muted-foreground" />}
                         <span className="text-xs font-semibold text-foreground">{mealName}</span>
                       </div>
-                      <span className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">
-                        {mealChecked}/{mealItems.length}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">
+                          {mealChecked}/{mealItems.length}
+                        </span>
+                        {isGroupView && onNudge && <NudgePill onClick={onNudge} />}
+                      </div>
                     </button>
                     <AnimatePresence initial={false}>
                       {open && (
@@ -125,15 +126,7 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
                           className="overflow-hidden"
                         >
                           {mealItems.map(item => (
-                            <ItemRow
-                              key={item.id}
-                              item={item}
-                              onToggle={onToggle}
-                              onDelete={onDelete}
-                              isGroupView={isGroupView}
-                              groupMembers={groupMembers}
-                              onAssign={onAssign}
-                            />
+                            <ItemRow key={item.id} item={item} onToggle={onToggle} onDelete={onDelete} />
                           ))}
                         </motion.div>
                       )}
@@ -142,17 +135,8 @@ const ShoppingMealPlanSection = ({ list, items, onToggle, onDelete, onDeleteList
                 );
               })}
 
-              {/* Ungrouped items */}
               {ungrouped.map(item => (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  onToggle={onToggle}
-                  onDelete={onDelete}
-                  isGroupView={isGroupView}
-                  groupMembers={groupMembers}
-                  onAssign={onAssign}
-                />
+                <ItemRow key={item.id} item={item} onToggle={onToggle} onDelete={onDelete} />
               ))}
             </div>
           </motion.div>
@@ -166,16 +150,10 @@ const ItemRow = ({
   item,
   onToggle,
   onDelete,
-  isGroupView,
-  groupMembers,
-  onAssign,
 }: {
   item: ShoppingListItem;
   onToggle: (id: string, checked: boolean) => void;
   onDelete: (id: string) => void;
-  isGroupView: boolean;
-  groupMembers: GroupMember[];
-  onAssign: (itemId: string, userIds: string[]) => void;
 }) => (
   <div className="flex items-center gap-3 px-4 py-2.5 group">
     <button
@@ -189,13 +167,6 @@ const ItemRow = ({
     <span className={`flex-1 text-sm transition-all ${item.checked ? "line-through text-muted-foreground/50" : "text-foreground"}`}>
       {item.name}
     </span>
-    {isGroupView && (
-      <ShoppingItemAssignee
-        assigneeUserIds={item.assignee_user_ids || []}
-        groupMembers={groupMembers}
-        onAssign={(userIds) => onAssign(item.id, userIds)}
-      />
-    )}
     <button
       onClick={() => onDelete(item.id)}
       className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-destructive transition-all"
