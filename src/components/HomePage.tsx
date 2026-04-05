@@ -832,7 +832,14 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                     selectedDate={selectedDate}
                     memberFilters={[]}
                   />
-                );
+                  {/* Quick Access Strip */}
+                  <QuickAccessStrip
+                    enabledSections={sectionVisible}
+                    onNavigate={onNavigate}
+                  />
+                </>;
+              return <div key={sectionId}>{todoBlock}</div>
+              );
 
               case "water":
                 // Water is now rendered inside the Scheduled section's Flexible period
