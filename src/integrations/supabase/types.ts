@@ -1349,6 +1349,50 @@ export type Database = {
           },
         ]
       }
+      study_sessions: {
+        Row: {
+          created_at: string
+          duration_seconds: number
+          ended_at: string | null
+          group_id: string | null
+          id: string
+          is_active: boolean
+          started_at: string
+          subject: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number
+          ended_at?: string | null
+          group_id?: string | null
+          id?: string
+          is_active?: boolean
+          started_at?: string
+          subject?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number
+          ended_at?: string | null
+          group_id?: string | null
+          id?: string
+          is_active?: boolean
+          started_at?: string
+          subject?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_sessions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assignee: string
