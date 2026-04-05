@@ -184,16 +184,12 @@ const Index = () => {
 
   const handleOpenGroupHub = (group: Group) => {
     setHubGroup(group);
-    setActiveTab("group-hub" as FullTab);
+    setActiveTab("group-hub" as Tab);
   };
 
   const handleBackFromHub = () => {
     setHubGroup(null);
-    setActiveTab("shared-interests" as FullTab);
-  };
-
-  const handleDragEnd = (_: any, info: PanInfo) => {
-    resetHomeSwipeState();
+    setActiveTab("shared-interests" as Tab);
   };
 
   const pages: Record<string, React.ReactNode> = {
