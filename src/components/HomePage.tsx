@@ -71,21 +71,36 @@ const QUICK_ACCESS_FEATURES = [
   )},
 ];
 
-const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress }: {
+const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress, onDragReposition }: {
   enabledSections: Set<string>;
   onNavigate?: (page: string) => void;
   isWiggling?: boolean;
   onLongPress?: () => void;
+  onDragReposition?: (direction: "up" | "down") => void;
 }) => {
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragStartY = useRef<number | null>(null);
   const clearLp = () => { if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; } };
   const tiles = QUICK_ACCESS_FEATURES.filter(f => enabledSections.has(f.id));
   if (tiles.length === 0) return null;
 
   return (
-    <section
-      className="mb-6"
-      onPointerDown={() => {
+    <motion.section
+      className="mb-6 select-none"
+      drag={isWiggling ? "y" : false}
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={0.5}
+      onDragStart={(_e, info) => {
+        dragStartY.current = info.point.y;
+      }}
+      onDragEnd={(_e, info) => {
+        const dy = info.offset.y;
+        if (Math.abs(dy) > 50) {
+          onDragReposition?.(dy < 0 ? "up" : "down");
+        }
+        dragStartY.current = null;
+      }}
+      onPointerDown={(e) => {
         if (isWiggling) return;
         clearLp();
         longPressRef.current = setTimeout(() => {
@@ -96,10 +111,16 @@ const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress
       onPointerUp={clearLp}
       onPointerLeave={clearLp}
       onPointerCancel={clearLp}
-      onContextMenu={(e) => e.preventDefault()}
-      onClick={(e) => { if (isWiggling) e.stopPropagation(); }}
+      onContextMenu={(e: React.MouseEvent) => e.preventDefault()}
+      onClick={(e: React.MouseEvent) => { if (isWiggling) e.stopPropagation(); }}
+      style={isWiggling ? { cursor: "grab", zIndex: 50 } : undefined}
     >
-      <div className={`bg-card rounded-xl border p-3 shadow-card transition-all ${isWiggling ? 'border-primary/30 shadow-lg' : 'border-border'}`}>
+      <div className={`bg-card rounded-xl border p-3 shadow-card transition-all ${isWiggling ? 'border-primary/30 shadow-lg ring-2 ring-primary/20' : 'border-border'}`}>
+        {isWiggling && (
+          <div className="flex justify-center mb-1.5">
+            <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
+          </div>
+        )}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {tiles.map((tile, i) => (
             <button
@@ -116,7 +137,7 @@ const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress
           ))}
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 };
 
