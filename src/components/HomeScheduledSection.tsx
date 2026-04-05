@@ -268,10 +268,14 @@ const HomeScheduledSection = ({
     return [...allDayItems.map(toUnified), ...allTimedItems.map(toUnified)];
   }, [allDayItems, allTimedItems]);
 
-  // Group by period
+  // Separate all-day items from timed items
+  const allDayUnified = useMemo(() => unifiedItems.filter(i => i.allDay), [unifiedItems]);
+  const timedUnified = useMemo(() => unifiedItems.filter(i => !i.allDay), [unifiedItems]);
+
+  // Group by period (only timed items)
   const periodMap = useMemo(() => {
     const map: Record<Period, UnifiedScheduledItem[]> = { morning: [], afternoon: [], evening: [], flexible: [] };
-    for (const item of unifiedItems) {
+    for (const item of timedUnified) {
       const period = getPeriod(item.sortMinutes);
       map[period].push(item);
     }
@@ -280,7 +284,7 @@ const HomeScheduledSection = ({
       map[key].sort((a, b) => a.sortMinutes - b.sortMinutes);
     }
     return map;
-  }, [unifiedItems]);
+  }, [timedUnified]);
 
   // Get habits grouped by period for enabled categories
   const habitsByPeriod = useMemo(() => {
