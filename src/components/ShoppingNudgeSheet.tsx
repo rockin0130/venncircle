@@ -101,7 +101,10 @@ export const NudgePill = ({ onClick }: { onClick: () => void }) => (
     onClick={(e) => { e.stopPropagation(); onClick(); }}
     className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-colors"
   >
-    <Bell size={10} />
+    <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#92400E" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
     <span>Nudge</span>
   </button>
 );
