@@ -120,7 +120,7 @@ function getUserTone(index: number): UserTone {
   };
 }
 
-const SobrietyPage = () => {
+const SobrietyPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
   const { user, activeGroup, setActiveGroup, profile, groups } = useAuth();
 
   const [categories, setCategories] = useState<SobrietyCategory[]>([]);
