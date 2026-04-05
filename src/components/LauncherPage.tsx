@@ -593,10 +593,9 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
               </div>
             )}
             {/* Sticky stack container */}
-            <div className="relative" style={{ paddingBottom: visualCalendarGroups.length > 1 ? 0 : undefined }}>
+            <div className="relative">
               {visualCalendarGroups.map((group, index) => {
                 const activeMembers = group.members.filter((m) => m.status === 'active' && m.user_id !== profile?.id);
-                const pendingMembers = group.members.filter((m) => m.status === 'pending_invited');
                 const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
                 const currentCoverUrl = localCoverMap[group.id] || group.cover_image_url || null;
                 const hasCover = !!currentCoverUrl;
@@ -607,6 +606,7 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
                 const CARD_HEIGHT = 76;
                 const PEEK_OFFSET = 52;
                 const shadowOpacity = Math.max(0.10 - index * 0.02, 0.02);
+                const isLast = index === visualCalendarGroups.length - 1;
 
                 return (
                   <div
@@ -616,7 +616,8 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
                     style={{
                       top: index * PEEK_OFFSET,
                       zIndex: visualCalendarGroups.length - index,
-                      marginBottom: index < visualCalendarGroups.length - 1 ? PEEK_OFFSET - CARD_HEIGHT : 0,
+                      height: CARD_HEIGHT,
+                      marginBottom: isLast ? 0 : -(CARD_HEIGHT - PEEK_OFFSET),
                     }}
                   >
                     <div
@@ -679,7 +680,6 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
                           <>
                             <img src={currentCoverUrl!} alt="" className="w-full h-full object-cover" />
                             <div className="absolute inset-0" style={{ background: "linear-gradient(to right, rgba(255,255,255,0.15), transparent 30%)" }} />
-                            {/* Chevron on photo */}
                             <div className="absolute inset-y-0 right-0 flex items-center pr-2">
                               <ChevronRight size={16} className="text-white/70" />
                             </div>
