@@ -1720,7 +1720,7 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
               </div>
               <div className="flex-shrink-0 px-5 pb-6 pt-3 flex gap-2">
                 <button onClick={() => dismissShopPrompt()} className="flex-1 py-2.5 rounded-xl bg-secondary text-foreground text-sm font-semibold">Skip</button>
-                <button onClick={saveToShoppingList} disabled={shopSaving} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+                <button onClick={() => saveToShoppingList()} disabled={shopSaving} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
                   {shopSaving ? <Loader2 size={14} className="animate-spin" /> : null} Add to Shopping List
                 </button>
               </div>
@@ -1728,6 +1728,19 @@ const NutritionPage = ({ onOpenSettings }: { onOpenSettings?: () => void }) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Shopping destination redirect sheet */}
+      {shopDestination && (
+        <ShoppingDestinationSheet
+          open={shopDestination.open}
+          groupName={shopDestination.groupName}
+          ingredientCount={shopDestination.selectedItems.length}
+          shoppingGroups={shoppingEnabledGroups}
+          onSelect={handleDestinationSelect}
+          onDismiss={() => { setShopDestination(null); setShopSaving(false); }}
+          saving={shopSaving}
+        />
+      )}
     </div>
   );
 };
