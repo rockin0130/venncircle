@@ -452,7 +452,7 @@ const ListSection = ({
 
       {/* Organized view */}
       {orgResult && viewMode === "organized" ? (
-        <OrganizedView result={orgResult} checkedIds={checkedIds} onToggle={onToggle} onDelete={onDelete} />
+        <OrganizedView result={orgResult} allItems={items} onToggle={onToggle} onDelete={onDelete} />
       ) : (
         /* Original view */
         <div className="divide-y divide-border/50">
