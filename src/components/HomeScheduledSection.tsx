@@ -448,40 +448,43 @@ const HomeScheduledSection = ({
 
               {/* Habits inline row */}
               {periodHabits.length > 0 && (
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[9px] font-medium uppercase text-[#aaa] flex-shrink-0">Habits</span>
-                  <div className="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
-                    <div className="flex gap-1.5 w-max">
-                      {(() => {
-                        const incomplete = periodHabits.filter((h) => !h.completionDates.includes(dateStr));
-                        const complete = periodHabits.filter((h) => h.completionDates.includes(dateStr));
-                        return [...incomplete, ...complete].map((habit) => {
-                          const doneForDate = habit.completionDates.includes(dateStr);
-                          return (
-                            <button
-                              key={habit.id}
-                              onClick={() => isTodayForHabits && !isViewingPartner && toggleHabit(habit.id)}
-                              disabled={!isTodayForHabits || isViewingPartner}
-                              className={cn(
-                                "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors active:scale-[0.97] flex-shrink-0",
-                                doneForDate
-                                  ? "border-border bg-secondary/50 opacity-45"
-                                  : "border-border bg-secondary/30 text-foreground",
-                                (!isTodayForHabits || isViewingPartner) && "opacity-80"
-                              )}
-                            >
-                              {doneForDate ? (
-                                <span className="w-3.5 h-3.5 rounded-full bg-habit-green flex items-center justify-center flex-shrink-0">
-                                  <Check size={9} className="text-primary-foreground" />
-                                </span>
-                              ) : (
-                                <span className="w-3.5 h-3.5 rounded-full border-[1.5px] border-muted flex-shrink-0" />
-                              )}
-                              <span className={cn(doneForDate && "line-through")}>{habit.label}</span>
-                            </button>
-                          );
-                        });
-                      })()}
+                <div className="rounded-xl bg-card border border-border mb-2" style={{ padding: "8px 12px", borderRadius: 12, borderWidth: "0.5px", borderColor: "rgba(0,0,0,0.07)" }}>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-[10px] font-medium uppercase text-[#aaa] flex-shrink-0 tracking-wide">Habits</span>
+                    <div className="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
+                      <div className="flex gap-1.5 w-max">
+                        {(() => {
+                          const incomplete = periodHabits.filter((h) => !h.completionDates.includes(dateStr));
+                          const complete = periodHabits.filter((h) => h.completionDates.includes(dateStr));
+                          return [...incomplete, ...complete].map((habit) => {
+                            const doneForDate = habit.completionDates.includes(dateStr);
+                            return (
+                              <button
+                                key={habit.id}
+                                onClick={() => isTodayForHabits && !isViewingPartner && toggleHabit(habit.id)}
+                                disabled={!isTodayForHabits || isViewingPartner}
+                                className={cn(
+                                  "flex items-center gap-1.5 rounded-full border text-[12px] font-medium transition-colors active:scale-[0.97] flex-shrink-0",
+                                  doneForDate
+                                    ? "border-border bg-secondary/50 opacity-45"
+                                    : "border-border bg-secondary/30 text-foreground",
+                                  (!isTodayForHabits || isViewingPartner) && "opacity-80"
+                                )}
+                                style={{ padding: "5px 12px" }}
+                              >
+                                {doneForDate ? (
+                                  <span className="rounded-full bg-habit-green flex items-center justify-center flex-shrink-0" style={{ width: 18, height: 18 }}>
+                                    <Check size={11} className="text-primary-foreground" />
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full border-[1.5px] border-muted flex-shrink-0" style={{ width: 18, height: 18 }} />
+                                )}
+                                <span className={cn(doneForDate && "line-through")}>{habit.label}</span>
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
                     </div>
                   </div>
                 </div>
