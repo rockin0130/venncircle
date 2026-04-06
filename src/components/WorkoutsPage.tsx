@@ -158,9 +158,9 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
   const pct = weeklyGoal > 0 ? (clamped / weeklyGoal) * 100 : 0;
   const remaining = Math.max(0, weeklyGoal - clamped);
 
-  // SVG ring — 72px, 7px stroke
-  const SIZE = 72;
-  const STROKE = 7;
+  // SVG ring — 82px, 8px stroke
+  const SIZE = 82;
+  const STROKE = 8;
   const R = (SIZE - STROKE) / 2;
   const C = 2 * Math.PI * R;
   const offset = C - (pct / 100) * C;
@@ -170,9 +170,9 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
   };
 
   return (
-    <div className="mb-5 rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
+    <div className="mb-5 rounded-2xl p-5" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
       {/* Top section: Ring + Goal info */}
-      <div className="flex items-center gap-4 mb-3">
+      <div className="flex items-center gap-5 mb-4">
         {/* Progress ring */}
         <div className="relative flex-shrink-0" style={{ width: SIZE, height: SIZE }}>
           <svg width={SIZE} height={SIZE} className="-rotate-90" viewBox={`0 0 ${SIZE} ${SIZE}`}>
@@ -182,63 +182,63 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
               className="transition-all duration-500" />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", lineHeight: 1 }}>{clamped}</span>
-            <span style={{ fontSize: 10, color: "#999", lineHeight: 1, marginTop: 1 }}>/{weeklyGoal}</span>
+            <span style={{ fontSize: 24, fontWeight: 600, color: "#1A1A1A", lineHeight: 1 }}>{clamped}</span>
+            <span style={{ fontSize: 12, color: "#999", lineHeight: 1, marginTop: 2 }}>/{weeklyGoal}</span>
           </div>
         </div>
 
         {/* Goal info + adjuster */}
         <div className="flex-1 min-w-0">
-          <p style={{ fontSize: 11, color: "#999", fontWeight: 500 }}>Weekly goal</p>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginTop: 1 }}>
+          <p style={{ fontSize: 12, color: "#999", fontWeight: 500 }}>Weekly goal</p>
+          <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", marginTop: 2 }}>
             {clamped >= weeklyGoal ? "Goal reached! 🎉" : `${remaining} workout${remaining !== 1 ? "s" : ""} to go`}
           </p>
-          <div className="flex items-center gap-2 mt-1.5">
+          <div className="flex items-center gap-2.5 mt-2">
             <button
               onClick={() => onGoalChange(Math.max(1, weeklyGoal - 1))}
-              className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-xs"
+              className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-sm"
               style={{ background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.1)", color: "#666" }}
             >−</button>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", minWidth: 14, textAlign: "center" }}>{weeklyGoal}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", minWidth: 16, textAlign: "center" }}>{weeklyGoal}</span>
             <button
               onClick={() => onGoalChange(Math.min(14, weeklyGoal + 1))}
-              className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-xs"
+              className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-sm"
               style={{ background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.1)", color: "#666" }}
             >+</button>
-            <span style={{ fontSize: 11, color: "#999" }}>per week</span>
+            <span style={{ fontSize: 12, color: "#999" }}>per week</span>
           </div>
         </div>
       </div>
 
       {/* Stats row — three boxes */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2.5">
         {/* Done */}
-        <div className="flex flex-col items-center justify-center py-2.5 px-2" style={{ background: "#F9F8F6", borderRadius: 10 }}>
-          <span style={{ fontSize: 16, fontWeight: 500, color: "#1A1A1A" }}>{weekDone}</span>
-          <span style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Done</span>
+        <div className="flex flex-col items-center justify-center py-3 px-2" style={{ background: "#F9F8F6", borderRadius: 12 }}>
+          <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>{weekDone}</span>
+          <span style={{ fontSize: 11, color: "#999", marginTop: 2 }}>Done</span>
         </div>
 
         {/* Kcal */}
-        <div className="flex flex-col items-center justify-center py-2.5 px-2" style={{ background: "#F9F8F6", borderRadius: 10 }}>
-          <span style={{ fontSize: 16, fontWeight: 500, color: "#1A1A1A" }}>{weekCals.toLocaleString()}</span>
-          <span style={{ fontSize: 10, color: "#999", marginTop: 2 }}>kcal</span>
+        <div className="flex flex-col items-center justify-center py-3 px-2" style={{ background: "#F9F8F6", borderRadius: 12 }}>
+          <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>{weekCals.toLocaleString()}</span>
+          <span style={{ fontSize: 11, color: "#999", marginTop: 2 }}>kcal</span>
         </div>
 
         {/* Distance */}
         <div className="relative">
           <button
             onClick={toggleDistUnit}
-            className="w-full flex flex-col items-center justify-center py-2.5 px-2"
-            style={{ background: "#F9F8F6", borderRadius: 10 }}
+            className="w-full flex flex-col items-center justify-center py-3 px-2"
+            style={{ background: "#F9F8F6", borderRadius: 12 }}
           >
             <div className="flex items-center gap-1">
-              <span style={{ fontSize: 16, fontWeight: 500, color: "#1A1A1A" }}>{totalDist}</span>
+              <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>{totalDist}</span>
             </div>
             <div className="flex items-center gap-1 mt-0.5">
-              <span style={{ fontSize: 10, color: "#999" }}>
+              <span style={{ fontSize: 11, color: "#999" }}>
                 {distUnit}{singleActivity ? ` · ${singleActivity}` : ""}
               </span>
-              <span style={{ fontSize: 8, color: "#bbb" }}>
+              <span style={{ fontSize: 9, color: "#bbb" }}>
                 {distUnit === "km" ? "mi" : "km"}
               </span>
             </div>
@@ -248,9 +248,9 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
           {activityNames.length > 1 && (
             <button
               onClick={(e) => { e.stopPropagation(); setDistDropdownOpen((p) => !p); }}
-              className="w-full mt-1 py-1 px-2 rounded-full text-center truncate"
+              className="w-full mt-1.5 py-1 px-2.5 rounded-full text-center truncate"
               style={{
-                fontSize: 9,
+                fontSize: 10,
                 fontWeight: 600,
                 background: distFilter.length > 0 ? "#6C47FF" : "#1a1a1a",
                 color: "#fff",
@@ -258,7 +258,7 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
             >
               {filterLabel}
             </button>
-          )}
+          )
 
           {/* Dropdown */}
           {distDropdownOpen && activityNames.length > 1 && (
