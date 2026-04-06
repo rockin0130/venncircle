@@ -12,6 +12,7 @@ export interface AvatarMember {
   id: string;
   initial: string;
   colorIndex: number;
+  avatarUrl?: string | null;
 }
 
 export interface CalendarCardTheme {
