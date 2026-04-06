@@ -1043,9 +1043,11 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
             <h3 className="text-sm font-semibold text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>
               Today's sessions
             </h3>
-            <span className="text-xs" style={{ color: "#6C47FF", fontWeight: 500 }}>
-              {fmtDuration(sessionsTotalSeconds)} total
-            </span>
+            {!showColumnView && (
+              <span className="text-xs" style={{ color: "#6C47FF", fontWeight: 500 }}>
+                {fmtDuration(sessionsTotalSeconds)} total
+              </span>
+            )}
           </div>
 
           {/* Filter pills (group view) — multi-select */}
@@ -1090,15 +1092,22 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
                 const mSessions = m.todaySessions.filter((s: StudySession) => !s.is_active);
                 return (
                   <div key={m.user_id} className="flex-shrink-0" style={{ width: 150 }}>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white" style={{ background: m.color }}>
-                        {m.profile?.avatar_url
-                          ? <img src={m.profile.avatar_url} className="w-5 h-5 rounded-full object-cover" />
-                          : (m.profile?.display_name || "?")[0]}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white" style={{ background: m.color }}>
+                          {m.profile?.avatar_url
+                            ? <img src={m.profile.avatar_url} className="w-5 h-5 rounded-full object-cover" />
+                            : (m.profile?.display_name || "?")[0]}
+                        </div>
+                        <span className="text-xs font-medium" style={{ color: m.color }}>
+                          {m.isMe ? "Me" : m.profile?.display_name}
+                        </span>
                       </div>
-                      <span className="text-xs font-medium" style={{ color: m.color }}>
-                        {m.isMe ? "Me" : m.profile?.display_name}
-                      </span>
+                      {m.todayTotal > 0 && (
+                        <span className="text-[11px] font-medium" style={{ color: m.color }}>
+                          {fmtDuration(m.todayTotal)}
+                        </span>
+                      )}
                     </div>
                     {mSessions.length === 0 ? (
                       <div
