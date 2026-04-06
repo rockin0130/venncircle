@@ -446,41 +446,43 @@ const HomeScheduledSection = ({
                 <InlineWaterWidget selectedDate={selectedDate} isToday={isToday} />
               )}
 
-              {/* Habits card at top of period */}
+              {/* Habits inline row */}
               {periodHabits.length > 0 && (
-                <div className="rounded-xl border border-border bg-card p-3 mb-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2 block">Habits</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(() => {
-                      const incomplete = periodHabits.filter((h) => !h.completionDates.includes(dateStr));
-                      const complete = periodHabits.filter((h) => h.completionDates.includes(dateStr));
-                      return [...incomplete, ...complete].map((habit) => {
-                        const doneForDate = habit.completionDates.includes(dateStr);
-                        return (
-                          <button
-                            key={habit.id}
-                            onClick={() => isTodayForHabits && !isViewingPartner && toggleHabit(habit.id)}
-                            disabled={!isTodayForHabits || isViewingPartner}
-                            className={cn(
-                              "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors active:scale-[0.97]",
-                              doneForDate
-                                ? "border-border bg-secondary/50 opacity-45"
-                                : "border-border bg-secondary/30 text-foreground",
-                              (!isTodayForHabits || isViewingPartner) && "opacity-80"
-                            )}
-                          >
-                            {doneForDate ? (
-                              <span className="w-3.5 h-3.5 rounded-full bg-habit-green flex items-center justify-center flex-shrink-0">
-                                <Check size={9} className="text-primary-foreground" />
-                              </span>
-                            ) : (
-                              <span className="w-3.5 h-3.5 rounded-full border-[1.5px] border-muted flex-shrink-0" />
-                            )}
-                            <span className={cn(doneForDate && "line-through")}>{habit.label}</span>
-                          </button>
-                        );
-                      });
-                    })()}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[9px] font-medium uppercase text-[#aaa] flex-shrink-0">Habits</span>
+                  <div className="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
+                    <div className="flex gap-1.5 w-max">
+                      {(() => {
+                        const incomplete = periodHabits.filter((h) => !h.completionDates.includes(dateStr));
+                        const complete = periodHabits.filter((h) => h.completionDates.includes(dateStr));
+                        return [...incomplete, ...complete].map((habit) => {
+                          const doneForDate = habit.completionDates.includes(dateStr);
+                          return (
+                            <button
+                              key={habit.id}
+                              onClick={() => isTodayForHabits && !isViewingPartner && toggleHabit(habit.id)}
+                              disabled={!isTodayForHabits || isViewingPartner}
+                              className={cn(
+                                "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors active:scale-[0.97] flex-shrink-0",
+                                doneForDate
+                                  ? "border-border bg-secondary/50 opacity-45"
+                                  : "border-border bg-secondary/30 text-foreground",
+                                (!isTodayForHabits || isViewingPartner) && "opacity-80"
+                              )}
+                            >
+                              {doneForDate ? (
+                                <span className="w-3.5 h-3.5 rounded-full bg-habit-green flex items-center justify-center flex-shrink-0">
+                                  <Check size={9} className="text-primary-foreground" />
+                                </span>
+                              ) : (
+                                <span className="w-3.5 h-3.5 rounded-full border-[1.5px] border-muted flex-shrink-0" />
+                              )}
+                              <span className={cn(doneForDate && "line-through")}>{habit.label}</span>
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
                   </div>
                 </div>
               )}
@@ -513,19 +515,6 @@ const HomeScheduledSection = ({
                       style={!item.done && !isNow && item.kind === "task" ? undefined : undefined}
                     >
                       <div className="flex items-center gap-3">
-                        {/* Completion circle */}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleToggle(item); }}
-                          disabled={isViewingPartner}
-                          className={cn(
-                            "w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors",
-                            item.done ? "bg-habit-green border-habit-green" : "border-muted hover:border-primary",
-                            isViewingPartner && "opacity-60"
-                          )}
-                        >
-                          {item.done && <Check size={14} className="text-primary-foreground" />}
-                        </button>
-
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <p className={cn(
