@@ -71,6 +71,23 @@ const QUICK_ACCESS_FEATURES = [
   )},
 ];
 
+const getStoredQuickAccessPos = (): "above-scheduled" | "below-todo" | null => {
+  try {
+    const saved = localStorage.getItem("home_qa_position");
+    return saved === "above-scheduled" || saved === "below-todo" ? saved : null;
+  } catch {
+    return null;
+  }
+};
+
+const persistQuickAccessPosLocally = (pos: "above-scheduled" | "below-todo") => {
+  try {
+    localStorage.setItem("home_qa_position", pos);
+  } catch {
+    // no-op
+  }
+};
+
 const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress, onDragReposition }: {
   enabledSections: Set<string>;
   onNavigate?: (page: string) => void;
@@ -160,11 +177,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   
   const [selectedHabitSubIds, setSelectedHabitSubIds] = useState<string[]>([]);
   const [quickAccessPos, setQuickAccessPos] = useState<"above-scheduled" | "below-todo">(() => {
-    try {
-      const saved = localStorage.getItem("home_qa_position");
-      if (saved === "above-scheduled" || saved === "below-todo") return saved;
-    } catch {}
-    return "below-todo";
+    return getStoredQuickAccessPos() ?? "below-todo";
   });
   const [wiggleMode, setWiggleMode] = useState(false);
   const {
@@ -183,30 +196,29 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
     setSectionVisible(prefs.visible);
     setSelectedSobrietyIds(prefs.selectedSobrietyIds);
     setSelectedHabitSubIds(prefs.selectedHabitSubIds);
-    try {
-      const pos = localStorage.getItem("home_qa_position");
-      if (pos === "above-scheduled" || pos === "below-todo") setQuickAccessPos(pos);
-    } catch {}
+    const localPos = getStoredQuickAccessPos();
+    if (localPos) setQuickAccessPos(localPos);
   }, []);
 
-  // Sync quick access position from backend (only override if DB has a saved value)
+  // Keep device-local placement authoritative for tab/page navigation, while backfilling backend.
   useEffect(() => {
     if (!user) return;
+
+    const localPos = getStoredQuickAccessPos();
+    if (localPos) {
+      void supabase
+        .from("profiles")
+        .update({ home_quick_access_position: localPos } as any)
+        .eq("id", user.id);
+      return;
+    }
+
     supabase.from("profiles").select("home_quick_access_position").eq("id", user.id).single()
       .then(({ data }) => {
         const pos = (data as any)?.home_quick_access_position;
         if (pos === "above-scheduled" || pos === "below-todo") {
           setQuickAccessPos(pos);
-          localStorage.setItem("home_qa_position", pos);
-        }
-        // If DB has no value yet, push localStorage value to DB
-        else {
-          try {
-            const local = localStorage.getItem("home_qa_position");
-            if (local === "above-scheduled" || local === "below-todo") {
-              supabase.from("profiles").update({ home_quick_access_position: local } as any).eq("id", user.id);
-            }
-          } catch {}
+          persistQuickAccessPosLocally(pos);
         }
       });
   }, [user?.id]);
@@ -214,9 +226,9 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   const saveQuickAccessPos = useCallback((pos: "above-scheduled" | "below-todo") => {
     setQuickAccessPos(pos);
     setWiggleMode(false);
-    localStorage.setItem("home_qa_position", pos);
+    persistQuickAccessPosLocally(pos);
     if (user) {
-      supabase.from("profiles").update({ home_quick_access_position: pos } as any).eq("id", user.id);
+      void supabase.from("profiles").update({ home_quick_access_position: pos } as any).eq("id", user.id);
     }
   }, [user]);
 
