@@ -20,6 +20,7 @@ import CongratsPopup from "@/components/CongratsPopup";
 import PageGroupSelector from "@/components/PageGroupSelector";
 
 import WorkoutPhotoPrompt, { isWorkoutPhotoPromptSuppressed } from "@/components/WorkoutPhotoPrompt";
+import ShareToFeedSheet from "@/components/ShareToFeedSheet";
 import ExerciseHistoryPage from "@/components/ExerciseHistoryPage";
 import ExerciseLibrarySheet from "@/components/ExerciseLibrarySheet";
 import WorkoutUserFilter, { EVERYONE_SENTINEL } from "@/components/WorkoutUserFilter";
