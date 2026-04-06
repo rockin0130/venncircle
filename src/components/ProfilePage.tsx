@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Search,
   Info,
@@ -10,7 +10,8 @@ import {
   Apple,
   ShoppingCart,
   Star,
-  Pencil,
+  Camera,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
