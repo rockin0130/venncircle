@@ -1711,7 +1711,7 @@ const EventList = ({
 
       {timedItems.map((item) => {
         const color = getPersonColor(item);
-        const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
+        const group = isPersonalOrAll && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
         const displayTime = item.type === "gcal" && item.time
           ? new Date(item.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
           : formatTime(item.time);
@@ -1731,9 +1731,7 @@ const EventList = ({
               </span>
             </div>
             {item.type === "gcal" && <GoogleBadge />}
-            {group && (
-              <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
-            )}
+            {group && renderGroupPill(group)}
             <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
           </button>
         );
