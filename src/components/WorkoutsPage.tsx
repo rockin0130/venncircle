@@ -1458,7 +1458,8 @@ const WorkoutCard = ({
         layout
         className={`bg-card rounded-xl border overflow-hidden transition-all ${
           workout.done ? "border-habit-green/50" : "border-border"
-        } ${accentBorder ? `border-l-[3px] ${accentBorder}` : ""}`}
+        } ${accentBorder ? "border-l-[3px]" : ""}`}
+        style={accentBorder?.startsWith("#") ? { borderLeftColor: accentBorder, borderLeftWidth: 3 } : undefined}
       >
         <div className="p-3.5 flex items-center gap-3">
           {/* Emoji icon in colored square */}
