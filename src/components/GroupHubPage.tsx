@@ -239,7 +239,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
       <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFileChange} />
 
       {/* Cover Photo */}
-      <div className="relative w-full flex-shrink-0" style={{ height: 110 }}>
+      <div className="relative w-full flex-shrink-0" style={{ height: 150 }}>
         {coverUrl ? (
           <>
             <img src={coverUrl} alt="" className="w-full h-full object-cover" />
@@ -292,12 +292,6 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
             style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(8px)" }}
           >
             <Settings size={13} className="text-white" />
-          </button>
-          <button
-            className="w-7 h-7 rounded-full flex items-center justify-center"
-            style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(8px)" }}
-          >
-            <MoreHorizontal size={13} className="text-white" />
           </button>
         </div>
       </div>
