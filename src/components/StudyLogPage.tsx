@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Clock, ChevronLeft, MoreHorizontal, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -86,8 +86,11 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
   const [timeRange, setTimeRange] = useState<"week" | "month" | "all" | "custom">("week");
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const [prevTimeRange, setPrevTimeRange] = useState<"week" | "month" | "all">("week");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [subjectDropdownOpen, setSubjectDropdownOpen] = useState(false);
+  const customPickerRef = useRef<HTMLDivElement>(null);
+  const customPillRef = useRef<HTMLButtonElement>(null);
 
   const isPersonal = contextFilter === "personal";
   const selectedGroupId = isPersonal ? null : contextFilter;
@@ -248,6 +251,27 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
     }
   };
 
+  const handleCustomCancel = () => {
+    setShowCustomPicker(false);
+    setCustomRange(undefined);
+    if (timeRange === "custom") setTimeRange(prevTimeRange);
+  };
+
+  // Close custom picker on outside click
+  useEffect(() => {
+    if (!showCustomPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        customPickerRef.current && !customPickerRef.current.contains(e.target as Node) &&
+        customPillRef.current && !customPillRef.current.contains(e.target as Node)
+      ) {
+        handleCustomCancel();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showCustomPicker, prevTimeRange, timeRange]);
+
   return (
     <div className="flex flex-col min-h-full pb-4" style={{ background: "#F4F3F0" }}>
       {/* Header */}
@@ -339,19 +363,29 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
         </div>
 
         {/* By subject */}
-        <div className="rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
+        <div className="rounded-2xl p-4 relative" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>By subject</h3>
-            <div className="flex gap-0.5 p-0.5 rounded-lg relative" style={{ background: "#F4F3F0" }}>
+            <div className="flex gap-0.5 p-0.5 rounded-lg" style={{ background: "#F4F3F0" }}>
               {(["week", "month", "all", "custom"] as const).map(r => (
                 <button
                   key={r}
+                  ref={r === "custom" ? customPillRef : undefined}
                   onClick={() => {
-                    if (r === "custom") { setShowCustomPicker(!showCustomPicker); }
-                    else { setTimeRange(r); setShowCustomPicker(false); setCustomRange(undefined); }
+                    if (r === "custom") {
+                      if (!showCustomPicker && timeRange !== "custom") setPrevTimeRange(timeRange as "week" | "month" | "all");
+                      setShowCustomPicker(!showCustomPicker);
+                    } else {
+                      setTimeRange(r);
+                      setShowCustomPicker(false);
+                      setCustomRange(undefined);
+                    }
                   }}
                   className="px-2 py-1 rounded-md text-[10px] font-medium transition-all capitalize"
-                  style={{ background: timeRange === r ? "#fff" : "transparent", color: timeRange === r ? "#1a1a1a" : "#888" }}
+                  style={{
+                    background: (timeRange === r || (r === "custom" && showCustomPicker)) ? "#fff" : "transparent",
+                    color: (timeRange === r || (r === "custom" && showCustomPicker)) ? "#1a1a1a" : "#888",
+                  }}
                 >
                   {r}
                 </button>
@@ -359,51 +393,60 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
             </div>
           </div>
 
-          {/* Custom range picker — compact, right-aligned to Custom pill */}
+          {/* Floating custom calendar picker */}
           {showCustomPicker && (
-            <div className="flex justify-end mb-3">
-              <div className="w-auto" style={{ maxWidth: 260 }}>
-                <Calendar
-                  mode="range"
-                  selected={customRange}
-                  onSelect={setCustomRange}
-                  className="p-1 pointer-events-auto"
-                  classNames={{
-                    months: "flex flex-col",
-                    month: "space-y-1",
-                    caption: "flex justify-center pt-0.5 relative items-center",
-                    caption_label: "text-[11px] font-medium",
-                    nav_button: "h-5 w-5 bg-transparent p-0 opacity-50 hover:opacity-100 inline-flex items-center justify-center",
-                    nav_button_previous: "absolute left-0",
-                    nav_button_next: "absolute right-0",
-                    table: "w-full border-collapse",
-                    head_row: "flex",
-                    head_cell: "text-muted-foreground rounded-md w-8 font-normal text-[9px]",
-                    row: "flex w-full mt-0.5",
-                    cell: "h-7 w-8 text-center text-[11px] p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-                    day: "h-7 w-8 p-0 font-normal text-[11px] aria-selected:opacity-100 inline-flex items-center justify-center rounded-md hover:bg-accent",
-                    day_selected: "bg-[#6C47FF] text-white hover:bg-[#6C47FF] focus:bg-[#6C47FF]",
-                    day_range_middle: "bg-[#EDE9FE] text-[#6C47FF]",
-                    day_today: "bg-accent text-accent-foreground",
-                    day_outside: "text-muted-foreground opacity-50",
-                    day_disabled: "text-muted-foreground opacity-50",
-                    day_hidden: "invisible",
-                  }}
-                />
-                <div className="flex gap-2 justify-end mt-1">
-                  <button
-                    onClick={() => { setShowCustomPicker(false); setCustomRange(undefined); if (timeRange === "custom") setTimeRange("week"); }}
-                    className="px-2.5 py-1 text-[11px] rounded-lg font-medium" style={{ color: "#888" }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCustomApply}
-                    className="px-2.5 py-1 text-[11px] rounded-lg font-medium text-white" style={{ background: "#6C47FF" }}
-                  >
-                    Apply
-                  </button>
-                </div>
+            <div
+              ref={customPickerRef}
+              className="absolute right-4 z-50 p-3"
+              style={{
+                top: 48,
+                maxWidth: 260,
+                background: "#fff",
+                borderRadius: 14,
+                boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+                border: "0.5px solid rgba(0,0,0,0.08)",
+              }}
+            >
+              <Calendar
+                mode="range"
+                selected={customRange}
+                onSelect={setCustomRange}
+                className="p-0 pointer-events-auto"
+                classNames={{
+                  months: "flex flex-col",
+                  month: "space-y-1",
+                  caption: "flex justify-center pt-0.5 relative items-center",
+                  caption_label: "text-[11px] font-medium",
+                  nav_button: "h-5 w-5 bg-transparent p-0 opacity-50 hover:opacity-100 inline-flex items-center justify-center",
+                  nav_button_previous: "absolute left-0",
+                  nav_button_next: "absolute right-0",
+                  table: "w-full border-collapse",
+                  head_row: "flex",
+                  head_cell: "text-muted-foreground rounded-md w-8 font-normal text-[9px]",
+                  row: "flex w-full mt-0.5",
+                  cell: "h-7 w-8 text-center text-[11px] p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+                  day: "h-7 w-8 p-0 font-normal text-[11px] aria-selected:opacity-100 inline-flex items-center justify-center rounded-md hover:bg-accent",
+                  day_selected: "bg-[#6C47FF] text-white hover:bg-[#6C47FF] focus:bg-[#6C47FF]",
+                  day_range_middle: "bg-[#EDE9FE] text-[#6C47FF]",
+                  day_today: "bg-accent text-accent-foreground",
+                  day_outside: "text-muted-foreground opacity-50",
+                  day_disabled: "text-muted-foreground opacity-50",
+                  day_hidden: "invisible",
+                }}
+              />
+              <div className="flex gap-2 justify-end mt-2">
+                <button
+                  onClick={handleCustomCancel}
+                  className="px-2.5 py-1 text-[11px] rounded-lg font-medium" style={{ color: "#888" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCustomApply}
+                  className="px-2.5 py-1 text-[11px] rounded-lg font-medium text-white" style={{ background: "#6C47FF" }}
+                >
+                  Apply
+                </button>
               </div>
             </div>
           )}
