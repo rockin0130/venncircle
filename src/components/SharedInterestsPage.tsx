@@ -258,7 +258,7 @@ const SwipeableGroupCard = ({
 };
 
 const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHub, onOpenMore }: SharedInterestsPageProps) => {
-  const { groups, user, leaveGroup, refreshGroups } = useAuth();
+  const { groups, user, refreshGroups } = useAuth();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
   const [splitMode, setSplitMode] = useState<SplitMode>("equal");
@@ -271,19 +271,6 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
     [groups]
   );
 
-  const handleLeaveGroup = async (group: Group) => {
-    const result = await leaveGroup(group.id);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success(`Left "${group.name}"`);
-      refreshGroups();
-    }
-  };
-
-  const handleDeleteGroup = () => {
-    refreshGroups();
-  };
 
   useEffect(() => {
     if (!user || allGroups.length === 0) {
