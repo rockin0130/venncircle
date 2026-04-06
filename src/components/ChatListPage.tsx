@@ -395,11 +395,18 @@ const ChatListPage = ({
           </div>
         )}
 
-        {!loading && previews.length === 0 && filteredDmChats.length === 0 && friendsWithoutDm.length === 0 && (
+        {!loading && filteredGroupChats.length === 0 && filteredDmChats.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <MessageCircle size={40} strokeWidth={1} className="mb-3 opacity-30" />
-            <p className="text-xs font-medium">No chats yet</p>
-            <p className="text-[10px] mt-1">Join or create a group to start chatting</p>
+            <p className="text-xs font-medium">No conversations yet</p>
+            <p className="text-[10px] mt-1">Start a chat with a friend to begin</p>
+            <button
+              onClick={() => setNewDmOpen(true)}
+              className="mt-4 px-4 py-1.5 rounded-full text-[11px] font-medium text-white"
+              style={{ backgroundColor: "#6C47FF" }}
+            >
+              Start Chat
+            </button>
           </div>
         )}
 
