@@ -1034,22 +1034,17 @@ const WorkoutsPage = ({
       {/* ── NEW HEADER ── */}
       <header className="pt-12 pb-3 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Workouts</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{todayFormatted}</p>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", fontFamily: "'DM Sans', sans-serif" }}>Workouts</h1>
+          <p style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{todayFormatted}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowLog(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary border border-border text-xs font-semibold text-foreground hover:bg-accent transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
+            style={{ background: "transparent", border: "0.5px solid rgba(0,0,0,0.15)", color: "#1a1a1a" }}
           >
             <ClipboardList size={13} />
             Log
-          </button>
-          <button
-            onClick={() => setShowCustomBuilder(true)}
-            className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm hover:bg-primary/90 transition-colors active:scale-95"
-          >
-            <Plus size={18} />
           </button>
           {onOpenMore && (
             <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
@@ -1121,14 +1116,7 @@ const WorkoutsPage = ({
           </div>
         )}
 
-        {/* Quick Add */}
-        <QuickAddSection
-          workouts={userFilteredWorkouts}
-          onAddActivity={addManualActivity}
-          onOpenCustomBuilder={() => setShowCustomBuilder(true)}
-          onAddWorkouts={addWorkouts}
-          selectedDate={selectedDate}
-        />
+        {/* Quick Add removed */}
 
         {/* Custom Workout Builder Modal */}
         <CustomWorkoutBuilder
@@ -1140,13 +1128,20 @@ const WorkoutsPage = ({
 
         {/* Today's Workouts Section */}
         <section className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Today's Workouts</h3>
-              {appleFitnessSyncEnabled && healthKitLoading && (
-                <Loader2 size={12} className="animate-spin text-muted-foreground" aria-hidden />
-              )}
-            </div>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span style={{ fontSize: 17, fontWeight: 500, color: "#1a1a1a", fontFamily: "'DM Sans', sans-serif" }} className="mr-auto">
+              Today's workouts
+            </span>
+            {appleFitnessSyncEnabled && healthKitLoading && (
+              <Loader2 size={12} className="animate-spin text-muted-foreground" aria-hidden />
+            )}
+            <button
+              onClick={() => setShowCustomBuilder(true)}
+              className="flex items-center gap-1 active:scale-95 transition-transform"
+              style={{ fontSize: 10, fontWeight: 500, color: "#1a1a1a", background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.09)", borderRadius: 999, padding: "3px 9px" }}
+            >
+              <Plus size={10} /> Custom
+            </button>
             <WorkoutAiSuggest
               selectedDate={selectedDate}
               recentWorkouts={displayWorkouts}
