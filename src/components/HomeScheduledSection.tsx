@@ -583,7 +583,7 @@ const HomeScheduledSection = ({
                 {items.map(item => {
                   const isNow = nowItemId === item.id;
                   const tag = getContextTag(item);
-                  const avatars = getAvatarInitials(item);
+                  const avatarMembers = getItemAvatarMembers(item);
                   const timeDisplay = formatTimeRange(item);
 
                   return (
