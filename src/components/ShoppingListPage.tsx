@@ -45,7 +45,7 @@ interface ShoppingListItem {
 const PERSONAL_SENTINEL = "__personal__";
 
 const ShoppingListPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
-  const { user, groups } = useAuth();
+  const { user, groups, profile } = useAuth();
   const [lists, setLists] = useState<ShoppingList[]>([]);
   const [items, setItems] = useState<ShoppingListItem[]>([]);
   const [loading, setLoading] = useState(true);
