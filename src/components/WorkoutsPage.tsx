@@ -170,7 +170,7 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
   };
 
   return (
-    <div className="mb-5 rounded-2xl p-5" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
+    <div className="mb-5 p-5" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)", borderRadius: 16 }}>
       {/* Top section: Ring + Goal info */}
       <div className="flex items-center gap-5 mb-4">
         {/* Progress ring */}
