@@ -502,7 +502,7 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
                     onDelete={handleDeleteGroup}
                   />
                 ))}
-                })}
+                
               </div>
             )}
           </div>
