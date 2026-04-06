@@ -584,12 +584,23 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     }
   }, [isPersonal, groups, activeGroup, user, memberProfiles]);
 
-  // Group name lookup
-  const groupNameMap = useMemo(() => {
-    const m: Record<string, string> = {};
-    (groups || []).forEach((g: any) => { if (!(g as any)._personal) m[g.id] = g.name; });
+  // Group info lookup (name, cover photo, color)
+  const groupInfoMap = useMemo(() => {
+    const m: Record<string, { name: string; coverUrl: string | null; color: string }> = {};
+    const GROUP_COLORS = ["#93C5FD", "#86EFAC", "#C4B5FD", "#FCD34D", "#FCA5A5", "#67E8F9", "#A7F3D0", "#FDBA74"];
+    (groups || []).forEach((g: any, i: number) => {
+      if (!(g as any)._personal) {
+        m[g.id] = { name: g.name, coverUrl: g.cover_image_url || null, color: GROUP_COLORS[i % GROUP_COLORS.length] };
+      }
+    });
     return m;
   }, [groups]);
+
+  const groupNameMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    Object.entries(groupInfoMap).forEach(([id, info]) => { m[id] = info.name; });
+    return m;
+  }, [groupInfoMap]);
 
   // Sessions filter options (group view)
   const sessionsFilterOptions = useMemo(() => {
