@@ -541,6 +541,7 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
                 </div>
               )}
             </div>
+            </div>
           </div>
 
           {sessionHistory.length === 0 ? (
