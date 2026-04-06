@@ -12,6 +12,7 @@ export interface AvatarMember {
   id: string;
   initial: string;
   colorIndex: number;
+  avatarUrl?: string | null;
 }
 
 export interface CalendarCardTheme {
@@ -134,11 +135,13 @@ export function getAssignedAvatarMembers({
   filterUsers,
   currentUserId,
   currentUserInitial,
+  currentUserAvatarUrl,
 }: {
   assignedUserIds: string[];
   filterUsers: FilterUser[];
   currentUserId: string;
   currentUserInitial: string;
+  currentUserAvatarUrl?: string | null;
 }): AvatarMember[] {
   const lookup = new Map(filterUsers.map((user) => [user.id, user]));
 
@@ -149,6 +152,7 @@ export function getAssignedAvatarMembers({
         id: filterUser.id,
         initial: filterUser.initial,
         colorIndex: filterUser.colorIndex,
+        avatarUrl: filterUser.avatarUrl || null,
       };
     }
 
@@ -156,6 +160,7 @@ export function getAssignedAvatarMembers({
       id: userId,
       initial: userId === currentUserId ? currentUserInitial : userId.charAt(0).toUpperCase() || "?",
       colorIndex: 0,
+      avatarUrl: userId === currentUserId ? (currentUserAvatarUrl || null) : null,
     };
   });
 }

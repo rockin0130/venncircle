@@ -327,7 +327,14 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
               {assignedColIndices.map(colIdx => {
                 const col = columns[colIdx];
                 if (!col) return null;
-                return (
+                return col.avatarUrl ? (
+                  <img
+                    key={col.id}
+                    src={col.avatarUrl}
+                    alt={col.initial}
+                    className="w-3 h-3 rounded-full object-cover ring-1 ring-white/50 flex-shrink-0"
+                  />
+                ) : (
                   <div
                     key={col.id}
                     className={`w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white ring-1 ring-white/50 flex-shrink-0 ${MEMBER_COLORS[col.colorIndex % MEMBER_COLORS.length].avatarBg}`}
@@ -465,9 +472,13 @@ const CalendarTeamDashboard = ({ items, filterUsers, selectedUserIds, onItemTap 
                 className={`rounded-lg px-2 py-1.5 flex items-center gap-1.5 min-w-0 overflow-hidden ${colors.bg} ${showReorder ? "cursor-grab active:cursor-grabbing ring-1 ring-primary/20" : ""} ${dragIdx === idx ? "opacity-50" : ""}`}
               >
                 {showReorder && <GripVertical size={10} className="text-muted-foreground flex-shrink-0" />}
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 ${colors.avatarBg}`}>
-                  {col.initial}
-                </span>
+                {col.avatarUrl ? (
+                  <img src={col.avatarUrl} alt={col.initial} className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                ) : (
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 ${colors.avatarBg}`}>
+                    {col.initial}
+                  </span>
+                )}
                 <span className={`text-[11px] font-semibold truncate ${colors.text}`}>{col.label}</span>
               </div>
             );

@@ -422,6 +422,7 @@ const HomeScheduledSection = ({
       filterUsers: allFilterUsers,
       currentUserId: user?.id || "",
       currentUserInitial: profile?.display_name?.charAt(0)?.toUpperCase() || "?",
+      currentUserAvatarUrl: profile?.avatar_url,
     });
   }, [user, groups, allFilterUsers, profile]);
 
@@ -680,7 +681,22 @@ const HomeScheduledSection = ({
                           <div className="flex -space-x-1.5 flex-shrink-0">
                             {avatarMembers.map((member) => {
                               const palette = getAvatarPalette(member.colorIndex);
-                              return (
+                              return member.avatarUrl ? (
+                                <img
+                                  key={member.id}
+                                  src={member.avatarUrl}
+                                  alt={member.initial}
+                                  className="w-6 h-6 rounded-full object-cover ring-2 ring-card"
+                                  onError={(e) => {
+                                    const span = document.createElement("span");
+                                    span.className = "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold leading-none ring-2 ring-card";
+                                    span.style.backgroundColor = palette.avatarBackground;
+                                    span.style.color = palette.avatarText;
+                                    span.textContent = member.initial;
+                                    (e.target as HTMLElement).replaceWith(span);
+                                  }}
+                                />
+                              ) : (
                                 <span
                                   key={member.id}
                                   className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold leading-none ring-2 ring-card"
