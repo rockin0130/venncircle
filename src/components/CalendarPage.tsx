@@ -2096,7 +2096,7 @@ const WeekView = ({
           <div key={getLocalDateKey(col.date)} className="flex-1 flex flex-col items-center"
             style={{ padding: "8px 6px 5px" }}>
             <div className="flex items-center gap-1">
-              <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>
+              <span style={{ fontSize: 14, fontWeight: 500, color: "#1a1a1a" }}>
                 {DAYS_ABBR[col.date.getDay()]}
               </span>
               {col.isToday ? (
