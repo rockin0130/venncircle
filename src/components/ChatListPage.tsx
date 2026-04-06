@@ -164,7 +164,7 @@ const ChatListPage = ({
     [previews]
   );
   const dmChats = useMemo(
-    () => previews.filter((p) => (p.group as any)._personal !== true && p.group.id !== "__personal__" && p.group.members.length <= 2),
+    () => previews.filter((p) => (p.group as any)._personal !== true && p.group.id !== "__personal__" && p.group.members.length <= 2 && p.lastMessage !== null),
     [previews]
   );
 
@@ -323,7 +323,7 @@ const ChatListPage = ({
           </div>
           <div className="flex items-center justify-between gap-2 mt-0.5">
             <p className="text-[11px] text-muted-foreground truncate">
-              {preview.lastMessage ? getMessagePreview(preview) : "No messages yet"}
+              {getMessagePreview(preview)}
             </p>
             {preview.unreadCount > 0 && (
               <span className="shrink-0 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-1" style={{ backgroundColor: "#6C47FF" }}>
@@ -395,11 +395,18 @@ const ChatListPage = ({
           </div>
         )}
 
-        {!loading && previews.length === 0 && filteredDmChats.length === 0 && friendsWithoutDm.length === 0 && (
+        {!loading && filteredGroupChats.length === 0 && filteredDmChats.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <MessageCircle size={40} strokeWidth={1} className="mb-3 opacity-30" />
-            <p className="text-xs font-medium">No chats yet</p>
-            <p className="text-[10px] mt-1">Join or create a group to start chatting</p>
+            <p className="text-xs font-medium">No conversations yet</p>
+            <p className="text-[10px] mt-1">Start a chat with a friend to begin</p>
+            <button
+              onClick={() => setNewDmOpen(true)}
+              className="mt-4 px-4 py-1.5 rounded-full text-[11px] font-medium text-white"
+              style={{ backgroundColor: "#6C47FF" }}
+            >
+              Start Chat
+            </button>
           </div>
         )}
 
