@@ -197,18 +197,52 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const addInputRef = useRef<HTMLInputElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
 
-  // Resume state
-  const [lastStoppedSession, setLastStoppedSession] = useState<StudySession | null>(null);
-  const [lastStoppedAt, setLastStoppedAt] = useState<number | null>(null);
-
   // Ref to hold the active session ID to prevent re-render issues
   const activeSessionIdRef = useRef<string | null>(null);
   const startedAtRef = useRef<string | null>(null);
 
-  // Timer tracking refs (source of truth for duration)
+  // ── Per-context timer state (keyed by context ID) ──
+  interface ContextTimerState {
+    lastStoppedSession: StudySession | null;
+    lastStoppedAt: number | null;
+    accumulatedSeconds: number;
+    baseDuration: number;
+  }
+  const contextTimerMapRef = useRef<Map<string, ContextTimerState>>(new Map());
+  const resumeWindowTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Derive context key from current view
+  const contextKey = isPersonal ? "__personal__" : (groupId || "__personal__");
+
+  // Helper to get/init a context's timer state
+  const getCtxState = useCallback((key: string): ContextTimerState => {
+    if (!contextTimerMapRef.current.has(key)) {
+      contextTimerMapRef.current.set(key, { lastStoppedSession: null, lastStoppedAt: null, accumulatedSeconds: 0, baseDuration: 0 });
+    }
+    return contextTimerMapRef.current.get(key)!;
+  }, []);
+
+  // Reactive state derived from the current context's ref (triggers re-renders on context switch / pause / expiry)
+  const [ctxResumeVersion, setCtxResumeVersion] = useState(0);
+  const bumpResume = useCallback(() => setCtxResumeVersion(v => v + 1), []);
+
+  // Read current context state (reactive via ctxResumeVersion + contextKey)
+  const currentCtxState = useMemo(() => getCtxState(contextKey), [contextKey, ctxResumeVersion, getCtxState]);
+
+  // Convenience aliases matching old API
+  const lastStoppedSession = currentCtxState.lastStoppedSession;
+  const lastStoppedAt = currentCtxState.lastStoppedAt;
+
+  // Convenience refs that point to current context for use in callbacks
   const accumulatedSecondsRef = useRef(0);
   const baseDurationRef = useRef(0);
-  const resumeWindowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync convenience refs from context map when context changes
+  useEffect(() => {
+    const s = getCtxState(contextKey);
+    accumulatedSecondsRef.current = s.accumulatedSeconds;
+    baseDurationRef.current = s.baseDuration;
+  }, [contextKey, ctxResumeVersion, getCtxState]);
 
   const isPersonal = !activeGroup || (activeGroup as any)?._personal;
   const groupId = isPersonal ? null : activeGroup?.id || null;
