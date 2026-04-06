@@ -288,6 +288,8 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
   const [splitRatio, setSplitRatio] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  const [activeSwipeId, setActiveSwipeId] = useState<string | null>(null);
+  const groupsScrollRef = useRef<HTMLDivElement>(null);
 
   const allGroups = useMemo(
     () => groups.filter((g: any) => !g._personal && g.id !== "__personal__"),
