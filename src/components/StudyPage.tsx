@@ -1405,6 +1405,25 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
           </div>
         </div>
       </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this session?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteConfirmId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSession}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
