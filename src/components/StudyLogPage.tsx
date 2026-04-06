@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Clock, ChevronLeft, MoreHorizontal, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -86,8 +86,11 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
   const [timeRange, setTimeRange] = useState<"week" | "month" | "all" | "custom">("week");
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const [prevTimeRange, setPrevTimeRange] = useState<"week" | "month" | "all">("week");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [subjectDropdownOpen, setSubjectDropdownOpen] = useState(false);
+  const customPickerRef = useRef<HTMLDivElement>(null);
+  const customPillRef = useRef<HTMLButtonElement>(null);
 
   const isPersonal = contextFilter === "personal";
   const selectedGroupId = isPersonal ? null : contextFilter;
@@ -248,6 +251,27 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
     }
   };
 
+  const handleCustomCancel = () => {
+    setShowCustomPicker(false);
+    setCustomRange(undefined);
+    if (timeRange === "custom") setTimeRange(prevTimeRange);
+  };
+
+  // Close custom picker on outside click
+  useEffect(() => {
+    if (!showCustomPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        customPickerRef.current && !customPickerRef.current.contains(e.target as Node) &&
+        customPillRef.current && !customPillRef.current.contains(e.target as Node)
+      ) {
+        handleCustomCancel();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showCustomPicker, prevTimeRange, timeRange]);
+
   return (
     <div className="flex flex-col min-h-full pb-4" style={{ background: "#F4F3F0" }}>
       {/* Header */}
@@ -342,16 +366,26 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
         <div className="rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>By subject</h3>
-            <div className="flex gap-0.5 p-0.5 rounded-lg relative" style={{ background: "#F4F3F0" }}>
+            <div className="flex gap-0.5 p-0.5 rounded-lg" style={{ background: "#F4F3F0" }}>
               {(["week", "month", "all", "custom"] as const).map(r => (
                 <button
                   key={r}
+                  ref={r === "custom" ? customPillRef : undefined}
                   onClick={() => {
-                    if (r === "custom") { setShowCustomPicker(!showCustomPicker); }
-                    else { setTimeRange(r); setShowCustomPicker(false); setCustomRange(undefined); }
+                    if (r === "custom") {
+                      if (!showCustomPicker && timeRange !== "custom") setPrevTimeRange(timeRange as "week" | "month" | "all");
+                      setShowCustomPicker(!showCustomPicker);
+                    } else {
+                      setTimeRange(r);
+                      setShowCustomPicker(false);
+                      setCustomRange(undefined);
+                    }
                   }}
                   className="px-2 py-1 rounded-md text-[10px] font-medium transition-all capitalize"
-                  style={{ background: timeRange === r ? "#fff" : "transparent", color: timeRange === r ? "#1a1a1a" : "#888" }}
+                  style={{
+                    background: (timeRange === r || (r === "custom" && showCustomPicker)) ? "#fff" : "transparent",
+                    color: (timeRange === r || (r === "custom" && showCustomPicker)) ? "#1a1a1a" : "#888",
+                  }}
                 >
                   {r}
                 </button>
