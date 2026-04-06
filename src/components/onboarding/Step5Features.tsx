@@ -542,11 +542,11 @@ const Step5Features = ({ userId, interests, subStep, onSubStepChange, onContinue
     }
   };
 
-  if (activeFeatures.length === 0) {
-    // No features selected — skip this step
-    useEffect(() => { onContinue(); }, []);
-    return null;
-  }
+  useEffect(() => {
+    if (activeFeatures.length === 0) onContinue();
+  }, [activeFeatures.length]);
+
+  if (activeFeatures.length === 0) return null;
 
   const current = activeFeatures[subStep] || activeFeatures[0];
 
