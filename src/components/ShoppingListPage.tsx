@@ -488,13 +488,23 @@ const ShoppingListPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
                 : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
             }`}
           >
-            <span className="text-sm leading-none">👤</span>
-            <span>Mine</span>
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt="" className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 text-[8px] font-bold text-white" style={{ background: "#6C47FF" }}>
+                {(profile?.display_name || "U")[0].toUpperCase()}
+              </span>
+            )}
+            <span>All</span>
           </button>
 
-          {shoppingGroups.map((group) => {
+          {shoppingGroups.map((group, index) => {
             const isActive = localContextId === group.id;
             const isFamily = group.name.toLowerCase() === "family" || group.category === "home";
+            const coverUrl = (group as any).cover_image_url;
+            const gInitial = (group.name || "G")[0].toUpperCase();
+            const GROUP_COLORS = ["#3B82F6", "#EC4899", "#059669", "#F97316", "#8B5CF6", "#14B8A6", "#EF4444", "#EAB308"];
+            const gColor = GROUP_COLORS[index % GROUP_COLORS.length];
             return (
               <button
                 key={group.id}
@@ -507,7 +517,13 @@ const ShoppingListPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
                     : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
                 }`}
               >
-                <span className="text-sm leading-none">{group.emoji}</span>
+                {coverUrl ? (
+                  <img src={coverUrl} alt="" className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0" />
+                ) : (
+                  <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 text-[8px] font-bold text-white" style={{ background: gColor }}>
+                    {gInitial}
+                  </span>
+                )}
                 <span className="truncate max-w-[120px]">{group.name}</span>
               </button>
             );
