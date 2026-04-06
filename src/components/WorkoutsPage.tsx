@@ -1124,6 +1124,7 @@ const WorkoutsPage = ({
           onClose={() => setShowCustomBuilder(false)}
           onAdd={addWorkouts}
           selectedDate={selectedDate}
+          recentWorkouts={displayWorkouts}
         />
 
         {/* Today's Workouts Section */}
