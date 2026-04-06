@@ -448,8 +448,7 @@ const ChatListPage = ({
                   borderRadius: 14,
                 }}
               >
-                {friendsWithoutDm.length === 0 && activeFriends.length === 0 && (
-                  <p className="text-[11px] text-muted-foreground text-center py-4">No friends yet</p>
+                  <p className="text-[11px] text-muted-foreground text-center py-3 px-4">No friends yet</p>
                 )}
                 {friendsWithoutDm.length === 0 && activeFriends.length > 0 && (
                   <p className="text-[11px] text-muted-foreground text-center py-4">All friends have a DM already</p>
