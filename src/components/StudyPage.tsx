@@ -653,7 +653,79 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
   };
 
-  // ── Ring ──
+  // ── Swipe-to-delete handlers ──
+  const canSwipeDelete = useMemo(() => {
+    if (isPersonal) return true;
+    return sessionsFilter.length === 1 && sessionsFilter[0] === "mine";
+  }, [isPersonal, sessionsFilter]);
+
+  const handleSwipeStart = useCallback((e: React.TouchEvent, sessionId: string) => {
+    if (!canSwipeDelete) return;
+    swipeStartX.current = e.touches[0].clientX;
+    swipeCurrentX.current = 0;
+  }, [canSwipeDelete]);
+
+  const handleSwipeMove = useCallback((e: React.TouchEvent, sessionId: string) => {
+    if (!canSwipeDelete || swipeStartX.current === null) return;
+    const diff = swipeStartX.current - e.touches[0].clientX;
+    const clamped = Math.max(0, Math.min(diff, 80));
+    swipeCurrentX.current = clamped;
+    const el = swipeRowRefs.current.get(sessionId);
+    if (el) el.style.transform = `translateX(-${clamped}px)`;
+    if (clamped > 10 && swipedSessionId !== sessionId) {
+      setSwipedSessionId(sessionId);
+    }
+  }, [canSwipeDelete, swipedSessionId]);
+
+  const handleSwipeEnd = useCallback((e: React.TouchEvent, sessionId: string) => {
+    if (!canSwipeDelete) return;
+    const el = swipeRowRefs.current.get(sessionId);
+    if (swipeCurrentX.current > 40) {
+      if (el) el.style.transform = `translateX(-72px)`;
+      setSwipedSessionId(sessionId);
+    } else {
+      if (el) el.style.transform = `translateX(0px)`;
+      if (swipedSessionId === sessionId) setSwipedSessionId(null);
+    }
+    swipeStartX.current = null;
+    swipeCurrentX.current = 0;
+  }, [canSwipeDelete, swipedSessionId]);
+
+  const resetSwipe = useCallback(() => {
+    if (swipedSessionId) {
+      const el = swipeRowRefs.current.get(swipedSessionId);
+      if (el) el.style.transform = `translateX(0px)`;
+      setSwipedSessionId(null);
+    }
+  }, [swipedSessionId]);
+
+  const handleDeleteSession = useCallback(async () => {
+    if (!deleteConfirmId) return;
+    setFadingSessionId(deleteConfirmId);
+    setDeleteConfirmId(null);
+    // Reset swipe on the row
+    const el = swipeRowRefs.current.get(deleteConfirmId);
+    if (el) el.style.transform = `translateX(0px)`;
+    setSwipedSessionId(null);
+
+    await supabase.from("study_sessions").delete().eq("id", deleteConfirmId);
+    // Small delay for fade animation
+    setTimeout(() => {
+      setFadingSessionId(null);
+      fetchSessions();
+      fetchGroupSessions();
+    }, 300);
+  }, [deleteConfirmId, fetchSessions, fetchGroupSessions]);
+
+  // Reset swipe on any interaction outside
+  useEffect(() => {
+    if (!swipedSessionId) return;
+    const handler = () => resetSwipe();
+    window.addEventListener("scroll", handler, true);
+    return () => window.removeEventListener("scroll", handler, true);
+  }, [swipedSessionId, resetSwipe]);
+
+
   const progress = Math.min(todayTotal / (DAILY_GOAL_HOURS * 3600), 1);
   const SIZE = 130;
   const STROKE = 9;
