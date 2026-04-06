@@ -491,73 +491,17 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
             ) : (
               /* Full group cards */
               <div className="space-y-2">
-                {allGroups.map((group, gi) => {
-                  const activeMembers = group.members.filter((m) => m.status === "active");
-                  const validPages = (group.shared_pages || [])
-                    .filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p))
-                    .slice(0, 4) as ShareablePage[];
-                  const extraPages = Math.max(
-                    (group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).length - 4,
-                    0
-                  );
-                  const coverUrl = group.cover_image_url || null;
-
-                  return (
-                    <button
-                      key={group.id}
-                      onClick={() => handleGroupTap(group)}
-                      className="w-full h-[76px] flex overflow-hidden text-left bg-card"
-                      style={{
-                        borderRadius: 14,
-                        border: "0.5px solid rgba(0,0,0,0.07)",
-                      }}
-                    >
-                      <div className="flex-1 min-w-0 px-3 py-2.5 flex flex-col justify-center bg-card">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <p className="text-[13px] font-medium text-foreground truncate">{group.name}</p>
-                          <div className="shrink-0">
-                            <MemberDots members={activeMembers} />
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {validPages.map((page) => (
-                            <span
-                              key={page}
-                              className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
-                            >
-                              {PAGE_LABELS[page] || page}
-                            </span>
-                          ))}
-                          {extraPages > 0 && (
-                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                              +{extraPages}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div
-                        className="w-[100px] shrink-0 overflow-hidden"
-                        style={{ borderRadius: "0 14px 14px 0" }}
-                      >
-                        {coverUrl ? (
-                          <img
-                            src={coverUrl}
-                            alt=""
-                            className="w-full h-full object-cover block"
-                          />
-                        ) : (
-                          <div
-                            className={`w-full h-full ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex flex-col items-center justify-center gap-0.5`}
-                          >
-                            <Camera size={12} className="text-muted-foreground/50" />
-                            <span className="text-[8px] font-medium text-muted-foreground/70">Add photo</span>
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  );
+                {allGroups.map((group, gi) => (
+                  <SwipeableGroupCard
+                    key={group.id}
+                    group={group}
+                    gi={gi}
+                    user={user}
+                    onTap={() => handleGroupTap(group)}
+                    onLeave={handleLeaveGroup}
+                    onDelete={handleDeleteGroup}
+                  />
+                ))}
                 })}
               </div>
             )}
