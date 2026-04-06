@@ -320,12 +320,12 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
             )}
           </div>
           <button
-            onClick={() => setShowEditProfile(true)}
+            onClick={() => setShowPhotoSheet(true)}
             className="absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] rounded-full flex items-center justify-center"
             style={{ background: "#222", border: "2px solid #fff" }}
-            aria-label="Edit photo"
+            aria-label="Change photo"
           >
-            <Pencil size={10} color="#fff" />
+            <Camera size={10} color="#fff" />
           </button>
         </div>
         <p style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A", fontFamily: "'DM Sans', sans-serif" }}>
