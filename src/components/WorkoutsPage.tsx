@@ -634,6 +634,13 @@ const WorkoutsPage = ({
       if (workout.groupId && !isWorkoutPhotoPromptSuppressed()) {
         setTimeout(() => setPhotoPromptWorkout(workout), 1200);
       }
+      // Trigger feed share prompt for workouts in groups with feed
+      const workoutGroups = groups.filter(
+        (g) => g.id === workout.groupId || (workout as any).sharedGroupIds?.includes(g.id)
+      );
+      if (workoutGroups.length > 0) {
+        setTimeout(() => setFeedShareWorkout(workout), workout.groupId ? 1800 : 1200);
+      }
     }
     toggleWorkout(id);
   };
