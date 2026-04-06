@@ -2122,7 +2122,7 @@ const WeekView = ({
       {/* ── All-day pill row (pinned between header and time grid) ── */}
       <div className="flex" style={{ flexShrink: 0, borderTop: "0.5px solid hsl(var(--border))", borderBottom: "0.5px solid hsl(var(--border))" }}>
         <div className="flex items-center justify-end pr-1"
-          style={{ width: WEEK_TIME_COL, flexShrink: 0, fontSize: 9, color: "#aaa" }}>all day</div>
+          style={{ width: WEEK_TIME_COL, flexShrink: 0, fontSize: 8, color: "#aaa" }}>all<br/>day</div>
         {dateItems.map((col, ci) => {
           const allDayItems = col.items.filter((it) => it.allDay || it.isDueDateTask);
           return (
@@ -2136,7 +2136,7 @@ const WeekView = ({
                     className="w-full flex items-center gap-0.5 text-left px-1 py-0.5 mb-0.5 hover:opacity-80 active:opacity-60 transition-opacity truncate"
                     style={{ backgroundColor: style.bg, borderRadius: 99 }}>
                     <MemberDot item={it} />
-                    <span className="text-[8px] font-medium truncate" style={{ color: style.text }}>
+                    <span className="text-[9px] font-medium truncate" style={{ color: style.text }}>
                       {it.title}
                     </span>
                   </button>
