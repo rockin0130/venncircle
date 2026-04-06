@@ -114,38 +114,46 @@ const SwipeableGroupCard = ({
   const cardRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
   const startOffset = useRef(0);
-  const dragging = useRef(false);
+  const movedDistance = useRef(0);
   const [offset, setOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const [leaveFlowOpen, setLeaveFlowOpen] = useState(false);
   const [removed, setRemoved] = useState(false);
 
   const REVEAL_WIDTH = 100;
+  const TAP_SLOP = 6;
   const isSwiped = activeSwipeId === group.id;
 
-  // Auto-reset when another card becomes active
   useEffect(() => {
-    if (!isSwiped && offset !== 0) {
+    if (!isSwiped && offset !== 0 && !isDragging) {
       setOffset(0);
     }
-  }, [isSwiped]);
+  }, [isSwiped, offset, isDragging]);
 
-  // Snap back on scroll
   useEffect(() => {
     const container = scrollContainerRef?.current;
     if (!container) return;
     const onScroll = () => {
-      if (isSwiped) onSwipeOpen(null);
+      if (offset !== 0 || isSwiped) {
+        setIsDragging(false);
+        setOffset(0);
+        if (isSwiped) onSwipeOpen(null);
+      }
     };
     container.addEventListener("scroll", onScroll, { passive: true });
     return () => container.removeEventListener("scroll", onScroll);
-  }, [isSwiped, onSwipeOpen, scrollContainerRef]);
+  }, [offset, isSwiped, onSwipeOpen, scrollContainerRef]);
 
-  // Click outside to snap back
   useEffect(() => {
-    if (!isSwiped) return;
+    if (!isSwiped && offset === 0) return;
     const handler = (e: MouseEvent | TouchEvent) => {
-      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
-        onSwipeOpen(null);
+      const target = e.target as Node;
+      const card = cardRef.current;
+      if (!card) return;
+      if (!card.contains(target)) {
+        setIsDragging(false);
+        setOffset(0);
+        if (isSwiped) onSwipeOpen(null);
       }
     };
     document.addEventListener("mousedown", handler, true);
@@ -154,35 +162,47 @@ const SwipeableGroupCard = ({
       document.removeEventListener("mousedown", handler, true);
       document.removeEventListener("touchstart", handler, true);
     };
-  }, [isSwiped, onSwipeOpen]);
+  }, [offset, isSwiped, onSwipeOpen]);
 
-  const handleStart = (clientX: number) => {
-    dragging.current = true;
-    startX.current = clientX;
+  const closeSwipe = () => {
+    setIsDragging(false);
+    setOffset(0);
+    if (isSwiped) onSwipeOpen(null);
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    startX.current = e.clientX;
     startOffset.current = offset;
-    // Close any other open card immediately
+    movedDistance.current = 0;
+    setIsDragging(true);
+
     if (activeSwipeId && activeSwipeId !== group.id) {
       onSwipeOpen(null);
     }
   };
 
-  const handleMove = (clientX: number) => {
-    if (!dragging.current) return;
-    const diff = clientX - startX.current + startOffset.current;
-    const clamped = Math.max(-REVEAL_WIDTH, Math.min(0, diff));
-    setOffset(clamped);
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    const deltaX = e.clientX - startX.current;
+    movedDistance.current = Math.max(movedDistance.current, Math.abs(deltaX));
+    const nextOffset = Math.max(-REVEAL_WIDTH, Math.min(0, startOffset.current + deltaX));
+    setOffset(nextOffset);
   };
 
-  const handleEnd = () => {
-    if (!dragging.current) return;
-    dragging.current = false;
+  const handlePointerEnd = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+
     if (offset < -REVEAL_WIDTH / 2) {
       setOffset(-REVEAL_WIDTH);
       onSwipeOpen(group.id);
-    } else {
-      setOffset(0);
-      if (isSwiped) onSwipeOpen(null);
+      return;
     }
+
+    setOffset(0);
+    if (isSwiped) onSwipeOpen(null);
   };
 
   if (removed) {
@@ -201,84 +221,72 @@ const SwipeableGroupCard = ({
 
   return (
     <>
-      <div ref={cardRef} className="relative" style={{ borderRadius: 14, height: 76, overflow: "hidden" }}>
-        {/* Background action button — positioned behind, only visible when card slides */}
-        <div
-          className="absolute right-0 top-0 bottom-0 flex items-center justify-center text-white text-xs font-semibold cursor-pointer select-none"
-          style={{
-            width: REVEAL_WIDTH,
-            background: "#E05C5C",
-            borderRadius: "0 14px 14px 0",
-          }}
+      <div ref={cardRef} className="relative overflow-hidden rounded-[14px]">
+        <button
+          type="button"
+          className="absolute inset-y-0 right-0 flex w-[100px] items-center justify-center text-xs font-semibold text-white select-none"
+          style={{ background: "#E05C5C" }}
           onClick={() => setLeaveFlowOpen(true)}
         >
           Leave Group
-        </div>
+        </button>
 
-        {/* Foreground card — oversized by REVEAL_WIDTH so it fully covers red at rest */}
         <div
-          className="absolute top-0 bottom-0 flex touch-pan-y"
+          className="relative z-10 flex bg-card touch-pan-y"
           style={{
-            left: 0,
-            width: `calc(100% + ${REVEAL_WIDTH}px)`,
+            height: 76,
             transform: `translateX(${offset}px)`,
-            transition: dragging.current ? "none" : "transform 0.25s cubic-bezier(.4,0,.2,1)",
+            transition: isDragging ? "none" : "transform 0.25s cubic-bezier(.4,0,.2,1)",
+            borderRadius: 14,
+            border: "0.5px solid rgba(0,0,0,0.07)",
             willChange: "transform",
           }}
-          onMouseDown={(e) => handleStart(e.clientX)}
-          onMouseMove={(e) => { if (e.buttons === 1) handleMove(e.clientX); }}
-          onMouseUp={handleEnd}
-          onMouseLeave={() => { if (dragging.current) handleEnd(); }}
-          onTouchStart={(e) => handleStart(e.touches[0].clientX)}
-          onTouchMove={(e) => handleMove(e.touches[0].clientX)}
-          onTouchEnd={handleEnd}
-          onClick={() => { if (Math.abs(offset) < 5) onTap(); }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerEnd}
+          onPointerCancel={closeSwipe}
+          onClick={() => {
+            if (movedDistance.current > TAP_SLOP) return;
+            if (offset !== 0 || isSwiped) {
+              closeSwipe();
+              return;
+            }
+            onTap();
+          }}
         >
-          {/* Visible card area — exactly container width */}
-          <div
-            className="flex bg-card shrink-0"
-            style={{
-              width: `calc(100% - ${REVEAL_WIDTH}px)`,
-              borderRadius: 14,
-              border: "0.5px solid rgba(0,0,0,0.07)",
-            }}
-          >
-            <div className="flex-1 min-w-0 px-3 py-2.5 flex flex-col justify-center">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <p className="text-[13px] font-medium text-foreground truncate">{group.name}</p>
-                <div className="shrink-0">
-                  <MemberDots members={activeMembers} />
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {validPages.map((page) => (
-                  <span
-                    key={page}
-                    className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
-                  >
-                    {PAGE_LABELS[page] || page}
-                  </span>
-                ))}
-                {extraPages > 0 && (
-                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                    +{extraPages}
-                  </span>
-                )}
+          <div className="flex-1 min-w-0 px-3 py-2.5 flex flex-col justify-center bg-card" style={{ borderRadius: "14px 0 0 14px" }}>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="text-[13px] font-medium text-foreground truncate">{group.name}</p>
+              <div className="shrink-0">
+                <MemberDots members={activeMembers} />
               </div>
             </div>
-            <div className="w-[100px] shrink-0 overflow-hidden" style={{ borderRadius: "0 14px 14px 0" }}>
-              {coverUrl ? (
-                <img src={coverUrl} alt="" className="w-full h-full object-cover block" />
-              ) : (
-                <div className={`w-full h-full ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex flex-col items-center justify-center gap-0.5`}>
-                  <Camera size={12} className="text-muted-foreground/50" />
-                  <span className="text-[8px] font-medium text-muted-foreground/70">Add photo</span>
-                </div>
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {validPages.map((page) => (
+                <span
+                  key={page}
+                  className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
+                >
+                  {PAGE_LABELS[page] || page}
+                </span>
+              ))}
+              {extraPages > 0 && (
+                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  +{extraPages}
+                </span>
               )}
             </div>
           </div>
-          {/* Extra coverage area that sits off-screen to the right — prevents any bleed */}
-          <div className="bg-card shrink-0" style={{ width: REVEAL_WIDTH }} />
+          <div className="w-[100px] shrink-0 overflow-hidden" style={{ borderRadius: "0 14px 14px 0" }}>
+            {coverUrl ? (
+              <img src={coverUrl} alt="" className="w-full h-full object-cover block" />
+            ) : (
+              <div className={`w-full h-full ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex flex-col items-center justify-center gap-0.5`}>
+                <Camera size={12} className="text-muted-foreground/50" />
+                <span className="text-[8px] font-medium text-muted-foreground/70">Add photo</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
