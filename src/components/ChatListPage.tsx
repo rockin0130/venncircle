@@ -138,11 +138,11 @@ const ChatListPage = ({
   }, [user, groups]);
 
   const groupChats = useMemo(
-    () => previews.filter((p) => !p.group._personal && p.group.id !== "__personal__" && p.group.members.length > 2),
+    () => previews.filter((p) => (p.group as any)._personal !== true && p.group.id !== "__personal__" && p.group.members.length > 2),
     [previews]
   );
   const dmChats = useMemo(
-    () => previews.filter((p) => !p.group._personal && p.group.id !== "__personal__" && p.group.members.length <= 2),
+    () => previews.filter((p) => (p.group as any)._personal !== true && p.group.id !== "__personal__" && p.group.members.length <= 2),
     [previews]
   );
 
