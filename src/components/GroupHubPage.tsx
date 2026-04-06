@@ -86,6 +86,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   const myMember = currentActiveMembers.find((m) => m.user_id === user?.id);
   const isAdmin = myMember?.role === "admin";
   const isOwner = user?.id === group.created_by;
+  const currentEnabledPages = (currentGroup.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)) as ShareablePage[];
   const coverUrl = localCoverUrl || currentGroup.cover_image_url || null;
   const coverGradientIdx = currentGroup.name.charCodeAt(0) % COVER_GRADIENTS.length;
 
