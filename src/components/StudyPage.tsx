@@ -450,8 +450,11 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const pauseSession = useCallback(async (totalElapsed: number) => {
     const sessionId = activeSessionIdRef.current;
     if (!sessionId) return;
+    const key = contextKeyRef.current;
+    const ctx = getCtxState(key);
+    ctx.accumulatedSeconds = totalElapsed;
     accumulatedSecondsRef.current = totalElapsed;
-    const finalDuration = baseDurationRef.current + totalElapsed;
+    const finalDuration = ctx.baseDuration + totalElapsed;
     const endedAt = new Date().toISOString();
     await supabase
       .from("study_sessions")
@@ -459,60 +462,88 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
       .eq("id", sessionId);
     const session = sessions.find(s => s.id === sessionId);
     if (session) {
-      setLastStoppedSession({ ...session, ended_at: endedAt, duration_seconds: finalDuration, is_active: false });
+      ctx.lastStoppedSession = { ...session, ended_at: endedAt, duration_seconds: finalDuration, is_active: false };
     }
-    setLastStoppedAt(Date.now());
+    ctx.lastStoppedAt = Date.now();
     setFullscreen(false);
     setActiveTick(0);
-    if (resumeWindowTimerRef.current) clearTimeout(resumeWindowTimerRef.current);
-    resumeWindowTimerRef.current = setTimeout(() => {
-      accumulatedSecondsRef.current = 0;
-      baseDurationRef.current = 0;
-      setLastStoppedSession(null);
-      setLastStoppedAt(null);
+    // Clear any existing resume window timer for this context
+    const existingTimer = resumeWindowTimersRef.current.get(key);
+    if (existingTimer) clearTimeout(existingTimer);
+    // Start 2-min window for THIS context only
+    const timer = setTimeout(() => {
+      const s = getCtxState(key);
+      s.accumulatedSeconds = 0;
+      s.baseDuration = 0;
+      s.lastStoppedSession = null;
+      s.lastStoppedAt = null;
+      resumeWindowTimersRef.current.delete(key);
+      // If user is currently viewing this context, update display
+      if (contextKeyRef.current === key) {
+        accumulatedSecondsRef.current = 0;
+        baseDurationRef.current = 0;
+        bumpResume();
+      }
     }, RESUME_WINDOW_MS);
+    resumeWindowTimersRef.current.set(key, timer);
+    bumpResume();
     fetchSessions();
     fetchGroupSessions();
-  }, [sessions, fetchSessions, fetchGroupSessions]);
+  }, [sessions, fetchSessions, fetchGroupSessions, getCtxState, bumpResume]);
 
   const startNewSession = useCallback(async () => {
     if (!user) return;
+    const key = contextKeyRef.current;
     const effectiveGroupId = groupId && studyEnabledGroupIds.has(groupId) ? groupId : null;
+    const ctx = getCtxState(key);
+    ctx.accumulatedSeconds = 0;
+    ctx.baseDuration = 0;
     accumulatedSecondsRef.current = 0;
     baseDurationRef.current = 0;
-    if (resumeWindowTimerRef.current) clearTimeout(resumeWindowTimerRef.current);
+    // Clear resume window timer for this context
+    const existingTimer = resumeWindowTimersRef.current.get(key);
+    if (existingTimer) { clearTimeout(existingTimer); resumeWindowTimersRef.current.delete(key); }
     await supabase
       .from("study_sessions")
       .insert({ user_id: user.id, subject: selectedSubject, group_id: effectiveGroupId, is_active: true, started_at: new Date().toISOString() } as any);
-    setLastStoppedSession(null);
-    setLastStoppedAt(null);
+    ctx.lastStoppedSession = null;
+    ctx.lastStoppedAt = null;
     setActiveTick(0);
     setFullscreen(true);
+    bumpResume();
     fetchSessions();
     fetchGroupSessions();
-  }, [user, selectedSubject, groupId, studyEnabledGroupIds, fetchSessions, fetchGroupSessions]);
+  }, [user, selectedSubject, groupId, studyEnabledGroupIds, fetchSessions, fetchGroupSessions, getCtxState, bumpResume]);
 
   const resumeSession = useCallback(async (sessionToResume: StudySession, fromList = false) => {
+    const key = contextKeyRef.current;
+    const ctx = getCtxState(key);
     if (fromList) {
+      ctx.baseDuration = sessionToResume.duration_seconds;
+      ctx.accumulatedSeconds = 0;
       baseDurationRef.current = sessionToResume.duration_seconds;
       accumulatedSecondsRef.current = 0;
     }
-    if (resumeWindowTimerRef.current) clearTimeout(resumeWindowTimerRef.current);
+    // Clear resume window timer for this context
+    const existingTimer = resumeWindowTimersRef.current.get(key);
+    if (existingTimer) { clearTimeout(existingTimer); resumeWindowTimersRef.current.delete(key); }
     await supabase
       .from("study_sessions")
       .update({ is_active: true, ended_at: null } as any)
       .eq("id", sessionToResume.id);
-    setLastStoppedSession(null);
-    setLastStoppedAt(null);
+    ctx.lastStoppedSession = null;
+    ctx.lastStoppedAt = null;
     setFullscreen(true);
+    bumpResume();
     fetchSessions();
     fetchGroupSessions();
-  }, [fetchSessions, fetchGroupSessions]);
+  }, [fetchSessions, fetchGroupSessions, getCtxState, bumpResume]);
 
-  // Cleanup resume window timer on unmount
+  // Cleanup all resume window timers on unmount
   useEffect(() => {
     return () => {
-      if (resumeWindowTimerRef.current) clearTimeout(resumeWindowTimerRef.current);
+      resumeWindowTimersRef.current.forEach(t => clearTimeout(t));
+      resumeWindowTimersRef.current.clear();
     };
   }, []);
 
