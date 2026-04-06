@@ -164,7 +164,7 @@ const ChatListPage = ({
     [previews]
   );
   const dmChats = useMemo(
-    () => previews.filter((p) => (p.group as any)._personal !== true && p.group.id !== "__personal__" && p.group.members.length <= 2),
+    () => previews.filter((p) => (p.group as any)._personal !== true && p.group.id !== "__personal__" && p.group.members.length <= 2 && p.lastMessage !== null),
     [previews]
   );
 
