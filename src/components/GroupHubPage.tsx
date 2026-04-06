@@ -443,17 +443,61 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Members ({currentActiveMembers.length})</label>
               <div className="space-y-2 mt-2">
-                {currentActiveMembers.map((m) => (
-                  <div key={m.user_id} className="flex items-center gap-2 p-2 rounded-lg bg-secondary/30">
-                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
-                      {(m.display_name || "?")[0].toUpperCase()}
+                {currentActiveMembers.map((m) => {
+                  const isMemberAdmin = m.role === "admin";
+                  const isMe = m.user_id === user?.id;
+                  return (
+                    <div key={m.user_id} className="flex items-center gap-2 p-2 rounded-lg bg-secondary/30 relative">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                        {(m.display_name || "?")[0].toUpperCase()}
+                      </div>
+                      <span className="text-sm text-foreground flex-1">{m.display_name || "Member"}</span>
+                      {isMemberAdmin && (
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">Admin</span>
+                      )}
+                      {isAdmin && !isMe && (
+                        <div className="relative">
+                          <button
+                            onClick={() => setMemberMenuOpen(memberMenuOpen === m.user_id ? null : m.user_id)}
+                            className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+                          >
+                            <MoreHorizontal size={14} className="text-muted-foreground" />
+                          </button>
+                          {memberMenuOpen === m.user_id && (
+                            <div className="absolute right-0 top-7 z-50 bg-card border border-border rounded-xl shadow-lg py-1 min-w-[160px]">
+                              {isMemberAdmin ? (
+                                <button
+                                  onClick={() => handleSetRole(m.user_id, "member")}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                                >
+                                  <ShieldOff size={14} className="text-muted-foreground" />
+                                  Remove admin role
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleSetRole(m.user_id, "admin")}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                                >
+                                  <ShieldCheck size={14} className="text-muted-foreground" />
+                                  Make admin
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <span className="text-sm text-foreground flex-1">{m.display_name || "Member"}</span>
-                    {m.user_id === currentGroup.created_by && (
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">Admin</span>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
+                {isAdmin && (
+                  <button
+                    onClick={() => setAddMemberOpen(true)}
+                    className="w-full flex items-center gap-2 p-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+                  >
+                    <UserPlus size={14} />
+                    Add member
+                  </button>
+                )}
               </div>
             </div>
 
@@ -484,31 +528,56 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
               </div>
             </div>
 
-            {/* Leave / Delete */}
-            <div className="border-t border-border pt-4 space-y-2">
-              {!isOwner && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button className="w-full flex items-center gap-2 p-3 rounded-xl text-destructive hover:bg-destructive/5 transition-colors text-sm font-medium"><LogOut size={16} />Leave Group</button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Leave group?</AlertDialogTitle><AlertDialogDescription>You'll lose access to shared data in this group. You can rejoin later with an invite.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleLeave} disabled={leaving}>{leaving ? "Leaving..." : "Leave"}</AlertDialogAction></AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-              {isOwner && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button className="w-full flex items-center gap-2 p-3 rounded-xl text-destructive hover:bg-destructive/5 transition-colors text-sm font-medium"><Trash2 size={16} />Delete Group</button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Delete group?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the group and remove all members. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive hover:bg-destructive/90">{deleting ? "Deleting..." : "Delete"}</AlertDialogAction></AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
+            {/* Leave Group */}
+            <div className="border-t border-border pt-4">
+              <button
+                onClick={() => setLeaveFlowOpen(true)}
+                className="w-full flex items-center gap-2 p-3 rounded-xl hover:bg-destructive/5 transition-colors text-sm font-medium"
+                style={{ color: "#E05C5C" }}
+              >
+                <LogOut size={16} />
+                Leave Group
+              </button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Leave Group Flow */}
+      {user && (
+        <LeaveGroupFlow
+          group={currentGroup}
+          userId={user.id}
+          open={leaveFlowOpen}
+          onOpenChange={setLeaveFlowOpen}
+          onLeft={handleLeaveFlowDone}
+        />
+      )}
+
+      {/* Add Member Dialog */}
+      <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+        <DialogContent className="max-w-sm max-h-[70vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Add Member</DialogTitle></DialogHeader>
+          <div className="space-y-2 py-2">
+            {activeFriends.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No friends to invite. Add friends first!</p>
+            ) : (
+              activeFriends
+                .filter((f) => f.friend && !currentActiveMembers.some((m) => m.user_id === f.friend!.id))
+                .map((f) => (
+                  <button
+                    key={f.friend!.id}
+                    onClick={() => handleAddMember(f.friend!.id)}
+                    className="w-full flex items-center gap-2.5 p-2.5 rounded-xl border border-border hover:border-primary/30 transition-all text-left"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                      {(f.friend!.display_name || "?")[0].toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium text-foreground flex-1">{f.friend!.display_name}</span>
+                    <Plus size={14} className="text-muted-foreground" />
+                  </button>
+                ))
+            )}
           </div>
         </DialogContent>
       </Dialog>
