@@ -101,115 +101,205 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
   const today = todayStr();
   const weekStart = loadWeekStart();
   const startStr = getWeekStartDate(new Date(), weekStart);
-  const [goalOpen, setGoalOpen] = useState(false);
 
-  const weekDone = useMemo(() => {
-    const days = new Set(
-      workouts
-        .filter((w) => w.done && (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today)
-        .map((w) => w.completedDate || w.scheduledDate!)
-    );
-    return days.size;
-  }, [workouts, startStr, today]);
+  const weekWorkouts = useMemo(() =>
+    workouts.filter((w) => w.done && (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today),
+    [workouts, startStr, today]
+  );
 
-  const weekCals = useMemo(() => {
-    return workouts
-      .filter((w) => w.done && (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today)
-      .reduce((s, w) => s + (w.cal || 0), 0);
-  }, [workouts, startStr, today]);
+  const weekDone = useMemo(() => new Set(weekWorkouts.map((w) => w.completedDate || w.scheduledDate!)).size, [weekWorkouts]);
+  const weekCals = useMemo(() => weekWorkouts.reduce((s, w) => s + (w.cal || 0), 0), [weekWorkouts]);
 
-  const weekDist = useMemo(() => {
-    return workouts
-      .filter((w) => w.done && w.distance && (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today)
-      .reduce((s, w) => s + (w.distance || 0), 0);
-  }, [workouts, startStr, today]);
+  // Distance — per activity type
+  const [distUnit, setDistUnit] = useState<"km" | "mi">(() => (localStorage.getItem("workout_distance_unit") as "km" | "mi") || "km");
+  const [distFilter, setDistFilter] = useState<string[]>([]);
+  const [distDropdownOpen, setDistDropdownOpen] = useState(false);
 
-  const distUnit = localStorage.getItem("workout_distance_unit") || "mi";
+  const KM_TO_MI = 0.621371;
 
-  // Streak
-  const streak = useMemo(() => {
-    const doneDates = new Set(
-      workouts.filter((w) => w.done && (w.completedDate || w.scheduledDate)).map((w) => w.completedDate || w.scheduledDate!)
-    );
-    if (doneDates.size === 0) return 0;
-    let s = 0;
-    const d = new Date();
-    if (!doneDates.has(fmtDate(d))) d.setDate(d.getDate() - 1);
-    while (doneDates.has(fmtDate(d))) { s++; d.setDate(d.getDate() - 1); }
-    return s;
-  }, [workouts]);
+  const distByActivity = useMemo(() => {
+    const map: Record<string, number> = {};
+    weekWorkouts.forEach((w) => {
+      if (!w.distance || w.distance <= 0) return;
+      const name = w.title || "Other";
+      map[name] = (map[name] || 0) + w.distance;
+    });
+    return map;
+  }, [weekWorkouts]);
+
+  const activityNames = useMemo(() => Object.keys(distByActivity).sort(), [distByActivity]);
+
+  const totalDist = useMemo(() => {
+    const selected = distFilter.length > 0 ? distFilter : activityNames;
+    const km = selected.reduce((s, n) => s + (distByActivity[n] || 0), 0);
+    return distUnit === "mi" ? Math.round(km * KM_TO_MI * 10) / 10 : Math.round(km * 10) / 10;
+  }, [distByActivity, distFilter, activityNames, distUnit]);
+
+  const toggleDistUnit = () => {
+    const next = distUnit === "km" ? "mi" : "km";
+    setDistUnit(next);
+    localStorage.setItem("workout_distance_unit", next);
+  };
+
+  const toggleActivityFilter = (name: string) => {
+    setDistFilter((prev) => {
+      if (prev.includes(name)) {
+        const next = prev.filter((n) => n !== name);
+        return next;
+      }
+      return [...prev, name];
+    });
+  };
+
+  const singleActivity = activityNames.length === 1 ? activityNames[0] : null;
+  const filterLabel = distFilter.length === 0 ? "All types" : distFilter.join(" · ");
 
   const clamped = Math.min(weekDone, weeklyGoal);
   const pct = weeklyGoal > 0 ? (clamped / weeklyGoal) * 100 : 0;
   const remaining = Math.max(0, weeklyGoal - clamped);
 
-  // SVG ring
-  const R = 22;
+  // SVG ring — 72px, 7px stroke
+  const SIZE = 72;
+  const STROKE = 7;
+  const R = (SIZE - STROKE) / 2;
   const C = 2 * Math.PI * R;
   const offset = C - (pct / 100) * C;
 
+  const ACTIVITY_COLORS: Record<string, string> = {
+    Running: "#10B981", Cycling: "#3B82F6", Swimming: "#06B6D4", Walking: "#F59E0B", Yoga: "#8B5CF6", Strength: "#EF4444",
+  };
+
   return (
-    <div className="bg-card rounded-2xl border border-border shadow-sm p-4 mb-5">
+    <div className="mb-5 rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
+      {/* Top section: Ring + Goal info */}
       <div className="flex items-center gap-4 mb-3">
-        {/* Ring */}
-        <div className="relative w-[52px] h-[52px] flex-shrink-0">
-          <svg className="w-[52px] h-[52px] -rotate-90" viewBox="0 0 52 52">
-            <circle cx="26" cy="26" r={R} fill="none" stroke="hsl(var(--muted))" strokeWidth="4" />
-            <circle cx="26" cy="26" r={R} fill="none" stroke="hsl(var(--primary))" strokeWidth="4"
+        {/* Progress ring */}
+        <div className="relative flex-shrink-0" style={{ width: SIZE, height: SIZE }}>
+          <svg width={SIZE} height={SIZE} className="-rotate-90" viewBox={`0 0 ${SIZE} ${SIZE}`}>
+            <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="#EEEDE8" strokeWidth={STROKE} />
+            <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="#1a1a1a" strokeWidth={STROKE}
               strokeDasharray={C} strokeDashoffset={offset} strokeLinecap="round"
               className="transition-all duration-500" />
           </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-xs font-bold">{clamped}<span className="text-[9px] text-muted-foreground">/{weeklyGoal}</span></span>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", lineHeight: 1 }}>{clamped}</span>
+            <span style={{ fontSize: 10, color: "#999", lineHeight: 1, marginTop: 1 }}>/{weeklyGoal}</span>
           </div>
         </div>
 
-        {/* Labels */}
+        {/* Goal info + adjuster */}
         <div className="flex-1 min-w-0">
-          <button onClick={() => setGoalOpen(!goalOpen)} className="text-sm font-semibold text-foreground hover:text-primary transition-colors">
-            Weekly Goal
-          </button>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p style={{ fontSize: 11, color: "#999", fontWeight: 500 }}>Weekly goal</p>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginTop: 1 }}>
             {clamped >= weeklyGoal ? "Goal reached! 🎉" : `${remaining} workout${remaining !== 1 ? "s" : ""} to go`}
           </p>
-        </div>
-
-        {/* Streak badge */}
-        {streak > 0 && (
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-semibold flex-shrink-0">
-            🔥 {streak} day{streak !== 1 ? "s" : ""}
+          <div className="flex items-center gap-2 mt-1.5">
+            <button
+              onClick={() => onGoalChange(Math.max(1, weeklyGoal - 1))}
+              className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-xs"
+              style={{ background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.1)", color: "#666" }}
+            >−</button>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", minWidth: 14, textAlign: "center" }}>{weeklyGoal}</span>
+            <button
+              onClick={() => onGoalChange(Math.min(14, weeklyGoal + 1))}
+              className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-xs"
+              style={{ background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.1)", color: "#666" }}
+            >+</button>
+            <span style={{ fontSize: 11, color: "#999" }}>per week</span>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Goal picker */}
-      <AnimatePresence>
-        {goalOpen && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-            <div className="flex gap-2 py-2">
-              {[2, 3, 4, 5, 6, 7].map((g) => (
-                <button key={g} onClick={() => { onGoalChange(g); setGoalOpen(false); }}
-                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${weeklyGoal === g ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:bg-secondary/80"}`}
-                >{g}x</button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Stats row — three boxes */}
+      <div className="grid grid-cols-3 gap-2">
+        {/* Done */}
+        <div className="flex flex-col items-center justify-center py-2.5 px-2" style={{ background: "#F9F8F6", borderRadius: 10 }}>
+          <span style={{ fontSize: 16, fontWeight: 500, color: "#1A1A1A" }}>{weekDone}</span>
+          <span style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Done</span>
+        </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border mt-2">
-        <div className="text-center">
-          <p className="text-lg font-bold">{weekDone}</p>
-          <p className="text-[10px] text-muted-foreground font-medium">Done</p>
+        {/* Kcal */}
+        <div className="flex flex-col items-center justify-center py-2.5 px-2" style={{ background: "#F9F8F6", borderRadius: 10 }}>
+          <span style={{ fontSize: 16, fontWeight: 500, color: "#1A1A1A" }}>{weekCals.toLocaleString()}</span>
+          <span style={{ fontSize: 10, color: "#999", marginTop: 2 }}>kcal</span>
         </div>
-        <div className="text-center">
-          <p className="text-lg font-bold">{weekCals.toLocaleString()}</p>
-          <p className="text-[10px] text-muted-foreground font-medium">kcal</p>
-        </div>
-        <div className="text-center">
-          <p className="text-lg font-bold">{weekDist < 10 ? weekDist.toFixed(1) : Math.round(weekDist)}</p>
-          <p className="text-[10px] text-muted-foreground font-medium">{distUnit}</p>
+
+        {/* Distance */}
+        <div className="relative">
+          <button
+            onClick={toggleDistUnit}
+            className="w-full flex flex-col items-center justify-center py-2.5 px-2"
+            style={{ background: "#F9F8F6", borderRadius: 10 }}
+          >
+            <div className="flex items-center gap-1">
+              <span style={{ fontSize: 16, fontWeight: 500, color: "#1A1A1A" }}>{totalDist}</span>
+            </div>
+            <div className="flex items-center gap-1 mt-0.5">
+              <span style={{ fontSize: 10, color: "#999" }}>
+                {distUnit}{singleActivity ? ` · ${singleActivity}` : ""}
+              </span>
+              <span style={{ fontSize: 8, color: "#bbb" }}>
+                {distUnit === "km" ? "mi" : "km"}
+              </span>
+            </div>
+          </button>
+
+          {/* Filter pill — only if multiple activity types */}
+          {activityNames.length > 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setDistDropdownOpen((p) => !p); }}
+              className="w-full mt-1 py-1 px-2 rounded-full text-center truncate"
+              style={{
+                fontSize: 9,
+                fontWeight: 600,
+                background: distFilter.length > 0 ? "#6C47FF" : "#1a1a1a",
+                color: "#fff",
+              }}
+            >
+              {filterLabel}
+            </button>
+          )}
+
+          {/* Dropdown */}
+          {distDropdownOpen && activityNames.length > 1 && (
+            <div
+              className="absolute right-0 top-full mt-1 z-50 py-1 min-w-[160px]"
+              style={{ background: "#fff", borderRadius: 10, border: "0.5px solid rgba(0,0,0,0.1)", boxShadow: "0 4px 16px rgba(0,0,0,0.1)" }}
+            >
+              {activityNames.map((name) => {
+                const active = distFilter.includes(name);
+                const dist = distByActivity[name] || 0;
+                const displayDist = distUnit === "mi" ? (dist * KM_TO_MI).toFixed(1) : dist.toFixed(1);
+                const dotColor = ACTIVITY_COLORS[name] || "#999";
+                return (
+                  <button
+                    key={name}
+                    onClick={(e) => { e.stopPropagation(); toggleActivityFilter(name); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50"
+                  >
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }} />
+                    <span className="flex-1 text-left truncate" style={{ fontSize: 12, fontWeight: 500, color: "#1A1A1A" }}>{name}</span>
+                    <span style={{ fontSize: 11, color: "#999" }}>{displayDist} {distUnit}</span>
+                    <div
+                      className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
+                      style={{ border: `1.5px solid ${active ? "#6C47FF" : "#ccc"}`, background: active ? "#6C47FF" : "transparent" }}
+                    >
+                      {active && <Check size={10} color="#fff" />}
+                    </div>
+                  </button>
+                );
+              })}
+              {distFilter.length > 0 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setDistFilter([]); setDistDropdownOpen(false); }}
+                  className="w-full text-center py-1.5"
+                  style={{ fontSize: 11, color: "#6C47FF", fontWeight: 600, borderTop: "0.5px solid rgba(0,0,0,0.05)" }}
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
