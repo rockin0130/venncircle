@@ -971,7 +971,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
 
               case "study":
                 return (
-                  <section key={id} className="mb-6">
+                  <section key={sectionId} className="mb-6">
                     <HomeStudyWidget selectedDate={selectedDate} />
                   </section>
                 );
