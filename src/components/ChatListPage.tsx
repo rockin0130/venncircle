@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
-import { Search, Plus, MoreHorizontal, MessageCircle } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Search, Plus, MoreHorizontal, MessageCircle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, Group } from "@/context/AuthContext";
+import { useFriendships } from "@/hooks/useFriendships";
 
 interface LastMessage {
   content: string;
@@ -45,10 +46,31 @@ const ChatListPage = ({
   onOpenMore?: () => void;
 }) => {
   const { user, groups } = useAuth();
+  const { activeFriends } = useFriendships();
   const [previews, setPreviews] = useState<ChatPreview[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchFocused, setSearchFocused] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [newDmOpen, setNewDmOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!newDmOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setNewDmOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [newDmOpen]);
+
+  // Auto-focus search input when opened
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   useEffect(() => {
     if (!user || groups.length === 0) {
@@ -200,6 +222,26 @@ const ChatListPage = ({
     return other || null;
   };
 
+  // Friends not already in a DM
+  const friendsWithoutDm = useMemo(() => {
+    const dmUserIds = new Set<string>();
+    dmChats.forEach((p) => {
+      const other = p.group.members.find((m) => m.user_id !== user?.id);
+      if (other) dmUserIds.add(other.user_id);
+    });
+    return activeFriends.filter((f) => f.friend && !dmUserIds.has(f.friend.id));
+  }, [activeFriends, dmChats, user]);
+
+  const handleStartDm = (friendId: string) => {
+    // Find if there's already a group with just these two users
+    const existing = dmChats.find((p) => p.group.members.some((m) => m.user_id === friendId));
+    if (existing) {
+      onOpenChat(existing.group);
+    }
+    // TODO: Create a new DM group if none exists
+    setNewDmOpen(false);
+  };
+
   const renderGroupChatRow = (preview: ChatPreview, index: number) => {
     const coverUrl = preview.group.cover_image_url;
 
@@ -209,7 +251,6 @@ const ChatListPage = ({
         onClick={() => onOpenChat(preview.group)}
         className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-[rgba(0,0,0,0.03)] transition-colors"
       >
-        {/* Group avatar — rounded rect with cover photo or gradient */}
         <div
           className="w-[38px] h-[38px] shrink-0 overflow-hidden flex items-center justify-center"
           style={{
@@ -256,7 +297,6 @@ const ChatListPage = ({
         onClick={() => onOpenChat(preview.group)}
         className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-[rgba(0,0,0,0.03)] transition-colors"
       >
-        {/* Circular avatar with online dot */}
         <div className="relative w-[38px] h-[38px] shrink-0">
           <div
             className="w-full h-full rounded-full overflow-hidden flex items-center justify-center"
@@ -268,7 +308,6 @@ const ChatListPage = ({
               <span className="text-white text-[13px] font-bold">{getInitials(name)}</span>
             )}
           </div>
-          {/* Online dot — placeholder, always show for now */}
           <div
             className="absolute -bottom-0.5 -right-0.5 w-[9px] h-[9px] rounded-full border-[1.5px] border-white"
             style={{ backgroundColor: "#059669" }}
@@ -304,19 +343,15 @@ const ChatListPage = ({
         <h1 className="text-xl font-bold tracking-tight text-foreground">Chats</h1>
         <div className="flex items-center gap-1.5">
           <button
-            onClick={() => setSearchFocused(true)}
+            onClick={() => {
+              setSearchOpen((v) => !v);
+              if (searchOpen) setSearchQuery("");
+            }}
             className="w-[26px] h-[26px] rounded-full flex items-center justify-center"
-            style={{ background: "rgba(0,0,0,0.04)" }}
+            style={{ background: searchOpen ? "rgba(108,71,255,0.12)" : "rgba(0,0,0,0.04)" }}
             aria-label="Search"
           >
-            <Search size={13} color="#888" />
-          </button>
-          <button
-            className="w-[26px] h-[26px] rounded-full flex items-center justify-center"
-            style={{ background: "rgba(0,0,0,0.04)" }}
-            aria-label="New chat"
-          >
-            <Plus size={13} color="#888" />
+            {searchOpen ? <X size={13} color="#6C47FF" /> : <Search size={13} color="#888" />}
           </button>
           {onOpenMore && (
             <button
@@ -331,20 +366,26 @@ const ChatListPage = ({
         </div>
       </header>
 
-      {/* Search bar */}
-      <div className="px-5 pb-3 shrink-0">
-        <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-2" style={{ border: "0.5px solid rgba(0,0,0,0.07)" }}>
-          <Search size={14} className="text-muted-foreground shrink-0" />
-          <input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            placeholder="Search messages..."
-            className="flex-1 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground"
-          />
+      {/* Search bar — only visible when toggled */}
+      {searchOpen && (
+        <div className="px-5 pb-3 shrink-0 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-2" style={{ border: "0.5px solid rgba(0,0,0,0.07)" }}>
+            <Search size={14} className="text-muted-foreground shrink-0" />
+            <input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search messages..."
+              className="flex-1 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="shrink-0">
+                <X size={12} className="text-muted-foreground" />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -354,7 +395,7 @@ const ChatListPage = ({
           </div>
         )}
 
-        {!loading && previews.length === 0 && (
+        {!loading && previews.length === 0 && filteredDmChats.length === 0 && friendsWithoutDm.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <MessageCircle size={40} strokeWidth={1} className="mb-3 opacity-30" />
             <p className="text-xs font-medium">No chats yet</p>
@@ -371,11 +412,67 @@ const ChatListPage = ({
           </div>
         )}
 
-        {!loading && filteredDmChats.length > 0 && (
-          <div>
-            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-[0.08em] px-5 pt-4 pb-1.5">
-              Direct Messages
-            </p>
+        {/* Direct Messages section — always show header with + button */}
+        {!loading && (
+          <div className="relative" ref={dropdownRef}>
+            <div className="flex items-center justify-between px-5 pt-4 pb-1.5">
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
+                Direct Messages
+              </p>
+              <button
+                onClick={() => setNewDmOpen((v) => !v)}
+                className="w-[20px] h-[20px] rounded-full flex items-center justify-center"
+                style={{ background: newDmOpen ? "rgba(108,71,255,0.12)" : "rgba(0,0,0,0.06)" }}
+                aria-label="New direct message"
+              >
+                <Plus size={11} color={newDmOpen ? "#6C47FF" : "#888"} />
+              </button>
+            </div>
+
+            {/* Friends dropdown */}
+            {newDmOpen && (
+              <div
+                className="mx-5 mb-2 bg-white rounded-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200"
+                style={{
+                  border: "0.5px solid rgba(0,0,0,0.07)",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                  maxHeight: 220,
+                  overflowY: "auto",
+                }}
+              >
+                {friendsWithoutDm.length === 0 && activeFriends.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground text-center py-4">No friends yet</p>
+                )}
+                {friendsWithoutDm.length === 0 && activeFriends.length > 0 && (
+                  <p className="text-[11px] text-muted-foreground text-center py-4">All friends have a DM already</p>
+                )}
+                {friendsWithoutDm.map((f, i) => {
+                  if (!f.friend) return null;
+                  const color = DM_AVATAR_COLORS[i % DM_AVATAR_COLORS.length];
+                  return (
+                    <button
+                      key={f.friend.id}
+                      onClick={() => handleStartDm(f.friend!.id)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left active:bg-[rgba(0,0,0,0.03)] transition-colors"
+                    >
+                      <div
+                        className="w-[30px] h-[30px] rounded-full overflow-hidden flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: f.friend.avatar_url ? undefined : color }}
+                      >
+                        {f.friend.avatar_url ? (
+                          <img src={f.friend.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-white text-[11px] font-bold">{getInitials(f.friend.display_name)}</span>
+                        )}
+                      </div>
+                      <span className="text-[12px] font-medium text-foreground truncate">{f.friend.display_name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* DM rows */}
             {filteredDmChats.map((p, i) => renderDmRow(p, i))}
           </div>
         )}
