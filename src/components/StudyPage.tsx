@@ -197,6 +197,9 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const addInputRef = useRef<HTMLInputElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
 
+  const isPersonal = !activeGroup || (activeGroup as any)?._personal;
+  const groupId = isPersonal ? null : activeGroup?.id || null;
+
   // Ref to hold the active session ID to prevent re-render issues
   const activeSessionIdRef = useRef<string | null>(null);
   const startedAtRef = useRef<string | null>(null);
@@ -213,6 +216,8 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
 
   // Derive context key from current view
   const contextKey = isPersonal ? "__personal__" : (groupId || "__personal__");
+  const contextKeyRef = useRef(contextKey);
+  contextKeyRef.current = contextKey;
 
   // Helper to get/init a context's timer state
   const getCtxState = useCallback((key: string): ContextTimerState => {
@@ -243,9 +248,6 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     accumulatedSecondsRef.current = s.accumulatedSeconds;
     baseDurationRef.current = s.baseDuration;
   }, [contextKey, ctxResumeVersion, getCtxState]);
-
-  const isPersonal = !activeGroup || (activeGroup as any)?._personal;
-  const groupId = isPersonal ? null : activeGroup?.id || null;
 
   // Groups that have Study feature enabled
   const studyEnabledGroupIds = useMemo(() => {
