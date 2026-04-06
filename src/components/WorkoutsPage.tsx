@@ -953,7 +953,7 @@ const WorkoutsPage = ({
   const todayFormatted = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 
   return (
-    <div className="px-5 pb-24">
+    <div className="px-5 pb-24" style={{ background: "#F4F3F0", minHeight: "100vh" }}>
 
       {showCongrats && (
         <CongratsPopup type="workout" show={true} onClose={() => setShowCongrats(false)} />
