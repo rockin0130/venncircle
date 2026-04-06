@@ -197,21 +197,57 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const addInputRef = useRef<HTMLInputElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
 
-  // Resume state
-  const [lastStoppedSession, setLastStoppedSession] = useState<StudySession | null>(null);
-  const [lastStoppedAt, setLastStoppedAt] = useState<number | null>(null);
+  const isPersonal = !activeGroup || (activeGroup as any)?._personal;
+  const groupId = isPersonal ? null : activeGroup?.id || null;
 
   // Ref to hold the active session ID to prevent re-render issues
   const activeSessionIdRef = useRef<string | null>(null);
   const startedAtRef = useRef<string | null>(null);
 
-  // Timer tracking refs (source of truth for duration)
+  // ── Per-context timer state (keyed by context ID) ──
+  interface ContextTimerState {
+    lastStoppedSession: StudySession | null;
+    lastStoppedAt: number | null;
+    accumulatedSeconds: number;
+    baseDuration: number;
+  }
+  const contextTimerMapRef = useRef<Map<string, ContextTimerState>>(new Map());
+  const resumeWindowTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Derive context key from current view
+  const contextKey = isPersonal ? "__personal__" : (groupId || "__personal__");
+  const contextKeyRef = useRef(contextKey);
+  contextKeyRef.current = contextKey;
+
+  // Helper to get/init a context's timer state
+  const getCtxState = useCallback((key: string): ContextTimerState => {
+    if (!contextTimerMapRef.current.has(key)) {
+      contextTimerMapRef.current.set(key, { lastStoppedSession: null, lastStoppedAt: null, accumulatedSeconds: 0, baseDuration: 0 });
+    }
+    return contextTimerMapRef.current.get(key)!;
+  }, []);
+
+  // Reactive state derived from the current context's ref (triggers re-renders on context switch / pause / expiry)
+  const [ctxResumeVersion, setCtxResumeVersion] = useState(0);
+  const bumpResume = useCallback(() => setCtxResumeVersion(v => v + 1), []);
+
+  // Read current context state (reactive via ctxResumeVersion + contextKey)
+  const currentCtxState = useMemo(() => getCtxState(contextKey), [contextKey, ctxResumeVersion, getCtxState]);
+
+  // Convenience aliases matching old API
+  const lastStoppedSession = currentCtxState.lastStoppedSession;
+  const lastStoppedAt = currentCtxState.lastStoppedAt;
+
+  // Convenience refs that point to current context for use in callbacks
   const accumulatedSecondsRef = useRef(0);
   const baseDurationRef = useRef(0);
-  const resumeWindowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isPersonal = !activeGroup || (activeGroup as any)?._personal;
-  const groupId = isPersonal ? null : activeGroup?.id || null;
+  // Sync convenience refs from context map when context changes
+  useEffect(() => {
+    const s = getCtxState(contextKey);
+    accumulatedSecondsRef.current = s.accumulatedSeconds;
+    baseDurationRef.current = s.baseDuration;
+  }, [contextKey, ctxResumeVersion, getCtxState]);
 
   // Groups that have Study feature enabled
   const studyEnabledGroupIds = useMemo(() => {
@@ -414,8 +450,11 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const pauseSession = useCallback(async (totalElapsed: number) => {
     const sessionId = activeSessionIdRef.current;
     if (!sessionId) return;
+    const key = contextKeyRef.current;
+    const ctx = getCtxState(key);
+    ctx.accumulatedSeconds = totalElapsed;
     accumulatedSecondsRef.current = totalElapsed;
-    const finalDuration = baseDurationRef.current + totalElapsed;
+    const finalDuration = ctx.baseDuration + totalElapsed;
     const endedAt = new Date().toISOString();
     await supabase
       .from("study_sessions")
@@ -423,60 +462,88 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
       .eq("id", sessionId);
     const session = sessions.find(s => s.id === sessionId);
     if (session) {
-      setLastStoppedSession({ ...session, ended_at: endedAt, duration_seconds: finalDuration, is_active: false });
+      ctx.lastStoppedSession = { ...session, ended_at: endedAt, duration_seconds: finalDuration, is_active: false };
     }
-    setLastStoppedAt(Date.now());
+    ctx.lastStoppedAt = Date.now();
     setFullscreen(false);
     setActiveTick(0);
-    if (resumeWindowTimerRef.current) clearTimeout(resumeWindowTimerRef.current);
-    resumeWindowTimerRef.current = setTimeout(() => {
-      accumulatedSecondsRef.current = 0;
-      baseDurationRef.current = 0;
-      setLastStoppedSession(null);
-      setLastStoppedAt(null);
+    // Clear any existing resume window timer for this context
+    const existingTimer = resumeWindowTimersRef.current.get(key);
+    if (existingTimer) clearTimeout(existingTimer);
+    // Start 2-min window for THIS context only
+    const timer = setTimeout(() => {
+      const s = getCtxState(key);
+      s.accumulatedSeconds = 0;
+      s.baseDuration = 0;
+      s.lastStoppedSession = null;
+      s.lastStoppedAt = null;
+      resumeWindowTimersRef.current.delete(key);
+      // If user is currently viewing this context, update display
+      if (contextKeyRef.current === key) {
+        accumulatedSecondsRef.current = 0;
+        baseDurationRef.current = 0;
+        bumpResume();
+      }
     }, RESUME_WINDOW_MS);
+    resumeWindowTimersRef.current.set(key, timer);
+    bumpResume();
     fetchSessions();
     fetchGroupSessions();
-  }, [sessions, fetchSessions, fetchGroupSessions]);
+  }, [sessions, fetchSessions, fetchGroupSessions, getCtxState, bumpResume]);
 
   const startNewSession = useCallback(async () => {
     if (!user) return;
+    const key = contextKeyRef.current;
     const effectiveGroupId = groupId && studyEnabledGroupIds.has(groupId) ? groupId : null;
+    const ctx = getCtxState(key);
+    ctx.accumulatedSeconds = 0;
+    ctx.baseDuration = 0;
     accumulatedSecondsRef.current = 0;
     baseDurationRef.current = 0;
-    if (resumeWindowTimerRef.current) clearTimeout(resumeWindowTimerRef.current);
+    // Clear resume window timer for this context
+    const existingTimer = resumeWindowTimersRef.current.get(key);
+    if (existingTimer) { clearTimeout(existingTimer); resumeWindowTimersRef.current.delete(key); }
     await supabase
       .from("study_sessions")
       .insert({ user_id: user.id, subject: selectedSubject, group_id: effectiveGroupId, is_active: true, started_at: new Date().toISOString() } as any);
-    setLastStoppedSession(null);
-    setLastStoppedAt(null);
+    ctx.lastStoppedSession = null;
+    ctx.lastStoppedAt = null;
     setActiveTick(0);
     setFullscreen(true);
+    bumpResume();
     fetchSessions();
     fetchGroupSessions();
-  }, [user, selectedSubject, groupId, studyEnabledGroupIds, fetchSessions, fetchGroupSessions]);
+  }, [user, selectedSubject, groupId, studyEnabledGroupIds, fetchSessions, fetchGroupSessions, getCtxState, bumpResume]);
 
   const resumeSession = useCallback(async (sessionToResume: StudySession, fromList = false) => {
+    const key = contextKeyRef.current;
+    const ctx = getCtxState(key);
     if (fromList) {
+      ctx.baseDuration = sessionToResume.duration_seconds;
+      ctx.accumulatedSeconds = 0;
       baseDurationRef.current = sessionToResume.duration_seconds;
       accumulatedSecondsRef.current = 0;
     }
-    if (resumeWindowTimerRef.current) clearTimeout(resumeWindowTimerRef.current);
+    // Clear resume window timer for this context
+    const existingTimer = resumeWindowTimersRef.current.get(key);
+    if (existingTimer) { clearTimeout(existingTimer); resumeWindowTimersRef.current.delete(key); }
     await supabase
       .from("study_sessions")
       .update({ is_active: true, ended_at: null } as any)
       .eq("id", sessionToResume.id);
-    setLastStoppedSession(null);
-    setLastStoppedAt(null);
+    ctx.lastStoppedSession = null;
+    ctx.lastStoppedAt = null;
     setFullscreen(true);
+    bumpResume();
     fetchSessions();
     fetchGroupSessions();
-  }, [fetchSessions, fetchGroupSessions]);
+  }, [fetchSessions, fetchGroupSessions, getCtxState, bumpResume]);
 
-  // Cleanup resume window timer on unmount
+  // Cleanup all resume window timers on unmount
   useEffect(() => {
     return () => {
-      if (resumeWindowTimerRef.current) clearTimeout(resumeWindowTimerRef.current);
+      resumeWindowTimersRef.current.forEach(t => clearTimeout(t));
+      resumeWindowTimersRef.current.clear();
     };
   }, []);
 
