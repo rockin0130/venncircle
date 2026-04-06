@@ -599,7 +599,7 @@ const HomeScheduledSection = ({
                                 ) : (
                                   <span
                                     className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white flex-shrink-0"
-                                    style={{ background: MEMBER_COLORS[0] }}
+                                    style={{ background: MEMBER_COLORS[0].dot }}
                                   >
                                     {profile?.display_name?.[0]?.toUpperCase() || "?"}
                                   </span>
