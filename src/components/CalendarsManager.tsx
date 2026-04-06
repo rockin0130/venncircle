@@ -6,6 +6,14 @@ import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
+import { Capacitor } from "@capacitor/core";
+import { listDeviceCalendars, normalizeAppleCalendarColor } from "@/integrations/appleCalendar";
+import type { Calendar } from "@ebarooni/capacitor-calendar";
+import {
+  getHiddenAppleCalendarIds,
+  setAppleCalendarVisibleInApp,
+  APPLE_CALENDAR_VISIBILITY_CHANGED,
+} from "@/lib/appleCalendarVisibility";
 
 // ── Types ──
 
@@ -56,6 +64,9 @@ const CalendarsManager = ({ open, onClose }: Props) => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [contextVisRows, setContextVisRows] = useState<ContextVisRow[]>([]);
+  const [appleDeviceCalendars, setAppleDeviceCalendars] = useState<Calendar[]>([]);
+  const [appleCalendarsLoading, setAppleCalendarsLoading] = useState(false);
+  const [appleHiddenIds, setAppleHiddenIds] = useState(() => getHiddenAppleCalendarIds());
 
   // New calendar form
   const [showNewForm, setShowNewForm] = useState(false);
@@ -162,6 +173,38 @@ const CalendarsManager = ({ open, onClose }: Props) => {
       fetchContextVisibility();
     }
   }, [open, fetchCalendars, syncGoogleCalendars, fetchContextVisibility]);
+
+  useEffect(() => {
+    const sync = () => setAppleHiddenIds(getHiddenAppleCalendarIds());
+    window.addEventListener(APPLE_CALENDAR_VISIBILITY_CHANGED, sync);
+    return () => window.removeEventListener(APPLE_CALENDAR_VISIBILITY_CHANGED, sync);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    setAppleHiddenIds(getHiddenAppleCalendarIds());
+    if (!Capacitor.isNativePlatform()) {
+      setAppleDeviceCalendars([]);
+      return;
+    }
+    let cancelled = false;
+    setAppleCalendarsLoading(true);
+    listDeviceCalendars()
+      .then((list) => {
+        if (cancelled) return;
+        const sorted = [...list].sort((a, b) => a.title.localeCompare(b.title));
+        setAppleDeviceCalendars(sorted);
+      })
+      .catch(() => {
+        if (!cancelled) setAppleDeviceCalendars([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAppleCalendarsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   // Ensure default calendar exists
   useEffect(() => {
@@ -526,6 +569,49 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* ── APPLE (device) ── */}
+              {Capacitor.isNativePlatform() && (appleCalendarsLoading || appleDeviceCalendars.length > 0) && (
+                <div>
+                  <div className="flex items-center gap-2 py-2">
+                    <span className="text-base">🍎</span>
+                    <span className="text-[14px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Apple Calendar
+                    </span>
+                  </div>
+
+                  {appleCalendarsLoading ? (
+                    <div className="flex items-center justify-center py-6 bg-card rounded-xl border border-border">
+                      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="bg-card rounded-xl border border-border divide-y divide-border">
+                      {appleDeviceCalendars.map((cal) => (
+                        <div
+                          key={cal.id}
+                          className="flex items-center gap-3 px-4 py-3"
+                        >
+                          <div
+                            className="w-7 h-7 rounded-full flex-shrink-0 border border-border/40"
+                            style={{ backgroundColor: normalizeAppleCalendarColor(cal.color) }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[14px] font-medium text-foreground truncate">{cal.title}</p>
+                            <p className="text-[11px] text-muted-foreground">On this device</p>
+                          </div>
+                          <Switch
+                            checked={!appleHiddenIds.has(cal.id)}
+                            onCheckedChange={(v) => {
+                              setAppleCalendarVisibleInApp(cal.id, v);
+                              setAppleHiddenIds(getHiddenAppleCalendarIds());
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

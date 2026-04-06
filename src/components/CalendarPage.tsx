@@ -24,6 +24,10 @@ import CalendarItemDetailModal from "@/components/CalendarItemDetailModal";
 import CalendarCreateEditModal from "@/components/CalendarCreateEditModal";
 import CalendarsManager from "@/components/CalendarsManager";
 import CalendarUserFilter from "@/components/CalendarUserFilter";
+import {
+  getHiddenAppleCalendarIds,
+  APPLE_CALENDAR_VISIBILITY_CHANGED,
+} from "@/lib/appleCalendarVisibility";
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -230,6 +234,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   const [selectedItem, setSelectedItem] = useState<CalItem | null>(null);
   const [editingItem, setEditingItem] = useState<{ id: string; type: "event" | "task"; raw: ScheduledEvent | Task; isDueDateTask?: boolean; done?: boolean } | null>(null);
   const [showCalendarsManager, setShowCalendarsManager] = useState(false);
+  const [appleHiddenCalendarIds, setAppleHiddenCalendarIds] = useState(() => getHiddenAppleCalendarIds());
   const [userFilterIds, setUserFilterIds] = useState<Set<string>>(() => new Set(["__everyone__"]));
   const timeGridRef = useRef<HTMLDivElement>(null);
   const calFilterUsers = useCalendarFilterUsers();
@@ -244,6 +249,12 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   useEffect(() => {
     setUserFilterIds(new Set(["__everyone__"]));
   }, [activeGroup?.id, activeGroup === null]);
+
+  useEffect(() => {
+    const sync = () => setAppleHiddenCalendarIds(getHiddenAppleCalendarIds());
+    window.addEventListener(APPLE_CALENDAR_VISIBILITY_CHANGED, sync);
+    return () => window.removeEventListener(APPLE_CALENDAR_VISIBILITY_CHANGED, sync);
+  }, []);
 
   // ── Active context ID for calendar visibility ──
   const activeContextId = useMemo(() => {
@@ -516,8 +527,16 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
 
     if (showGoogleCalendar) {
       googleCalendarEvents.forEach((ge) => {
-        // Calendar visibility filter for Google Calendar events
-        if (hasCalendarData && ge.calendarId && !visibleProviderCalendarIds.has(ge.calendarId)) return;
+        // Google-synced calendars only: device Apple IDs are not in Supabase
+        if (
+          hasCalendarData &&
+          ge.calendarId &&
+          !ge.isApple &&
+          !visibleProviderCalendarIds.has(ge.calendarId)
+        ) {
+          return;
+        }
+        if (ge.isApple && ge.calendarId && appleHiddenCalendarIds.has(ge.calendarId)) return;
 
         const gcalStart = parseGoogleDateValue(ge.start);
         const gcalEnd = parseGoogleDateValue(ge.end) ?? gcalStart;
@@ -657,7 +676,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
     });
 
     return filtered;
-  }, [calFilteredEvents, calFilteredTasks, googleCalendarEvents, showGoogleCalendar, visibleCalendarIds, visibleProviderCalendarIds, calendarColorMap.defaultVisible, calendarRecords.length, userFilterIds, user?.id, groups]);
+  }, [calFilteredEvents, calFilteredTasks, googleCalendarEvents, showGoogleCalendar, visibleCalendarIds, visibleProviderCalendarIds, calendarColorMap.defaultVisible, calendarRecords.length, userFilterIds, user?.id, groups, appleHiddenCalendarIds]);
 
   const selectedDayItems = useMemo(
     () => getItemsForDate(selDay, selMonth, selYear),
@@ -1498,6 +1517,23 @@ const GoogleBadge = () => (
   </span>
 );
 
+const AppleBadge = () => (
+  <span className="inline-flex items-center justify-center w-4 h-4 flex-shrink-0" title="From Apple Calendar">
+    <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden>
+      <path
+        fill="currentColor"
+        className="text-foreground"
+        d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"
+      />
+    </svg>
+  </span>
+);
+
+function GcalProviderBadge({ raw }: { raw: GoogleCalendarEvent }) {
+  if (raw.isApple) return <AppleBadge />;
+  return <GoogleBadge />;
+}
+
 // ── Assignee Avatars Component ──────────────────────────────
 const AVATAR_COLORS = [
   "bg-blue-500", "bg-amber-500", "bg-emerald-500", "bg-pink-500",
@@ -1663,7 +1699,7 @@ const EventList = ({
                 <span className={`text-[13px] font-medium flex-1 truncate ${item.done ? "line-through opacity-40" : "text-foreground"}`}>
                   {item.title}
                 </span>
-                {item.type === "gcal" && <GoogleBadge />}
+                {item.type === "gcal" && <GcalProviderBadge raw={item.raw as GoogleCalendarEvent} />}
                 {item.isMultiDay && (
                   <span className="text-[10px] text-muted-foreground">multi-day</span>
                 )}
@@ -1698,7 +1734,7 @@ const EventList = ({
                 {displayTime}{displayEndTime && displayEndTime !== displayTime ? ` – ${displayEndTime}` : ""}
               </span>
             </div>
-            {item.type === "gcal" && <GoogleBadge />}
+            {item.type === "gcal" && <GcalProviderBadge raw={item.raw as GoogleCalendarEvent} />}
             {group && (
               <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
             )}
