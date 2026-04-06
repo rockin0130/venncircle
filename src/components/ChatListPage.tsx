@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { MessageCircle, Settings, Home, Compass, User, MoreHorizontal } from "lucide-react";
+import { Search, Plus, MoreHorizontal, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, Group } from "@/context/AuthContext";
 
@@ -16,18 +16,39 @@ interface ChatPreview {
   unreadCount: number;
 }
 
+const GROUP_AVATAR_COLORS = [
+  "linear-gradient(135deg, hsl(210,60%,75%), hsl(210,50%,60%))",
+  "linear-gradient(135deg, hsl(160,45%,72%), hsl(160,40%,55%))",
+  "linear-gradient(135deg, hsl(260,45%,78%), hsl(260,40%,62%))",
+  "linear-gradient(135deg, hsl(35,60%,75%), hsl(35,50%,60%))",
+  "linear-gradient(135deg, hsl(340,50%,78%), hsl(340,45%,62%))",
+  "linear-gradient(135deg, hsl(190,50%,75%), hsl(190,45%,58%))",
+];
+
+const DM_AVATAR_COLORS = [
+  "hsl(0, 72%, 63%)",
+  "hsl(160, 55%, 45%)",
+  "hsl(260, 55%, 60%)",
+  "hsl(210, 60%, 55%)",
+  "hsl(35, 70%, 55%)",
+  "hsl(190, 55%, 45%)",
+];
+
+const getInitials = (name: string) =>
+  name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+
 const ChatListPage = ({
   onOpenChat,
-  onOpenSettings,
   onOpenMore,
 }: {
   onOpenChat: (group: Group) => void;
-  onOpenSettings?: () => void;
   onOpenMore?: () => void;
 }) => {
   const { user, groups } = useAuth();
   const [previews, setPreviews] = useState<ChatPreview[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
 
   useEffect(() => {
     if (!user || groups.length === 0) {
@@ -93,7 +114,7 @@ const ChatListPage = ({
               if (p.group.id === msg.group_id) {
                 return {
                   ...p,
-                  lastMessage: { content: msg.content, created_at: msg.created_at, user_id: msg.user_id },
+                  lastMessage: { content: msg.content, created_at: msg.created_at, user_id: msg.user_id, metadata: msg.metadata },
                 };
               }
               return p;
@@ -116,23 +137,43 @@ const ChatListPage = ({
     };
   }, [user, groups]);
 
-  const homeChats = useMemo(() => previews.filter((p) => (p.group as any).category === "home"), [previews]);
-  const interestChats = useMemo(() => previews.filter((p) => (p.group as any).category === "interest"), [previews]);
-  // DMs: groups with exactly 2 members and no category distinction — heuristic
-  const dmChats = useMemo(() => previews.filter((p) => p.group.members.length === 2 && !(p.group as any).category), [previews]);
+  const groupChats = useMemo(
+    () => previews.filter((p) => (p.group as any)._personal !== true && p.group.id !== "__personal__" && p.group.members.length > 2),
+    [previews]
+  );
+  const dmChats = useMemo(
+    () => previews.filter((p) => (p.group as any)._personal !== true && p.group.id !== "__personal__" && p.group.members.length <= 2),
+    [previews]
+  );
+
+  const filteredGroupChats = useMemo(() => {
+    if (!searchQuery.trim()) return groupChats;
+    const q = searchQuery.toLowerCase();
+    return groupChats.filter((p) =>
+      p.group.name.toLowerCase().includes(q) ||
+      p.lastMessage?.content?.toLowerCase().includes(q)
+    );
+  }, [groupChats, searchQuery]);
+
+  const filteredDmChats = useMemo(() => {
+    if (!searchQuery.trim()) return dmChats;
+    const q = searchQuery.toLowerCase();
+    return dmChats.filter((p) =>
+      p.group.name.toLowerCase().includes(q) ||
+      p.lastMessage?.content?.toLowerCase().includes(q)
+    );
+  }, [dmChats, searchQuery]);
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);
     const now = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (d.toDateString() === now.toDateString()) {
-      return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    }
-    if (d.toDateString() === yesterday.toDateString()) {
-      return "Yesterday";
-    }
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHrs = Math.floor(diffMins / 60);
+    if (diffHrs < 24) return `${diffHrs}h ago`;
+    const diffDays = Math.floor(diffHrs / 24);
+    if (diffDays === 1) return "Yesterday";
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
@@ -143,90 +184,57 @@ const ChatListPage = ({
     return member?.display_name?.split(" ")[0] || "Someone";
   };
 
-  const getInitials = (name: string) =>
-    name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
-
-  const getMemberAvatars = (group: Group) => {
-    const others = group.members.filter((m) => m.user_id !== user?.id);
-    return others.slice(0, 3);
+  const getMessagePreview = (preview: ChatPreview) => {
+    if (!preview.lastMessage) return "No messages yet";
+    const sender = getSenderName(preview);
+    const meta = preview.lastMessage.metadata;
+    const content = meta?.type === "voice" ? "🎤 Voice memo"
+      : meta?.type === "image" ? "📷 Photo"
+      : meta?.type === "video" ? "🎥 Video"
+      : preview.lastMessage.content;
+    return `${sender}: ${content}`;
   };
 
-  const renderChatItem = (preview: ChatPreview) => {
-    const avatars = getMemberAvatars(preview.group);
-    const senderName = getSenderName(preview);
+  const getDmOther = (preview: ChatPreview) => {
+    const other = preview.group.members.find((m) => m.user_id !== user?.id);
+    return other || null;
+  };
+
+  const renderGroupChatRow = (preview: ChatPreview, index: number) => {
+    const coverUrl = preview.group.cover_image_url;
 
     return (
       <button
         key={preview.group.id}
         onClick={() => onOpenChat(preview.group)}
-        className="w-full flex items-center gap-3 px-1 py-3.5 border-b border-border/50 text-left hover:bg-secondary/40 active:scale-[0.98] transition-all"
+        className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-[rgba(0,0,0,0.03)] transition-colors"
       >
-        <div className="w-12 h-12 relative flex-shrink-0">
-          {avatars.length === 0 ? (
-            <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-lg">
-              {preview.group.emoji}
-            </div>
-          ) : avatars.length === 1 ? (
-            <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
-              {avatars[0].avatar_url ? (
-                <img src={avatars[0].avatar_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-sm font-bold text-foreground">
-                  {getInitials(avatars[0].display_name || "?")}
-                </span>
-              )}
-            </div>
+        {/* Group avatar — rounded rect with cover photo or gradient */}
+        <div
+          className="w-[38px] h-[38px] shrink-0 overflow-hidden flex items-center justify-center"
+          style={{
+            borderRadius: 11,
+            background: coverUrl ? undefined : GROUP_AVATAR_COLORS[index % GROUP_AVATAR_COLORS.length],
+          }}
+        >
+          {coverUrl ? (
+            <img src={coverUrl} alt="" className="w-full h-full object-cover" />
           ) : (
-            <>
-              <div className="absolute top-0 left-0 w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden ring-2 ring-background z-10">
-                {avatars[0].avatar_url ? (
-                  <img src={avatars[0].avatar_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-[10px] font-bold text-foreground">
-                    {getInitials(avatars[0].display_name || "?")}
-                  </span>
-                )}
-              </div>
-              <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden ring-2 ring-background">
-                {avatars[1].avatar_url ? (
-                  <img src={avatars[1].avatar_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-[10px] font-bold text-foreground">
-                    {getInitials(avatars[1].display_name || "?")}
-                  </span>
-                )}
-              </div>
-              {avatars.length > 2 && (
-                <div className="absolute bottom-0 left-4 w-6 h-6 rounded-full bg-muted flex items-center justify-center ring-2 ring-background z-20">
-                  <span className="text-[8px] font-bold text-muted-foreground">+{avatars.length - 2}</span>
-                </div>
-              )}
-            </>
+            <span className="text-white text-[13px] font-bold">{getInitials(preview.group.name)}</span>
           )}
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-2">
-            <h3 className="text-sm font-semibold truncate text-foreground">{preview.group.name}</h3>
+            <h3 className="text-[12px] font-medium text-foreground truncate">{preview.group.name}</h3>
             {preview.lastMessage && (
-              <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                {formatTime(preview.lastMessage.created_at)}
-              </span>
+              <span className="text-[10px] text-muted-foreground shrink-0">{formatTime(preview.lastMessage.created_at)}</span>
             )}
           </div>
           <div className="flex items-center justify-between gap-2 mt-0.5">
-            <p className="text-xs text-muted-foreground truncate">
-              {preview.lastMessage
-                ? `${senderName}: ${
-                    preview.lastMessage.metadata?.type === "voice" ? "🎤 Voice memo" :
-                    preview.lastMessage.metadata?.type === "image" ? "📷 Photo" :
-                    preview.lastMessage.metadata?.type === "video" ? "🎥 Video" :
-                    preview.lastMessage.content
-                  }`
-                : `${preview.group.members.length} member${preview.group.members.length !== 1 ? "s" : ""} · No messages yet`}
-            </p>
+            <p className="text-[11px] text-muted-foreground truncate">{getMessagePreview(preview)}</p>
             {preview.unreadCount > 0 && (
-              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+              <span className="shrink-0 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-1" style={{ backgroundColor: "#6C47FF" }}>
                 {preview.unreadCount}
               </span>
             )}
@@ -236,69 +244,140 @@ const ChatListPage = ({
     );
   };
 
-  const renderSection = (title: string, icon: React.ReactNode, items: ChatPreview[]) => {
-    if (items.length === 0) return null;
+  const renderDmRow = (preview: ChatPreview, index: number) => {
+    const other = getDmOther(preview);
+    const name = other?.display_name || preview.group.name;
+    const avatarUrl = other?.avatar_url;
+    const color = DM_AVATAR_COLORS[index % DM_AVATAR_COLORS.length];
+
     return (
-      <div className="mb-4">
-        <div className="flex items-center gap-2 px-1 pt-3 pb-2">
-          {icon}
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{title}</p>
+      <button
+        key={preview.group.id}
+        onClick={() => onOpenChat(preview.group)}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-[rgba(0,0,0,0.03)] transition-colors"
+      >
+        {/* Circular avatar with online dot */}
+        <div className="relative w-[38px] h-[38px] shrink-0">
+          <div
+            className="w-full h-full rounded-full overflow-hidden flex items-center justify-center"
+            style={{ backgroundColor: avatarUrl ? undefined : color }}
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-white text-[13px] font-bold">{getInitials(name)}</span>
+            )}
+          </div>
+          {/* Online dot — placeholder, always show for now */}
+          <div
+            className="absolute -bottom-0.5 -right-0.5 w-[9px] h-[9px] rounded-full border-[1.5px] border-white"
+            style={{ backgroundColor: "#059669" }}
+          />
         </div>
-        {items.map(renderChatItem)}
-      </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between gap-2">
+            <h3 className="text-[12px] font-medium text-foreground truncate">{name}</h3>
+            {preview.lastMessage && (
+              <span className="text-[10px] text-muted-foreground shrink-0">{formatTime(preview.lastMessage.created_at)}</span>
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <p className="text-[11px] text-muted-foreground truncate">
+              {preview.lastMessage ? getMessagePreview(preview) : "No messages yet"}
+            </p>
+            {preview.unreadCount > 0 && (
+              <span className="shrink-0 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-1" style={{ backgroundColor: "#6C47FF" }}>
+                {preview.unreadCount}
+              </span>
+            )}
+          </div>
+        </div>
+      </button>
     );
   };
 
   return (
-    <div className="px-5 flex flex-col h-[calc(100svh-5rem)]">
-      <header className="pt-12 pb-4 flex items-center justify-between flex-shrink-0">
-        <h1 className="text-[1.75rem] font-bold tracking-tight">Chats</h1>
+    <div className="flex flex-col h-[calc(100svh-5rem)]" style={{ backgroundColor: "#F4F3F0" }}>
+      {/* Header */}
+      <header className="px-5 pt-12 pb-2 flex items-center justify-between shrink-0">
+        <h1 className="text-xl font-bold tracking-tight text-foreground">Chats</h1>
         <div className="flex items-center gap-1.5">
-          {onOpenSettings && (
-            <button
-              onClick={onOpenSettings}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              aria-label="Settings"
-            >
-              <Settings size={18} />
-            </button>
-          )}
+          <button
+            onClick={() => setSearchFocused(true)}
+            className="w-[26px] h-[26px] rounded-full flex items-center justify-center"
+            style={{ background: "rgba(0,0,0,0.04)" }}
+            aria-label="Search"
+          >
+            <Search size={13} color="#888" />
+          </button>
+          <button
+            className="w-[26px] h-[26px] rounded-full flex items-center justify-center"
+            style={{ background: "rgba(0,0,0,0.04)" }}
+            aria-label="New chat"
+          >
+            <Plus size={13} color="#888" />
+          </button>
           {onOpenMore && (
-            <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
-              <MoreHorizontal size={15} color="#888" />
+            <button
+              onClick={onOpenMore}
+              className="w-[26px] h-[26px] rounded-full flex items-center justify-center"
+              style={{ background: "rgba(0,0,0,0.04)" }}
+              aria-label="More"
+            >
+              <MoreHorizontal size={13} color="#888" />
             </button>
           )}
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto -webkit-overflow-scrolling-touch">
+      {/* Search bar */}
+      <div className="px-5 pb-3 shrink-0">
+        <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-2" style={{ border: "0.5px solid rgba(0,0,0,0.07)" }}>
+          <Search size={14} className="text-muted-foreground shrink-0" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            placeholder="Search messages..."
+            className="flex-1 bg-transparent text-[12px] outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+      </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
         {loading && (
           <div className="flex justify-center py-12">
-            <span className="text-sm text-muted-foreground">Loading chats...</span>
+            <span className="text-xs text-muted-foreground">Loading chats...</span>
           </div>
         )}
 
         {!loading && previews.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            <MessageCircle size={48} strokeWidth={1} className="mb-4 opacity-40" />
-            <p className="text-sm font-medium">No group chats yet</p>
-            <p className="text-xs mt-1">Join or create a group to start chatting</p>
+            <MessageCircle size={40} strokeWidth={1} className="mb-3 opacity-30" />
+            <p className="text-xs font-medium">No chats yet</p>
+            <p className="text-[10px] mt-1">Join or create a group to start chatting</p>
           </div>
         )}
 
-        {!loading && (
-          <>
-            {renderSection("Home Groups", <Home size={12} className="text-muted-foreground" />, homeChats)}
-            {renderSection("Shared Interests", <Compass size={12} className="text-muted-foreground" />, interestChats)}
-            {renderSection("Direct Messages", <User size={12} className="text-muted-foreground" />, dmChats)}
+        {!loading && filteredGroupChats.length > 0 && (
+          <div>
+            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-[0.08em] px-5 pt-3 pb-1.5">
+              My Group Chats
+            </p>
+            {filteredGroupChats.map((p, i) => renderGroupChatRow(p, i))}
+          </div>
+        )}
 
-            {/* Show uncategorized groups that don't fit the above sections */}
-            {previews.filter(p => !homeChats.includes(p) && !interestChats.includes(p) && !dmChats.includes(p)).length > 0 && (
-              renderSection("Other", <MessageCircle size={12} className="text-muted-foreground" />,
-                previews.filter(p => !homeChats.includes(p) && !interestChats.includes(p) && !dmChats.includes(p))
-              )
-            )}
-          </>
+        {!loading && filteredDmChats.length > 0 && (
+          <div>
+            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-[0.08em] px-5 pt-4 pb-1.5">
+              Direct Messages
+            </p>
+            {filteredDmChats.map((p, i) => renderDmRow(p, i))}
+          </div>
         )}
       </div>
     </div>
