@@ -1239,7 +1239,7 @@ const WorkoutsPage = ({
                             readOnly={(!!w.ownerUserId && w.ownerUserId !== user?.id) || w.id.startsWith("hk-")}
                             progress={workoutProgress[w.id]?.progress}
                             onCopyWorkout={handleCopyWorkout}
-                            accentBorder={`border-l-[${colColor.border}]`}
+                            accentBorder={colColor.border}
                           />
                         );
                       })
