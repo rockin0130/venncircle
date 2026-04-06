@@ -495,7 +495,7 @@ const ShoppingListPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
                 {(profile?.display_name || "U")[0].toUpperCase()}
               </span>
             )}
-            <span>All</span>
+            <span>Mine</span>
           </button>
 
           {shoppingGroups.map((group, index) => {

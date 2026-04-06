@@ -1004,7 +1004,7 @@ const NutritionPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => 
         </div>
       </div>
 
-      <PageGroupSelector page="nutrition" personalLabel="All" hideAllPill showAvatars />
+      <PageGroupSelector page="nutrition" personalLabel="Mine" hideAllPill showAvatars />
       <NutritionUserFilter selectedUserIds={selectedUserIds} onSelectionChange={handlePillChange} />
 
       {/* ─── Date Strip ─── */}
