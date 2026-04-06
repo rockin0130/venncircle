@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { X, Plus, Trash2, Search, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, MapPin, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WorkoutType as HealthWorkoutType } from "@capgo/capacitor-health";
@@ -27,9 +27,10 @@ interface CustomWorkoutBuilderProps {
   onClose: () => void;
   onAdd: (workouts: Workout[]) => void;
   selectedDate: string;
+  recentWorkouts?: Workout[];
 }
 
-const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWorkoutBuilderProps) => {
+const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate, recentWorkouts = [] }: CustomWorkoutBuilderProps) => {
   const { user, activeGroup, groups } = useAuth();
   const [step, setStep] = useState<Step>("type");
   const [title, setTitle] = useState("");
