@@ -1059,7 +1059,7 @@ const WorkoutsPage = ({
         </div>
       </header>
 
-      <PageGroupSelector page="workout" personalLabel="Mine" hideAllPill />
+      <PageGroupSelector page="workout" personalLabel="All" hideAllPill showAvatars />
 
       {/* User filter pills */}
       {!isPersonalView && (

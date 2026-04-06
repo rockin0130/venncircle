@@ -26,7 +26,7 @@ const SobrietyUserFilter = ({ selectedUserIds, onSelectionChange }: SobrietyUser
     const users: FilterUser[] = [];
     users.push({
       id: user?.id || "me",
-      label: "Mine",
+      label: "Me",
       avatarUrl: profile?.avatar_url || null,
       initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?",
     });
