@@ -1451,14 +1451,17 @@ const WorkoutCard = ({
 
       <motion.div
         layout
-        className={`bg-card rounded-xl border overflow-hidden transition-all ${
-          workout.done ? "border-habit-green/50" : "border-border"
-        } ${accentBorder ? "border-l-[3px]" : ""}`}
-        style={accentBorder?.startsWith("#") ? { borderLeftColor: accentBorder, borderLeftWidth: 3 } : undefined}
+        className={`overflow-hidden transition-all ${accentBorder ? "border-l-[3px]" : ""}`}
+        style={{
+          background: "#fff",
+          borderRadius: accentBorder ? "0 14px 14px 0" : 14,
+          border: "0.5px solid rgba(0,0,0,0.07)",
+          ...(accentBorder?.startsWith("#") ? { borderLeftColor: accentBorder, borderLeftWidth: 2.5 } : {}),
+        }}
       >
-        <div className="p-3.5 flex items-center gap-3">
+        <div style={{ padding: "11px 13px" }} className="flex items-center gap-3">
           {/* Emoji icon in colored square */}
-          <div className="w-[34px] h-[34px] rounded-lg bg-primary/8 flex items-center justify-center flex-shrink-0">
+          <div className="flex-shrink-0 flex items-center justify-center" style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(0,0,0,0.04)" }}>
             <span className="text-lg">{workout.emoji}</span>
           </div>
 
@@ -1466,31 +1469,27 @@ const WorkoutCard = ({
           <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowDetail(true)}>
             <div className="flex items-center gap-1.5 min-w-0">
               {isHealthKitEntry && (
-                <span className="text-[12px] shrink-0 leading-none" title="Apple Health">
-                  🍎
-                </span>
+                <span className="text-[12px] shrink-0 leading-none" title="Apple Health">🍎</span>
               )}
-              <p className={`text-[14px] font-semibold truncate ${workout.done ? "line-through text-muted-foreground" : ""}`}>{workout.title}</p>
+              <p style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }} className="truncate">{workout.title}</p>
             </div>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: "#F4F3F0", color: "#888" }}>
                 <Clock size={9} /> {workout.duration}
               </span>
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
-                <Flame size={9} /> {workout.cal} cal
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: "#F4F3F0", color: "#888" }}>
+                <Flame size={9} /> {workout.cal} kcal
               </span>
               {workout.tag && (
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${tagColor}`}>
-                  {workout.tag}
-                </span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${tagColor}`}>{workout.tag}</span>
               )}
               {distFmt && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: "#F4F3F0", color: "#888" }}>
                   <Footprints size={9} /> {distFmt.value} {distFmt.unit}
                 </span>
               )}
               {workout.heartRateAvg != null && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: "#F4F3F0", color: "#888" }}>
                   <Heart size={9} /> {workout.heartRateAvg} bpm
                 </span>
               )}
@@ -1509,20 +1508,13 @@ const WorkoutCard = ({
           <div
             role={readOnly ? undefined : "button"}
             onClick={readOnly ? undefined : (e) => { e.stopPropagation(); onToggle(workout.id); }}
-            className={`relative w-7 h-7 flex items-center justify-center flex-shrink-0 ${readOnly ? "pointer-events-none" : "cursor-pointer"}`}
+            className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${readOnly ? "pointer-events-none" : "cursor-pointer"} transition-all`}
+            style={{
+              background: workout.done ? "#1a1a1a" : "transparent",
+              border: workout.done ? "none" : "2px solid rgba(0,0,0,0.15)",
+            }}
           >
-            <svg className="absolute inset-0 w-7 h-7 -rotate-90" viewBox="0 0 28 28">
-              <circle cx="14" cy="14" r="11" fill="none" stroke="currentColor" className="text-muted-foreground/20" strokeWidth="2" />
-              {(progress || 0) > 0 && !workout.done && (
-                <circle cx="14" cy="14" r="11" fill="none" stroke="currentColor" className="text-habit-green" strokeWidth="2"
-                  strokeDasharray={`${((progress || 0) / 100) * 69.12} 69.12`} strokeLinecap="round" />
-              )}
-            </svg>
-            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all z-10 ${
-              workout.done ? "bg-habit-green border-habit-green" : "border-transparent"
-            }`}>
-              {workout.done && <Check size={12} className="text-primary-foreground" />}
-            </div>
+            {workout.done && <Check size={14} color="#fff" />}
           </div>
         </div>
       </motion.div>
