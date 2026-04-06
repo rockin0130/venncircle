@@ -1842,11 +1842,27 @@ const TimeGridView = ({
   );
 };
 
-// ── Week View (5-day scrollable layout) ──────────────────
+// ── Week View (5-day sliding window) ─────────────────────
 const WEEK_COL_WIDTH = 62;
 const WEEK_TIME_COL = 34;
 const WEEK_VISIBLE_DAYS = 5;
 const WEEK_HOUR_HEIGHT = 60;
+const WEEK_CONTAINER_WIDTH = WEEK_TIME_COL + WEEK_VISIBLE_DAYS * WEEK_COL_WIDTH;
+
+// Richer light backgrounds per member color
+const MEMBER_LIGHT_BG: Record<string, string> = {
+  "#3B82F6": "#EEF4FF",
+  "#10B981": "#F0FDF4",
+  "#EC4899": "#FFF0F0",
+  "#F59E0B": "#FFF8E1",
+  "#14B8A6": "#F0FDFA",
+  "#F97316": "#FFF7ED",
+  "#8B5CF6": "#FAF5FF",
+};
+
+function memberLightBg(color: string): string {
+  return MEMBER_LIGHT_BG[color] || color + "22";
+}
 
 const WeekView = ({
   selectedDate, setSelectedDate, getItemsForDate, groups, timeGridRef, onItemTap, colorMap, filterUsers, userFilterIds, currentUserId,
@@ -1863,43 +1879,62 @@ const WeekView = ({
   currentUserId: string;
 }) => {
   const { profile } = useAuth();
-  const today = new Date();
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [scrollOffset, setScrollOffset] = useState(0);
+  const todayRef = useRef(new Date());
+  // windowStart = the leftmost date index offset from today (0 = today is leftmost)
+  const [windowStart, setWindowStart] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const [swiping, setSwiping] = useState(false);
 
-  // Generate 60 days: 15 before today, 45 after
-  const allDates = useMemo(() => {
+  // The 5 visible dates
+  const visibleDates = useMemo(() => {
     const dates: Date[] = [];
-    for (let i = -15; i <= 45; i++) dates.push(addDays(today, i));
+    for (let i = 0; i < WEEK_VISIBLE_DAYS; i++) {
+      dates.push(addDays(todayRef.current, windowStart + i));
+    }
     return dates;
-  }, []);
+  }, [windowStart]);
 
-  // Today index in allDates array
-  const todayIdx = 15;
-
-  // Sync horizontal scroll
-  const handleScroll = useCallback(() => {
-    if (scrollContainerRef.current) {
-      setScrollOffset(scrollContainerRef.current.scrollLeft);
-    }
-  }, []);
-
-  // Scroll to today on mount
-  useEffect(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollLeft = todayIdx * WEEK_COL_WIDTH;
-      setScrollOffset(todayIdx * WEEK_COL_WIDTH);
-    }
-  }, []);
-
-  // Build items per date
+  // Build items per visible date
   const dateItems = useMemo(() => {
-    return allDates.map((d) => ({
+    return visibleDates.map((d) => ({
       date: d,
       items: getItemsForDate(d.getDate(), d.getMonth(), d.getFullYear()),
-      isToday: isSameDay(d, today),
+      isToday: isSameDay(d, todayRef.current),
     }));
-  }, [allDates, getItemsForDate]);
+  }, [visibleDates, getItemsForDate]);
+
+  // Swipe handlers for the unified container
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    setSwiping(false);
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    // Only trigger horizontal swipe if horizontal movement > vertical and > threshold
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (deltaX < 0) {
+        // Swipe left → shift window forward
+        setWindowStart((prev) => prev + 1);
+      } else {
+        // Swipe right → shift window back
+        setWindowStart((prev) => prev - 1);
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  }, []);
+
+  // Scroll time grid to 8am on mount
+  useEffect(() => {
+    if (timeGridRef.current) {
+      timeGridRef.current.scrollTop = 8 * WEEK_HOUR_HEIGHT;
+    }
+  }, []);
 
   // Get member dots for a date
   const getMemberDots = useCallback((items: CalItem[]): string[] => {
@@ -1930,27 +1965,20 @@ const WeekView = ({
         if (seen.has(uid)) return;
         if (filterUsers.length > 0) {
           const fu = filterUsers.find(u => u.id === uid);
-          if (fu) {
-            seen.add(uid);
-            dots.push(MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot);
-          }
+          if (fu) { seen.add(uid); dots.push(MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot); }
         } else {
-          if (!seen.has(currentUserId)) {
-            seen.add(currentUserId);
-            dots.push(MEMBER_COLORS[0].dot);
-          }
+          if (!seen.has(currentUserId)) { seen.add(currentUserId); dots.push(MEMBER_COLORS[0].dot); }
         }
       });
     });
     return dots.slice(0, 3);
   }, [filterUsers, groups, currentUserId]);
 
-  // Layout overlapping events in a column
+  // Layout overlapping events
   const layoutEventsInCol = (items: CalItem[]) => {
     const timed = items.filter((it) => !it.allDay && it.hour != null);
     const sorted = [...timed].sort((a, b) => (a.hour ?? 0) - (b.hour ?? 0));
     const positioned: { item: CalItem; col: number; totalCols: number }[] = [];
-
     sorted.forEach((item) => {
       const startH = item.hour!;
       const endH = item.endHour ?? startH + 1;
@@ -1968,7 +1996,6 @@ const WeekView = ({
       group.forEach((g) => { g.totalCols = maxCol; });
       overlapping.forEach((o) => { o.totalCols = maxCol; });
     });
-
     return positioned;
   };
 
@@ -1989,9 +2016,38 @@ const WeekView = ({
     return resolveItemColor(item, groups, colorMap);
   };
 
-  // Get a lighter bg version of a color
-  const getLightBg = (color: string): string => color + "18";
-  const getDarkText = (color: string): string => color;
+  // Resolve member info — never returns "?"
+  const resolveMemberInfo = useCallback((uid: string): { initial: string; color: string; avatarUrl: string | null } => {
+    // Check filterUsers first
+    const fu = filterUsers.find(u => u.id === uid);
+    if (fu) {
+      return {
+        initial: fu.initial,
+        color: MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot,
+        avatarUrl: fu.avatarUrl || null,
+      };
+    }
+    // Check if it's current user
+    if (uid === currentUserId) {
+      return {
+        initial: profile?.display_name?.charAt(0)?.toUpperCase() || "U",
+        color: MEMBER_COLORS[0].dot,
+        avatarUrl: profile?.avatar_url || null,
+      };
+    }
+    // Search across all groups for this member
+    for (const grp of groups) {
+      const member = grp.members?.find((m: any) => m.user_id === uid);
+      if (member) {
+        return {
+          initial: (member.display_name || "M").charAt(0).toUpperCase(),
+          color: MEMBER_COLORS[1].dot,
+          avatarUrl: member.avatar_url || null,
+        };
+      }
+    }
+    return { initial: "M", color: MEMBER_COLORS[0].dot, avatarUrl: null };
+  }, [filterUsers, currentUserId, profile, groups]);
 
   // Member avatar dot for event cards
   const MemberDot = ({ item }: { item: CalItem }) => {
@@ -2014,35 +2070,29 @@ const WeekView = ({
           .forEach((m: any) => memberIds.push(m.user_id));
       }
     }
+    if (memberIds.length === 0) memberIds.push(ownerId);
 
     return (
       <div className="flex -space-x-1 mt-auto">
         {memberIds.map((uid) => {
-          const fu = filterUsers.find(u => u.id === uid);
-          const memberColor = fu ? MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot : MEMBER_COLORS[0].dot;
-          const initial = fu ? fu.initial : (uid === currentUserId ? (profile?.display_name?.charAt(0)?.toUpperCase() || "?") : "?");
-          const avatarUrl = fu?.avatarUrl || (uid === currentUserId ? profile?.avatar_url : null);
-          return avatarUrl ? (
-            <img key={uid} src={avatarUrl} alt={initial}
+          const info = resolveMemberInfo(uid);
+          return info.avatarUrl ? (
+            <img key={uid} src={info.avatarUrl} alt={info.initial}
               className="rounded-full object-cover border"
               style={{ width: 12, height: 12, borderColor: "hsl(var(--card))" }}
               onError={(e) => {
                 const span = document.createElement("span");
                 span.className = "inline-flex items-center justify-center rounded-full font-bold leading-none";
-                span.style.width = "12px";
-                span.style.height = "12px";
-                span.style.fontSize = "6px";
-                span.style.backgroundColor = memberColor;
-                span.style.color = "white";
-                span.textContent = initial;
+                span.style.cssText = `width:12px;height:12px;font-size:6px;background:${info.color};color:white`;
+                span.textContent = info.initial;
                 (e.target as HTMLElement).replaceWith(span);
               }}
             />
           ) : (
             <span key={uid}
               className="inline-flex items-center justify-center rounded-full font-bold leading-none text-white"
-              style={{ width: 12, height: 12, fontSize: 6, backgroundColor: memberColor }}>
-              {initial}
+              style={{ width: 12, height: 12, fontSize: 6, backgroundColor: info.color }}>
+              {info.initial}
             </span>
           );
         })}
@@ -2050,147 +2100,139 @@ const WeekView = ({
     );
   };
 
-  const totalWidth = allDates.length * WEEK_COL_WIDTH;
-
   return (
-    <div>
-      {/* Synced scrollable container */}
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="overflow-x-auto overflow-y-hidden"
-        style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
-      >
-        <style>{`.week-scroll::-webkit-scrollbar { display: none; }`}</style>
-        <div className="week-scroll" style={{ width: totalWidth + WEEK_TIME_COL }}>
-          {/* ── Day Strip ── */}
-          <div className="flex" style={{ paddingLeft: WEEK_TIME_COL }}>
-            {dateItems.map((col, i) => {
-              const dots = getMemberDots(col.items);
-              return (
-                <div key={i} className="flex flex-col items-center py-1.5"
-                  style={{ width: WEEK_COL_WIDTH, flexShrink: 0 }}>
-                  <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {DAYS_ABBR[col.date.getDay()]}
-                  </span>
-                  <span className={cn(
-                    "w-7 h-7 flex items-center justify-center rounded-full text-[13px] font-semibold mt-0.5",
-                    col.isToday ? "text-primary-foreground" : "text-foreground"
-                  )}
-                    style={col.isToday ? { backgroundColor: "#1a1a1a", color: "white" } : undefined}
-                  >
-                    {col.date.getDate()}
-                  </span>
-                  <div className="flex gap-[2px] mt-0.5 h-[5px]">
-                    {dots.map((c, di) => (
-                      <span key={di} className="rounded-full" style={{ width: 5, height: 5, backgroundColor: c }} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* ── All-day strip ── */}
-          {dateItems.some((c) => c.items.some((it) => it.allDay || it.isDueDateTask)) && (
-            <div className="flex border-t border-b border-border">
-              <div className="flex items-center justify-end pr-1 text-[9px] text-muted-foreground"
-                style={{ width: WEEK_TIME_COL, flexShrink: 0 }}>all day</div>
-              {dateItems.map((col, ci) => (
-                <div key={ci} className="border-l border-border p-0.5"
-                  style={{ width: WEEK_COL_WIDTH, flexShrink: 0, minHeight: 24 }}>
-                  {col.items.filter((it) => it.allDay || it.isDueDateTask).map((it) => {
-                    const color = it.isDueDateTask ? TODO_COLOR : getPersonColor(it);
-                    return (
-                      <button key={it.id} onClick={() => onItemTap?.(it)}
-                        className="w-full flex items-center gap-0.5 text-left rounded px-0.5 py-0.5 mb-0.5 hover:opacity-80 active:opacity-60 transition-opacity truncate"
-                        style={{ backgroundColor: getLightBg(color) }}>
-                        <MemberDot item={it} />
-                        <span className="text-[8px] font-medium truncate" style={{ color: getDarkText(color) }}>
-                          {it.title}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── Time grid ── */}
-          <div ref={timeGridRef} className="overflow-y-auto relative" style={{ maxHeight: 310 }}>
-            <div className="flex" style={{ height: 24 * WEEK_HOUR_HEIGHT }}>
-              {/* Time labels */}
-              <div className="relative" style={{ width: WEEK_TIME_COL, flexShrink: 0 }}>
-                {HOURS.map((h) => (
-                  <div key={h} className="absolute w-full text-right pr-1 text-[9px] text-muted-foreground"
-                    style={{ top: h * WEEK_HOUR_HEIGHT - 5 }}>
-                    {h === 0 ? "" : h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`}
-                  </div>
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{ width: WEEK_CONTAINER_WIDTH, maxWidth: "100%", margin: "0 auto", overflow: "hidden" }}
+    >
+      {/* ── Day Strip ── */}
+      <div className="flex">
+        <div style={{ width: WEEK_TIME_COL, flexShrink: 0 }} />
+        {dateItems.map((col, i) => {
+          const dots = getMemberDots(col.items);
+          return (
+            <div key={getLocalDateKey(col.date)} className="flex flex-col items-center py-1.5"
+              style={{ width: WEEK_COL_WIDTH, flexShrink: 0 }}>
+              <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                {DAYS_ABBR[col.date.getDay()]}
+              </span>
+              <span className={cn(
+                "w-7 h-7 flex items-center justify-center rounded-full text-[13px] font-semibold mt-0.5",
+                !col.isToday && "text-foreground"
+              )}
+                style={col.isToday ? { backgroundColor: "#1a1a1a", color: "white" } : undefined}
+              >
+                {col.date.getDate()}
+              </span>
+              <div className="flex gap-[2px] mt-0.5 h-[5px]">
+                {dots.map((c, di) => (
+                  <span key={di} className="rounded-full" style={{ width: 5, height: 5, backgroundColor: c }} />
                 ))}
               </div>
+            </div>
+          );
+        })}
+      </div>
 
-              {/* Day columns */}
-              {dateItems.map((col, ci) => {
-                const positioned = layoutEventsInCol(col.items);
+      {/* ── All-day strip ── */}
+      {dateItems.some((c) => c.items.some((it) => it.allDay || it.isDueDateTask)) && (
+        <div className="flex border-t border-b border-border">
+          <div className="flex items-center justify-end pr-1 text-[9px] text-muted-foreground"
+            style={{ width: WEEK_TIME_COL, flexShrink: 0 }}>all day</div>
+          {dateItems.map((col, ci) => (
+            <div key={ci} className="border-l border-border p-0.5"
+              style={{ width: WEEK_COL_WIDTH, flexShrink: 0, minHeight: 24 }}>
+              {col.items.filter((it) => it.allDay || it.isDueDateTask).map((it) => {
+                const color = it.isDueDateTask ? TODO_COLOR : getPersonColor(it);
                 return (
-                  <div key={ci} className="relative border-l border-border"
-                    style={{ width: WEEK_COL_WIDTH, flexShrink: 0 }}>
-                    {/* Hour lines */}
-                    {HOURS.map((h) => (
-                      <div key={h} className="absolute border-t border-border/60"
-                        style={{ top: h * WEEK_HOUR_HEIGHT, width: "100%" }} />
-                    ))}
-
-                    {/* Now line */}
-                    {col.isToday && (() => {
-                      const now = new Date();
-                      const nowPos = (now.getHours() + now.getMinutes() / 60) * WEEK_HOUR_HEIGHT;
-                      return (
-                        <div className="absolute z-10" style={{ top: nowPos, width: "100%" }}>
-                          <div className="w-2 h-2 rounded-full absolute -left-1 -top-[3px]" style={{ backgroundColor: "hsl(var(--destructive))" }} />
-                          <div className="h-[2px] w-full" style={{ backgroundColor: "hsl(var(--destructive))" }} />
-                        </div>
-                      );
-                    })()}
-
-                    {/* Event cards */}
-                    {positioned.map(({ item, col: colIdx, totalCols }) => {
-                      const color = getPersonColor(item);
-                      const top = item.hour! * WEEK_HOUR_HEIGHT;
-                      const endH = item.endHour ?? item.hour! + 1;
-                      const duration = Math.max(endH - item.hour!, 0.25);
-                      const height = Math.max(duration * WEEK_HOUR_HEIGHT, 20);
-                      const colW = (WEEK_COL_WIDTH - 2) / totalCols;
-                      const left = colIdx * colW + 1;
-
-                      return (
-                        <button key={item.id} onClick={() => onItemTap?.(item)}
-                          className="absolute overflow-hidden cursor-pointer text-left hover:brightness-105 active:brightness-95 transition-all flex flex-col"
-                          style={{
-                            top, height, width: colW, left,
-                            backgroundColor: getLightBg(color),
-                            borderLeft: `3px solid ${color}`,
-                            borderRadius: "0 7px 7px 0",
-                          }}>
-                          <p className="text-[9px] font-medium leading-tight px-1 pt-0.5 truncate"
-                            style={{ color: getDarkText(color) }}>
-                            {item.title}
-                          </p>
-                          {height > 24 && (
-                            <p className="text-[7px] px-1 truncate" style={{ color: getDarkText(color), opacity: 0.7 }}>
-                              {item.type === "gcal" ? new Date(item.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : formatTime(item.time)}
-                            </p>
-                          )}
-                          {height > 36 && <div className="px-1 pb-0.5"><MemberDot item={item} /></div>}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <button key={it.id} onClick={() => onItemTap?.(it)}
+                    className="w-full flex items-center gap-0.5 text-left rounded px-0.5 py-0.5 mb-0.5 hover:opacity-80 active:opacity-60 transition-opacity truncate"
+                    style={{ backgroundColor: memberLightBg(color) }}>
+                    <MemberDot item={it} />
+                    <span className="text-[8px] font-medium truncate" style={{ color }}>
+                      {it.title}
+                    </span>
+                  </button>
                 );
               })}
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Time grid ── */}
+      <div ref={timeGridRef} className="overflow-y-auto relative" style={{ maxHeight: 310 }}>
+        <div className="flex" style={{ height: 24 * WEEK_HOUR_HEIGHT }}>
+          {/* Time labels — fixed left */}
+          <div className="relative" style={{ width: WEEK_TIME_COL, flexShrink: 0 }}>
+            {HOURS.map((h) => (
+              <div key={h} className="absolute w-full text-right pr-1 text-[9px] text-muted-foreground"
+                style={{ top: h * WEEK_HOUR_HEIGHT - 5 }}>
+                {h === 0 ? "" : h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`}
+              </div>
+            ))}
           </div>
+
+          {/* Day columns */}
+          {dateItems.map((col, ci) => {
+            const positioned = layoutEventsInCol(col.items);
+            return (
+              <div key={getLocalDateKey(col.date)} className="relative border-l border-border"
+                style={{ width: WEEK_COL_WIDTH, flexShrink: 0 }}>
+                {/* Hour lines */}
+                {HOURS.map((h) => (
+                  <div key={h} className="absolute border-t border-border/60"
+                    style={{ top: h * WEEK_HOUR_HEIGHT, width: "100%" }} />
+                ))}
+
+                {/* Now line */}
+                {col.isToday && (() => {
+                  const now = new Date();
+                  const nowPos = (now.getHours() + now.getMinutes() / 60) * WEEK_HOUR_HEIGHT;
+                  return (
+                    <div className="absolute z-10" style={{ top: nowPos, width: "100%" }}>
+                      <div className="w-2 h-2 rounded-full absolute -left-1 -top-[3px]" style={{ backgroundColor: "hsl(var(--destructive))" }} />
+                      <div className="h-[2px] w-full" style={{ backgroundColor: "hsl(var(--destructive))" }} />
+                    </div>
+                  );
+                })()}
+
+                {/* Event cards */}
+                {positioned.map(({ item, col: colIdx, totalCols }) => {
+                  const color = getPersonColor(item);
+                  const top = item.hour! * WEEK_HOUR_HEIGHT;
+                  const endH = item.endHour ?? item.hour! + 1;
+                  const duration = Math.max(endH - item.hour!, 0.25);
+                  const height = Math.max(duration * WEEK_HOUR_HEIGHT, 20);
+                  const colW = (WEEK_COL_WIDTH - 2) / totalCols;
+                  const left = colIdx * colW + 1;
+
+                  return (
+                    <button key={item.id} onClick={() => onItemTap?.(item)}
+                      className="absolute overflow-hidden cursor-pointer text-left hover:brightness-105 active:brightness-95 transition-all flex flex-col"
+                      style={{
+                        top, height, width: colW, left,
+                        backgroundColor: memberLightBg(color),
+                        borderLeft: `3px solid ${color}`,
+                        borderRadius: "0 7px 7px 0",
+                      }}>
+                      <p className="text-[9px] font-medium leading-tight px-1 pt-0.5 truncate"
+                        style={{ color }}>
+                        {item.title}
+                      </p>
+                      {height > 24 && (
+                        <p className="text-[7px] px-1 truncate" style={{ color, opacity: 0.7 }}>
+                          {item.type === "gcal" ? new Date(item.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : formatTime(item.time)}
+                        </p>
+                      )}
+                      {height > 36 && <div className="px-1 pb-0.5"><MemberDot item={item} /></div>}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
