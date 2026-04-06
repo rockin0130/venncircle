@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Clock, ChevronLeft, MoreHorizontal, ChevronDown } from "lucide-react";
+import { Clock, ChevronLeft, MoreHorizontal, ChevronDown, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { Calendar } from "@/components/ui/calendar";
 import type { DateRange } from "react-day-picker";
+import StudySessionHistoryPage from "./StudySessionHistoryPage";
 
 interface StudySession {
   id: string;
