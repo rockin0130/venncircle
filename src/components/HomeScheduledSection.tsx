@@ -389,7 +389,6 @@ const HomeScheduledSection = ({
   // Get avatar members for shared items using the same logic as Calendar
   const getItemAvatarMembers = useCallback((item: UnifiedScheduledItem) => {
     const assigneeValue = (item.assignee || "me") as "me" | "partner" | "both";
-    if (assigneeValue === "me") return [];
     const assignedIds = normalizeCalendarAssignees({
       item: {
         assignee: assigneeValue,
@@ -400,7 +399,7 @@ const HomeScheduledSection = ({
       currentUserId: user?.id || "",
       groups,
     });
-    if (assignedIds.length <= 1 && assigneeValue === "me") return [];
+    if (assignedIds.length <= 1) return [];
     return getAssignedAvatarMembers({
       assignedUserIds: assignedIds,
       filterUsers: allFilterUsers,
