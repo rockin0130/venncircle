@@ -584,12 +584,23 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     }
   }, [isPersonal, groups, activeGroup, user, memberProfiles]);
 
-  // Group name lookup
-  const groupNameMap = useMemo(() => {
-    const m: Record<string, string> = {};
-    (groups || []).forEach((g: any) => { if (!(g as any)._personal) m[g.id] = g.name; });
+  // Group info lookup (name, cover photo, color)
+  const groupInfoMap = useMemo(() => {
+    const m: Record<string, { name: string; coverUrl: string | null; color: string }> = {};
+    const GROUP_COLORS = ["#93C5FD", "#86EFAC", "#C4B5FD", "#FCD34D", "#FCA5A5", "#67E8F9", "#A7F3D0", "#FDBA74"];
+    (groups || []).forEach((g: any, i: number) => {
+      if (!(g as any)._personal) {
+        m[g.id] = { name: g.name, coverUrl: g.cover_image_url || null, color: GROUP_COLORS[i % GROUP_COLORS.length] };
+      }
+    });
     return m;
   }, [groups]);
+
+  const groupNameMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    Object.entries(groupInfoMap).forEach(([id, info]) => { m[id] = info.name; });
+    return m;
+  }, [groupInfoMap]);
 
   // Sessions filter options (group view)
   const sessionsFilterOptions = useMemo(() => {
@@ -1018,11 +1029,26 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {fmtTime(s.started_at)}{s.ended_at ? ` – ${fmtTime(s.ended_at)}` : " – now"}
-                          {isPersonal && s.group_id && groupNameMap[s.group_id] && (
-                            <span className="ml-1 text-muted-foreground"> · {groupNameMap[s.group_id]}</span>
-                          )}
+                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                          <span>{fmtTime(s.started_at)}{s.ended_at ? ` – ${fmtTime(s.ended_at)}` : " – now"}</span>
+                          {isPersonal && s.group_id && groupInfoMap[s.group_id] && (() => {
+                            const gi = groupInfoMap[s.group_id];
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1"
+                                style={{ fontSize: 9, fontWeight: 500, padding: "1px 6px", borderRadius: 99, background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.08)" }}
+                              >
+                                {gi.coverUrl ? (
+                                  <img src={gi.coverUrl} className="w-3 h-3 rounded-full object-cover flex-shrink-0" />
+                                ) : (
+                                  <span className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white flex-shrink-0" style={{ background: gi.color }}>
+                                    {gi.name[0]}
+                                  </span>
+                                )}
+                                {gi.name}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
