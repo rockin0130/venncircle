@@ -357,6 +357,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
                 onLike={() => handleLike(post.id, !!post.liked_by_me)}
                 memberColors={MEMBER_COLORS}
                 members={currentActiveMembers}
+                currentUserId={user?.id}
               />
             ))
           )}
