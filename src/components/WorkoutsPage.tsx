@@ -20,6 +20,7 @@ import CongratsPopup from "@/components/CongratsPopup";
 import PageGroupSelector from "@/components/PageGroupSelector";
 
 import WorkoutPhotoPrompt, { isWorkoutPhotoPromptSuppressed } from "@/components/WorkoutPhotoPrompt";
+import ShareToFeedSheet from "@/components/ShareToFeedSheet";
 import ExerciseHistoryPage from "@/components/ExerciseHistoryPage";
 import ExerciseLibrarySheet from "@/components/ExerciseLibrarySheet";
 import WorkoutUserFilter, { EVERYONE_SENTINEL } from "@/components/WorkoutUserFilter";
@@ -356,6 +357,7 @@ const WorkoutsPage = ({
   const [editExReps, setEditExReps] = useState("");
   const [loggingWorkout, setLoggingWorkout] = useState<Workout | null>(null);
   const [photoPromptWorkout, setPhotoPromptWorkout] = useState<Workout | null>(null);
+  const [feedShareWorkout, setFeedShareWorkout] = useState<Workout | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [nudgeCooldown, setNudgeCooldown] = useState<Set<string>>(new Set());
@@ -631,6 +633,13 @@ const WorkoutsPage = ({
       setShowCongrats(true);
       if (workout.groupId && !isWorkoutPhotoPromptSuppressed()) {
         setTimeout(() => setPhotoPromptWorkout(workout), 1200);
+      }
+      // Trigger feed share prompt for workouts in groups with feed
+      const workoutGroups = groups.filter(
+        (g) => g.id === workout.groupId || (workout as any).sharedGroupIds?.includes(g.id)
+      );
+      if (workoutGroups.length > 0) {
+        setTimeout(() => setFeedShareWorkout(workout), workout.groupId ? 1800 : 1200);
       }
     }
     toggleWorkout(id);
@@ -1086,6 +1095,28 @@ const WorkoutsPage = ({
           onPhotoSent={(url) => handlePhotoSent(photoPromptWorkout.id, url)}
         />
       )}
+
+      {/* Share to Feed Prompt */}
+      {feedShareWorkout && (() => {
+        const targetGroup = groups.find((g) => g.id === feedShareWorkout.groupId);
+        if (!targetGroup) return null;
+        const stats: Record<string, string | number> = {};
+        if (feedShareWorkout.duration) stats["Duration"] = feedShareWorkout.duration;
+        if (feedShareWorkout.cal) stats["Calories"] = feedShareWorkout.cal;
+        if (feedShareWorkout.distance) stats["Distance"] = `${feedShareWorkout.distance} ${feedShareWorkout.distanceUnit || "km"}`;
+        return (
+          <ShareToFeedSheet
+            open
+            onClose={() => setFeedShareWorkout(null)}
+            groupId={targetGroup.id}
+            groupName={targetGroup.name}
+            userId={user?.id || ""}
+            caption={`${feedShareWorkout.emoji} Completed ${feedShareWorkout.title}!`}
+            interestTag="workout"
+            stats={stats}
+          />
+        );
+      })()}
     </>
     </div>
   );
