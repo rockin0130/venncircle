@@ -335,7 +335,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   }, [weekDays, sessions, activeTick]);
 
   const weekTotal = useMemo(() => weeklyData.reduce((s, d) => s + d.seconds, 0), [weeklyData]);
-  const maxBar = useMemo(() => Math.max(...weeklyData.map(d => d.seconds), 1), [weeklyData]);
+  const maxBar = useMemo(() => Math.max(...weeklyData.map(d => d.seconds), 3600), [weeklyData]);
 
   // Group members enriched
   const groupMembers = useMemo(() => {
