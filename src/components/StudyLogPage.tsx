@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Clock, ChevronLeft, MoreHorizontal, ChevronDown } from "lucide-react";
+import { Clock, ChevronLeft, MoreHorizontal, ChevronDown, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { Calendar } from "@/components/ui/calendar";
 import type { DateRange } from "react-day-picker";
+import StudySessionHistoryPage from "./StudySessionHistoryPage";
 
 interface StudySession {
   id: string;
@@ -89,6 +90,7 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
   const [prevTimeRange, setPrevTimeRange] = useState<"week" | "month" | "all">("week");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [subjectDropdownOpen, setSubjectDropdownOpen] = useState(false);
+  const [showFullHistory, setShowFullHistory] = useState(false);
   const customPickerRef = useRef<HTMLDivElement>(null);
   const customPillRef = useRef<HTMLButtonElement>(null);
 
@@ -271,6 +273,17 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [showCustomPicker, prevTimeRange, timeRange]);
+
+  if (showFullHistory) {
+    return (
+      <StudySessionHistoryPage
+        onBack={() => setShowFullHistory(false)}
+        onOpenMore={onOpenMore}
+        contextFilter={contextFilter}
+        memberFilter={memberFilter}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-full pb-4" style={{ background: "#F4F3F0" }}>
@@ -488,7 +501,16 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
         <div className="rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>Session history</h3>
-            <div className="relative">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowFullHistory(true)}
+                className="flex items-center gap-0.5 text-[11px] font-medium"
+                style={{ color: "#6C47FF" }}
+              >
+                See all
+                <ChevronRight size={13} />
+              </button>
+              <div className="relative">
               <button
                 onClick={() => setSubjectDropdownOpen(!subjectDropdownOpen)}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
@@ -518,6 +540,7 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
                   ))}
                 </div>
               )}
+            </div>
             </div>
           </div>
 
