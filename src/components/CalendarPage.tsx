@@ -671,6 +671,9 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
     const dots = new Map<number, { id: string; color: string }[]>();
     const currentUserId = user?.id || "";
     const isEveryone = userFilterIds.has(EVERYONE_SENTINEL);
+    const hasFilterUsers = calFilterUsers.length > 0;
+    // Default dot color for current user when calFilterUsers is empty (Personal/All mode)
+    const defaultDotColor = MEMBER_COLORS[0].dot;
 
     for (let d = 1; d <= daysInMonth; d++) {
       const items = getItemsForDate(d, month, year);
@@ -705,13 +708,23 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
 
         ownerIds.forEach(uid => {
           if (seenUsers.has(uid)) return;
-          // Only show dot if this user's pill is selected
           if (!isEveryone && !userFilterIds.has(uid)) return;
-          const fu = calFilterUsers.find(u => u.id === uid);
-          if (!fu) return;
-          seenUsers.add(uid);
-          const memberColor = MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length];
-          dotColors.push({ id: uid, color: memberColor.dot });
+
+          if (hasFilterUsers) {
+            const fu = calFilterUsers.find(u => u.id === uid);
+            if (!fu) return;
+            seenUsers.add(uid);
+            const memberColor = MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length];
+            dotColors.push({ id: uid, color: memberColor.dot });
+          } else {
+            // Personal/All mode — no filter users available, show dot for current user
+            if (uid === currentUserId || ownerId === currentUserId) {
+              if (!seenUsers.has(currentUserId)) {
+                seenUsers.add(currentUserId);
+                dotColors.push({ id: currentUserId, color: defaultDotColor });
+              }
+            }
+          }
         });
       });
 
