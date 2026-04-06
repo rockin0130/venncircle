@@ -315,8 +315,8 @@ const HomeScheduledSection = ({
   const allPeriodHabits = useMemo(() => {
     return Object.values(habitsByPeriod).flat();
   }, [habitsByPeriod]);
-  const totalItems = unifiedItems.length + allPeriodHabits.length;
-  const doneItems = unifiedItems.filter(i => i.done).length + allPeriodHabits.filter(h => h.completionDates.includes(dateStr)).length;
+  const totalItems = unifiedItems.length + allPeriodHabits.length + scheduledWorkouts.length;
+  const doneItems = unifiedItems.filter(i => i.done).length + allPeriodHabits.filter(h => h.completionDates.includes(dateStr)).length + scheduledWorkouts.filter(w => w.done).length;
   const progressPercent = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
 
   // NOW item: the item whose time window contains current time
