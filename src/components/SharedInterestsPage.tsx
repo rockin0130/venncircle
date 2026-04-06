@@ -113,7 +113,8 @@ const SwipeableGroupCard = ({
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
-  const currentX = useRef(0);
+  const startOffset = useRef(0);
+  const dragging = useRef(false);
   const [offset, setOffset] = useState(0);
   const [leaveFlowOpen, setLeaveFlowOpen] = useState(false);
   const [removed, setRemoved] = useState(false);
@@ -156,21 +157,25 @@ const SwipeableGroupCard = ({
   }, [isSwiped, onSwipeOpen]);
 
   const handleStart = (clientX: number) => {
+    dragging.current = true;
     startX.current = clientX;
-    currentX.current = offset;
-    // If another card is open, close it
+    startOffset.current = offset;
+    // Close any other open card immediately
     if (activeSwipeId && activeSwipeId !== group.id) {
       onSwipeOpen(null);
     }
   };
 
   const handleMove = (clientX: number) => {
-    const diff = clientX - startX.current + currentX.current;
+    if (!dragging.current) return;
+    const diff = clientX - startX.current + startOffset.current;
     const clamped = Math.max(-REVEAL_WIDTH, Math.min(0, diff));
     setOffset(clamped);
   };
 
   const handleEnd = () => {
+    if (!dragging.current) return;
+    dragging.current = false;
     if (offset < -REVEAL_WIDTH / 2) {
       setOffset(-REVEAL_WIDTH);
       onSwipeOpen(group.id);
@@ -197,7 +202,7 @@ const SwipeableGroupCard = ({
   return (
     <>
       <div ref={cardRef} className="relative" style={{ borderRadius: 14, height: 76, overflow: "hidden" }}>
-        {/* Background action button */}
+        {/* Background action button — positioned behind, only visible when card slides */}
         <div
           className="absolute right-0 top-0 bottom-0 flex items-center justify-center text-white text-xs font-semibold cursor-pointer select-none"
           style={{
@@ -210,57 +215,70 @@ const SwipeableGroupCard = ({
           Leave Group
         </div>
 
-        {/* Foreground card — z-10 so it fully covers the red button at rest */}
+        {/* Foreground card — oversized by REVEAL_WIDTH so it fully covers red at rest */}
         <div
-          className="absolute top-0 left-0 right-0 bottom-0 w-full flex bg-card touch-pan-y z-10"
+          className="absolute top-0 bottom-0 flex touch-pan-y"
           style={{
+            left: 0,
+            width: `calc(100% + ${REVEAL_WIDTH}px)`,
             transform: `translateX(${offset}px)`,
-            transition: offset === 0 || offset === -REVEAL_WIDTH ? "transform 0.25s cubic-bezier(.4,0,.2,1)" : "none",
-            borderRadius: 14,
-            border: "0.5px solid rgba(0,0,0,0.07)",
+            transition: dragging.current ? "none" : "transform 0.25s cubic-bezier(.4,0,.2,1)",
             willChange: "transform",
           }}
           onMouseDown={(e) => handleStart(e.clientX)}
           onMouseMove={(e) => { if (e.buttons === 1) handleMove(e.clientX); }}
           onMouseUp={handleEnd}
+          onMouseLeave={() => { if (dragging.current) handleEnd(); }}
           onTouchStart={(e) => handleStart(e.touches[0].clientX)}
           onTouchMove={(e) => handleMove(e.touches[0].clientX)}
           onTouchEnd={handleEnd}
           onClick={() => { if (Math.abs(offset) < 5) onTap(); }}
         >
-          <div className="flex-1 min-w-0 px-3 py-2.5 flex flex-col justify-center bg-card" style={{ borderRadius: "14px 0 0 14px" }}>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <p className="text-[13px] font-medium text-foreground truncate">{group.name}</p>
-              <div className="shrink-0">
-                <MemberDots members={activeMembers} />
+          {/* Visible card area — exactly container width */}
+          <div
+            className="flex bg-card shrink-0"
+            style={{
+              width: `calc(100% - ${REVEAL_WIDTH}px)`,
+              borderRadius: 14,
+              border: "0.5px solid rgba(0,0,0,0.07)",
+            }}
+          >
+            <div className="flex-1 min-w-0 px-3 py-2.5 flex flex-col justify-center">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <p className="text-[13px] font-medium text-foreground truncate">{group.name}</p>
+                <div className="shrink-0">
+                  <MemberDots members={activeMembers} />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {validPages.map((page) => (
+                  <span
+                    key={page}
+                    className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
+                  >
+                    {PAGE_LABELS[page] || page}
+                  </span>
+                ))}
+                {extraPages > 0 && (
+                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                    +{extraPages}
+                  </span>
+                )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {validPages.map((page) => (
-                <span
-                  key={page}
-                  className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
-                >
-                  {PAGE_LABELS[page] || page}
-                </span>
-              ))}
-              {extraPages > 0 && (
-                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                  +{extraPages}
-                </span>
+            <div className="w-[100px] shrink-0 overflow-hidden" style={{ borderRadius: "0 14px 14px 0" }}>
+              {coverUrl ? (
+                <img src={coverUrl} alt="" className="w-full h-full object-cover block" />
+              ) : (
+                <div className={`w-full h-full ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex flex-col items-center justify-center gap-0.5`}>
+                  <Camera size={12} className="text-muted-foreground/50" />
+                  <span className="text-[8px] font-medium text-muted-foreground/70">Add photo</span>
+                </div>
               )}
             </div>
           </div>
-          <div className="w-[100px] shrink-0 overflow-hidden" style={{ borderRadius: "0 14px 14px 0" }}>
-            {coverUrl ? (
-              <img src={coverUrl} alt="" className="w-full h-full object-cover block" />
-            ) : (
-              <div className={`w-full h-full ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex flex-col items-center justify-center gap-0.5`}>
-                <Camera size={12} className="text-muted-foreground/50" />
-                <span className="text-[8px] font-medium text-muted-foreground/70">Add photo</span>
-              </div>
-            )}
-          </div>
+          {/* Extra coverage area that sits off-screen to the right — prevents any bleed */}
+          <div className="bg-card shrink-0" style={{ width: REVEAL_WIDTH }} />
         </div>
       </div>
 
