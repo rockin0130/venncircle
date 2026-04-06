@@ -90,6 +90,7 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
   const [prevTimeRange, setPrevTimeRange] = useState<"week" | "month" | "all">("week");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [subjectDropdownOpen, setSubjectDropdownOpen] = useState(false);
+  const [showFullHistory, setShowFullHistory] = useState(false);
   const customPickerRef = useRef<HTMLDivElement>(null);
   const customPillRef = useRef<HTMLButtonElement>(null);
 
