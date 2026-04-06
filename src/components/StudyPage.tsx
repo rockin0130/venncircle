@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Clock, MoreHorizontal, ChevronDown } from "lucide-react";
+import { Clock, MoreHorizontal, ChevronDown, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import PageGroupSelector from "@/components/PageGroupSelector";
 import StudyFullscreenTimer from "@/components/StudyFullscreenTimer";
+import StudyLogPage from "@/components/StudyLogPage";
 
 // ═══ Types ═══
 interface StudySession {
@@ -26,6 +27,69 @@ interface StudyPageProps {
 const DEFAULT_SUBJECTS = ["Math", "Reading", "Work"];
 const DAILY_GOAL_HOURS = 4;
 const MEMBER_COLORS = ["#6C47FF", "#F59E0B", "#10B981", "#EF4444", "#3B82F6", "#EC4899", "#14B8A6", "#8B5CF6"];
+
+// ═══ Subject similarity ═══
+const ABBREVIATION_MAP: Record<string, string> = {
+  math: "math", mathematics: "math", maths: "math",
+  sci: "science", science: "science",
+  eng: "english", english: "english",
+  hist: "history", history: "history",
+  bio: "biology", biology: "biology",
+  chem: "chemistry", chemistry: "chemistry",
+  phys: "physics", physics: "physics",
+  geo: "geography", geography: "geography",
+  lit: "literature", literature: "literature",
+  econ: "economics", economics: "economics",
+  cs: "computer science", "computer science": "computer science", "comp sci": "computer science",
+  pe: "physical education", "physical education": "physical education",
+  psych: "psychology", psychology: "psychology",
+};
+
+function normalizeSubject(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function getCanonicalKey(name: string): string | null {
+  const norm = normalizeSubject(name);
+  return ABBREVIATION_MAP[norm] || null;
+}
+
+type MatchResult = { type: "exact"; existing: string } | { type: "similar"; existing: string } | { type: "none" };
+
+function findSubjectMatch(newName: string, existingSubjects: string[], allSessionSubjects: string[]): MatchResult {
+  const norm = normalizeSubject(newName);
+  const allKnown = [...new Set([...existingSubjects, ...allSessionSubjects])];
+
+  // Exact case-insensitive match
+  for (const ex of allKnown) {
+    if (normalizeSubject(ex) === norm) return { type: "exact", existing: ex };
+  }
+
+  // Abbreviation match
+  const newKey = getCanonicalKey(newName);
+  if (newKey) {
+    for (const ex of allKnown) {
+      const exKey = getCanonicalKey(ex);
+      if (exKey && exKey === newKey) return { type: "exact", existing: ex };
+    }
+  }
+
+  // Plural/singular
+  const withoutS = norm.endsWith("s") ? norm.slice(0, -1) : norm + "s";
+  for (const ex of allKnown) {
+    const exNorm = normalizeSubject(ex);
+    if (exNorm === withoutS) return { type: "similar", existing: ex };
+  }
+
+  // Levenshtein-like prefix check
+  for (const ex of allKnown) {
+    const exNorm = normalizeSubject(ex);
+    if (norm.length >= 3 && exNorm.startsWith(norm)) return { type: "similar", existing: ex };
+    if (exNorm.length >= 3 && norm.startsWith(exNorm)) return { type: "similar", existing: ex };
+  }
+
+  return { type: "none" };
+}
 
 function getSubjects(): string[] {
   try {
@@ -128,11 +192,21 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const [chartFilter, setChartFilter] = useState("mine");
   const [chartDropdownOpen, setChartDropdownOpen] = useState(false);
   const [sessionsFilter, setSessionsFilter] = useState("mine");
+  const [editMode, setEditMode] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+  const [similarityPrompt, setSimilarityPrompt] = useState<{ newName: string; existing: string } | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
+  const pillsRef = useRef<HTMLDivElement>(null);
 
   const isPersonal = !activeGroup || (activeGroup as any)?._personal;
   const groupId = isPersonal ? null : activeGroup?.id || null;
+
+  // All subjects ever used in sessions (for similarity matching)
+  const allSessionSubjects = useMemo(() => {
+    const set = new Set(sessions.map(s => s.subject));
+    return Array.from(set);
+  }, [sessions]);
 
   // ── Fetch ──
   const fetchSessions = useCallback(async () => {
@@ -196,6 +270,18 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     }
   }, [activeSession]);
 
+  // ── Click outside to exit edit mode ──
+  useEffect(() => {
+    if (!editMode) return;
+    const handler = (e: MouseEvent) => {
+      if (pillsRef.current && !pillsRef.current.contains(e.target as Node)) {
+        setEditMode(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [editMode]);
+
   // ── Derived ──
   const today = todayStr();
   const weekDays = useMemo(() => getWeekDays(), []);
@@ -214,8 +300,6 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     const dates = new Set(sessions.filter(s => s.duration_seconds > 0 || s.is_active).map(s => s.started_at.slice(0, 10)));
     let current = 0;
     let best = 0;
-    const d = new Date();
-    // Current streak
     const d2 = new Date();
     while (true) {
       const key = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
@@ -223,7 +307,6 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
       else if (current === 0 && key === today) { d2.setDate(d2.getDate() - 1); }
       else break;
     }
-    // Best streak (simple scan)
     const sortedDates = Array.from(dates).sort();
     let run = 0;
     for (let i = 0; i < sortedDates.length; i++) {
@@ -290,25 +373,102 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
       fetchSessions();
       fetchGroupSessions();
     } else {
-      await supabase
-        .from("study_sessions")
-        .insert({ user_id: user.id, subject: selectedSubject, group_id: groupId, is_active: true, started_at: new Date().toISOString() } as any);
+      // Save to group AND personal (dual-write for group context)
+      if (groupId) {
+        // Insert group session
+        await supabase
+          .from("study_sessions")
+          .insert({ user_id: user.id, subject: selectedSubject, group_id: groupId, is_active: true, started_at: new Date().toISOString() } as any);
+      } else {
+        // Personal only
+        await supabase
+          .from("study_sessions")
+          .insert({ user_id: user.id, subject: selectedSubject, group_id: null, is_active: true, started_at: new Date().toISOString() } as any);
+      }
       setFullscreen(true);
       fetchSessions();
       fetchGroupSessions();
     }
   };
 
+  const removeSubject = (sub: string) => {
+    const updated = subjects.filter(s => s !== sub);
+    setSubjects(updated);
+    saveSubjects(updated);
+    if (selectedSubject === sub) {
+      setSelectedSubject(updated[0] || "Other");
+    }
+    if (updated.length === 0) setEditMode(false);
+  };
+
   const addSubject = () => {
     const trimmed = newSubjectText.trim();
-    if (trimmed && !subjects.includes(trimmed)) {
-      const updated = [...subjects, trimmed];
-      setSubjects(updated);
-      saveSubjects(updated);
-      setSelectedSubject(trimmed);
+    if (!trimmed) {
+      setNewSubjectText("");
+      setAddingSubject(false);
+      return;
     }
-    setNewSubjectText("");
-    setAddingSubject(false);
+
+    const match = findSubjectMatch(trimmed, subjects, allSessionSubjects);
+
+    if (match.type === "exact") {
+      // Silently map to existing
+      if (!subjects.includes(match.existing)) {
+        const updated = [...subjects, match.existing];
+        setSubjects(updated);
+        saveSubjects(updated);
+      }
+      setSelectedSubject(match.existing);
+      setNewSubjectText("");
+      setAddingSubject(false);
+    } else if (match.type === "similar") {
+      // Show prompt
+      setSimilarityPrompt({ newName: trimmed, existing: match.existing });
+      setNewSubjectText("");
+      setAddingSubject(false);
+    } else {
+      // Create new
+      if (!subjects.includes(trimmed)) {
+        const updated = [...subjects, trimmed];
+        setSubjects(updated);
+        saveSubjects(updated);
+      }
+      setSelectedSubject(trimmed);
+      setNewSubjectText("");
+      setAddingSubject(false);
+    }
+  };
+
+  const handleSimilarityResponse = (isSame: boolean) => {
+    if (!similarityPrompt) return;
+    if (isSame) {
+      // Merge — use existing
+      if (!subjects.includes(similarityPrompt.existing)) {
+        const updated = [...subjects, similarityPrompt.existing];
+        setSubjects(updated);
+        saveSubjects(updated);
+      }
+      setSelectedSubject(similarityPrompt.existing);
+    } else {
+      // Keep separate
+      if (!subjects.includes(similarityPrompt.newName)) {
+        const updated = [...subjects, similarityPrompt.newName];
+        setSubjects(updated);
+        saveSubjects(updated);
+      }
+      setSelectedSubject(similarityPrompt.newName);
+    }
+    setSimilarityPrompt(null);
+  };
+
+  // Long press handler
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handlePillPointerDown = () => {
+    if (activeSession) return;
+    longPressTimer.current = setTimeout(() => setEditMode(true), 500);
+  };
+  const handlePillPointerUp = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
   };
 
   // ── Ring ──
@@ -341,7 +501,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     }
   }, [isPersonal, groups, activeGroup, user, memberProfiles]);
 
-  // Group name lookup for personal aggregate
+  // Group name lookup
   const groupNameMap = useMemo(() => {
     const m: Record<string, string> = {};
     (groups || []).forEach((g: any) => { if (!(g as any)._personal) m[g.id] = g.name; });
@@ -370,6 +530,11 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
 
   // Weekly sessions count
   const weekSessionsCount = useMemo(() => sessions.filter(s => weekDays.some(d => s.started_at.startsWith(d.date))).length, [sessions, weekDays]);
+
+  // ── Show Log page ──
+  if (showLog) {
+    return <StudyLogPage onBack={() => setShowLog(false)} onOpenMore={onOpenMore} />;
+  }
 
   // ── Fullscreen ──
   if (fullscreen && activeSession) {
@@ -400,15 +565,24 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
             Study
           </h1>
         </div>
-        {onOpenMore && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={onOpenMore}
+            onClick={() => setShowLog(true)}
             className="w-[30px] h-[30px] rounded-full flex items-center justify-center"
             style={{ background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.07)" }}
           >
-            <MoreHorizontal size={15} color="#888" />
+            <Clock size={14} color="#888" />
           </button>
-        )}
+          {onOpenMore && (
+            <button
+              onClick={onOpenMore}
+              className="w-[30px] h-[30px] rounded-full flex items-center justify-center"
+              style={{ background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.07)" }}
+            >
+              <MoreHorizontal size={15} color="#888" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Context toggle ── */}
@@ -485,21 +659,34 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
           )}
 
           {/* Subject pills */}
-          <div className="flex gap-2 flex-wrap justify-center">
+          <div ref={pillsRef} className="flex gap-2 flex-wrap justify-center">
             {subjects.map(sub => (
-              <button
-                key={sub}
-                onClick={() => !activeSession && setSelectedSubject(sub)}
-                className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
-                style={{
-                  background: selectedSubject === sub ? "#6C47FF" : "#F4F3F0",
-                  color: selectedSubject === sub ? "#fff" : "#888",
-                  border: "0.5px solid rgba(0,0,0,0.07)",
-                  opacity: activeSession ? 0.6 : 1,
-                }}
-              >
-                {sub}
-              </button>
+              <div key={sub} className="relative">
+                <button
+                  onClick={() => !activeSession && !editMode && setSelectedSubject(sub)}
+                  onPointerDown={handlePillPointerDown}
+                  onPointerUp={handlePillPointerUp}
+                  onPointerLeave={handlePillPointerUp}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                  style={{
+                    background: selectedSubject === sub ? "#6C47FF" : "#F4F3F0",
+                    color: selectedSubject === sub ? "#fff" : "#888",
+                    border: "0.5px solid rgba(0,0,0,0.07)",
+                    opacity: activeSession ? 0.6 : 1,
+                  }}
+                >
+                  {sub}
+                </button>
+                {editMode && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeSubject(sub); }}
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center"
+                    style={{ background: "#EF4444", border: "1.5px solid #fff" }}
+                  >
+                    <X size={8} color="#fff" />
+                  </button>
+                )}
+              </div>
             ))}
             {addingSubject ? (
               <input
@@ -523,6 +710,31 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
               </button>
             )}
           </div>
+
+          {/* Similarity prompt */}
+          {similarityPrompt && (
+            <div className="mt-3 p-3 rounded-xl w-full" style={{ background: "#FAF5FF", border: "1px solid #EDE9FE" }}>
+              <p className="text-xs text-foreground mb-2">
+                This looks similar to <strong>{similarityPrompt.existing}</strong>. Are these the same?
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleSimilarityResponse(true)}
+                  className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
+                  style={{ background: "#6C47FF" }}
+                >
+                  Yes, same subject
+                </button>
+                <button
+                  onClick={() => handleSimilarityResponse(false)}
+                  className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ background: "#F4F3F0", color: "#555" }}
+                >
+                  No, keep separate
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ═══ Group Today Card ═══ */}
@@ -537,7 +749,6 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
               )}
             </div>
             <div className="space-y-2.5">
-              {/* Live members first */}
               {[...groupMembers].sort((a, b) => (a.active ? -1 : 1) - (b.active ? -1 : 1)).map(m => (
                 <div key={m.user_id} className="flex items-center gap-3">
                   <div
@@ -750,7 +961,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
           <div className="flex items-end justify-between gap-1.5 h-[100px]">
             {weeklyData.map((day, i) => {
               const h = day.seconds > 0 ? Math.max((day.seconds / maxBar) * 80, 6) : 4;
-              const color = day.isFuture ? "#EEEDE8" : day.isToday ? "#1a1a1a" : "#6C47FF";
+              const color = day.isFuture ? "#EEEDE8" : "#6C47FF";
               return (
                 <div key={i} className="flex flex-col items-center flex-1 gap-1">
                   <div className="w-full flex items-end justify-center" style={{ height: 80 }}>
