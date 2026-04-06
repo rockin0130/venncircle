@@ -1667,7 +1667,7 @@ const EventList = ({
       {todoItems.length > 0 && (
         <div className="py-0.5">
           {todoItems.map((item) => {
-            const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
+            const group = isPersonalOrAll && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
             return (
               <button key={item.id} onClick={() => onItemTap?.(item)}
                 className="w-full flex items-center gap-2.5 py-1.5 px-1 text-left hover:bg-secondary/50 rounded-lg transition-colors active:bg-secondary">
@@ -1676,9 +1676,7 @@ const EventList = ({
                 <span className={`text-[13px] font-medium flex-1 truncate ${item.done ? "line-through opacity-40" : "text-foreground"}`}>
                   {item.title}
                 </span>
-                {group && (
-                  <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
-                )}
+                {group && renderGroupPill(group)}
                 <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
               </button>
             );
