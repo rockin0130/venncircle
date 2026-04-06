@@ -1688,7 +1688,7 @@ const EventList = ({
         <div className="py-0.5">
           {allDayItems.map((item) => {
             const color = getPersonColor(item);
-            const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
+            const group = isPersonalOrAll && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
             return (
               <button key={item.id} onClick={() => onItemTap?.(item)}
                 className="w-full flex items-center gap-2.5 py-1.5 px-1 text-left hover:bg-secondary/50 rounded-lg transition-colors active:bg-secondary">
@@ -1701,9 +1701,7 @@ const EventList = ({
                 {item.isMultiDay && (
                   <span className="text-[10px] text-muted-foreground">multi-day</span>
                 )}
-                {group && (
-                  <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
-                )}
+                {group && renderGroupPill(group)}
                 <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
               </button>
             );
