@@ -216,7 +216,7 @@ const HomeScheduledSection = ({
   showWater = false,
 }: Props) => {
   const { groups, activeGroup, user } = useAuth();
-  const { filteredHabits, toggleHabit, getHabitStreak } = useAppContext();
+  const { filteredHabits, toggleHabit, getHabitStreak, getWorkoutsForDate } = useAppContext();
   const dateStr = selectedDate ? fmtDateStr(selectedDate) : fmtDateStr(new Date());
   const isTodayForHabits = dateStr === fmtDateStr(new Date());
   const [nowMinutes, setNowMinutes] = useState(() => {
