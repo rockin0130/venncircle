@@ -89,6 +89,42 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate, recentWorkou
     })();
   }, [open, user]);
 
+  // Recent workouts — last 5 unique done workouts
+  const recentUniqueWorkouts = useMemo(() => {
+    const seen = new Set<string>();
+    return recentWorkouts
+      .filter((w) => w.done && w.title)
+      .sort((a, b) => (b.completedDate || b.scheduledDate || "").localeCompare(a.completedDate || a.scheduledDate || ""))
+      .filter((w) => {
+        const key = w.title.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 5);
+  }, [recentWorkouts]);
+
+  const prefillFromRecent = useCallback((w: Workout) => {
+    setTitle(w.title);
+    if (w.exercises && w.exercises.length > 0) {
+      setWorkoutType("strength");
+      setExercises(w.exercises.map((ex: any) => ({
+        name: ex.name,
+        sets: ex.sets || 3,
+        reps: ex.reps || "10",
+        weight: ex.weight ? String(ex.weight) : "",
+        unit: (ex.unit as "lb" | "kg") || "lb",
+      })));
+      setStep("exercises");
+    } else {
+      setWorkoutType("activity");
+      setActivityEmoji(w.emoji || "🏃");
+      setActivityDuration(w.duration?.replace(/[^\d]/g, "") || "");
+      setActivityCal(w.cal ? String(w.cal) : "");
+      setStep("activity-details");
+    }
+  }, []);
+
   const filteredActivities = healthKitActivityOptions.filter((a) =>
     a.label.toLowerCase().includes(activitySearch.toLowerCase())
   );
