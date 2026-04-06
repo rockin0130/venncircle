@@ -158,9 +158,9 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
   const pct = weeklyGoal > 0 ? (clamped / weeklyGoal) * 100 : 0;
   const remaining = Math.max(0, weeklyGoal - clamped);
 
-  // SVG ring — 82px, 8px stroke
-  const SIZE = 82;
-  const STROKE = 8;
+  // SVG ring — 72px, 7px stroke
+  const SIZE = 72;
+  const STROKE = 7;
   const R = (SIZE - STROKE) / 2;
   const C = 2 * Math.PI * R;
   const offset = C - (pct / 100) * C;
@@ -190,7 +190,7 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
         {/* Goal info + adjuster */}
         <div className="flex-1 min-w-0">
           <p style={{ fontSize: 12, color: "#999", fontWeight: 500 }}>Weekly goal</p>
-          <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", marginTop: 2 }}>
+          <p style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", marginTop: 2 }}>
             {clamped >= weeklyGoal ? "Goal reached! 🎉" : `${remaining} workout${remaining !== 1 ? "s" : ""} to go`}
           </p>
           <div className="flex items-center gap-2.5 mt-2">
@@ -214,13 +214,13 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
       <div className="grid grid-cols-3 gap-2.5">
         {/* Done */}
         <div className="flex flex-col items-center justify-center py-3 px-2" style={{ background: "#F9F8F6", borderRadius: 12 }}>
-          <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>{weekDone}</span>
+          <span style={{ fontSize: 17, fontWeight: 500, color: "#1A1A1A" }}>{weekDone}</span>
           <span style={{ fontSize: 11, color: "#999", marginTop: 2 }}>Done</span>
         </div>
 
         {/* Kcal */}
         <div className="flex flex-col items-center justify-center py-3 px-2" style={{ background: "#F9F8F6", borderRadius: 12 }}>
-          <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>{weekCals.toLocaleString()}</span>
+          <span style={{ fontSize: 17, fontWeight: 500, color: "#1A1A1A" }}>{weekCals.toLocaleString()}</span>
           <span style={{ fontSize: 11, color: "#999", marginTop: 2 }}>kcal</span>
         </div>
 
@@ -232,7 +232,7 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
             style={{ background: "#F9F8F6", borderRadius: 12 }}
           >
             <div className="flex items-center gap-1">
-              <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>{totalDist}</span>
+              <span style={{ fontSize: 17, fontWeight: 500, color: "#1A1A1A" }}>{totalDist}</span>
             </div>
             <div className="flex items-center gap-1 mt-0.5">
               <span style={{ fontSize: 11, color: "#999" }}>
