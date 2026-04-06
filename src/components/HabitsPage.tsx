@@ -376,7 +376,7 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
         </div>
       </header>
 
-      <PageGroupSelector page="habits" personalLabel="Mine" hideAllPill />
+      <PageGroupSelector page="habits" personalLabel="Mine" hideAllPill showAvatars />
 
       <HabitUserFilter
         selectedUserIds={selectedUserIds}

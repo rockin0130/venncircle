@@ -928,7 +928,7 @@ const SobrietyPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
                 {(profile?.display_name || "U")[0].toUpperCase()}
               </span>
             )}
-            All
+            Mine
           </button>
           {contextGroups.map((group, index) => {
             const selected = activeGroup?.id === group.id && !(activeGroup as any)?._personal;

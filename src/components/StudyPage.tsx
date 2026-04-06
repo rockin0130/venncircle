@@ -700,7 +700,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
 
       {/* ── Context toggle ── */}
       <div className="px-4 pb-2">
-        <PageGroupSelector page="study" personalLabel="All" hideAllPill showAvatars />
+        <PageGroupSelector page="study" personalLabel="Mine" hideAllPill showAvatars />
       </div>
 
       <div className="px-4 space-y-3">
