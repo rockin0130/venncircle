@@ -62,6 +62,7 @@ interface FeedPost {
 
 const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps) => {
   const { user, leaveGroup, updateGroupSharedPages, inviteToGroup, refreshGroups, groups } = useAuth();
+  const { friendships, friendProfiles } = useFriendships();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addInterestOpen, setAddInterestOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -71,6 +72,9 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   const [deleting, setDeleting] = useState(false);
   const [memberSheetOpen, setMemberSheetOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [leaveFlowOpen, setLeaveFlowOpen] = useState(false);
+  const [memberMenuOpen, setMemberMenuOpen] = useState<string | null>(null);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [uploadingCover, setUploadingCover] = useState(false);
