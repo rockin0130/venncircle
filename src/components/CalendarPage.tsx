@@ -1529,11 +1529,12 @@ function getAvatarColor(userId: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName }: {
+const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName, currentUserAvatarUrl }: {
   item: CalItem;
   groups: Group[];
   currentUserId: string;
   currentUserName: string;
+  currentUserAvatarUrl?: string | null;
 }) => {
   const assignee = item.assignee;
   const groupId = item.groupId;
@@ -1541,27 +1542,27 @@ const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName }: {
   const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
 
   // Build list of assigned members
-  const members: { id: string; initial: string }[] = [];
+  const members: { id: string; initial: string; avatarUrl?: string | null }[] = [];
+
+  const getMemberInfo = (userId: string) => {
+    if (userId === currentUserId) {
+      return { id: currentUserId, initial: currentUserName.charAt(0).toUpperCase() || "?", avatarUrl: currentUserAvatarUrl || null };
+    }
+    const grp = groupId ? groups.find(g => g.id === groupId) : null;
+    const member = grp?.members?.find((m: any) => m.user_id === userId);
+    return { id: userId, initial: (member?.display_name || "?").charAt(0).toUpperCase(), avatarUrl: member?.avatar_url || null };
+  };
 
   if (assignee === "me") {
-    // Only the owner
-    if (ownerId === currentUserId) {
-      members.push({ id: currentUserId, initial: currentUserName.charAt(0).toUpperCase() || "?" });
-    } else {
-      // Find owner name from group
-      const grp = groupId ? groups.find(g => g.id === groupId) : null;
-      const member = grp?.members?.find((m: any) => m.user_id === ownerId);
-      members.push({ id: ownerId, initial: (member?.display_name || "?").charAt(0).toUpperCase() });
-    }
+    members.push(getMemberInfo(ownerId));
   } else if (assignee === "partner") {
-    // Only the other members (not the owner)
     if (groupId) {
       const grp = groups.find(g => g.id === groupId);
       if (grp) {
         grp.members
           .filter((m: any) => m.user_id !== ownerId && m.status === "active")
           .forEach((m: any) => {
-            members.push({ id: m.user_id, initial: (m.display_name || "?").charAt(0).toUpperCase() });
+            members.push(getMemberInfo(m.user_id));
           });
       }
     }
@@ -1569,21 +1570,16 @@ const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName }: {
       members.push({ id: "partner", initial: "P" });
     }
   } else if (assignee === "both") {
-    // Owner + all other members
-    members.push({ id: currentUserId === ownerId ? currentUserId : ownerId, initial: (currentUserId === ownerId ? currentUserName : "?").charAt(0).toUpperCase() || "?" });
+    members.push(getMemberInfo(ownerId));
     if (groupId) {
       const grp = groups.find(g => g.id === groupId);
       if (grp) {
         grp.members
           .filter((m: any) => m.user_id !== ownerId && m.status === "active")
           .forEach((m: any) => {
-            members.push({ id: m.user_id, initial: (m.display_name || "?").charAt(0).toUpperCase() });
+            members.push(getMemberInfo(m.user_id));
           });
       }
-    }
-    // If owner is current user, fix initial
-    if (ownerId === currentUserId && members.length > 0) {
-      members[0].initial = currentUserName.charAt(0).toUpperCase() || "?";
     }
   }
 
@@ -1592,12 +1588,27 @@ const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName }: {
   return (
     <div className="flex -space-x-1.5 flex-shrink-0">
       {members.map((m) => (
-        <div
-          key={m.id}
-          className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white ring-1 ring-card ${getAvatarColor(m.id)}`}
-        >
-          {m.initial}
-        </div>
+        m.avatarUrl ? (
+          <img
+            key={m.id}
+            src={m.avatarUrl}
+            alt={m.initial}
+            className="w-5 h-5 rounded-full object-cover ring-1 ring-card"
+            onError={(e) => {
+              const div = document.createElement("div");
+              div.className = `w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white ring-1 ring-card ${getAvatarColor(m.id)}`;
+              div.textContent = m.initial;
+              (e.target as HTMLElement).replaceWith(div);
+            }}
+          />
+        ) : (
+          <div
+            key={m.id}
+            className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white ring-1 ring-card ${getAvatarColor(m.id)}`}
+          >
+            {m.initial}
+          </div>
+        )
       ))}
     </div>
   );
