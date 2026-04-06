@@ -203,6 +203,12 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const [editMode, setEditMode] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [similarityPrompt, setSimilarityPrompt] = useState<{ newName: string; existing: string } | null>(null);
+  const [swipedSessionId, setSwipedSessionId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [fadingSessionId, setFadingSessionId] = useState<string | null>(null);
+  const swipeStartX = useRef<number | null>(null);
+  const swipeCurrentX = useRef<number>(0);
+  const swipeRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
