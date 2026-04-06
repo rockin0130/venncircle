@@ -188,7 +188,10 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   const { user, activeGroup, setActiveGroup, groups } = useAuth();
   const { showGoogleCalendar } = useGroupContext();
 
-  // "Mine" is now the default via AuthContext initial state
+  // Always default to "Mine" on Calendar page mount
+  useEffect(() => {
+    setActiveGroup({ _personal: true, id: "__personal__", name: "Mine", type: "personal", emoji: "👤", invite_code: "", created_by: "", shared_pages: [], members: [] } as any);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isPrivateMode = !!(activeGroup as any)?._personal;
 
