@@ -1179,8 +1179,8 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
                     {dots && (
                       <div className="flex gap-[2px] absolute bottom-0">
                         {dots.slice(0, 3).map((dot, idx) => (
-                            <span key={idx} className="w-[4px] h-[4px] rounded-full"
-                              style={{ backgroundColor: dot.color }} />
+                            <span key={idx} className="rounded-full"
+                              style={{ width: 5, height: 5, backgroundColor: dot.color }} />
                         ))}
                       </div>
                     )}
