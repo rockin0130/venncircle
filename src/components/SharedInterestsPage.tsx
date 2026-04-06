@@ -460,7 +460,7 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
               </div>
             ) : (
               /* Full group cards */
-              <div className="space-y-2">
+              <div className="space-y-2" ref={groupsScrollRef}>
                 {allGroups.map((group, gi) => (
                   <SwipeableGroupCard
                     key={group.id}
@@ -469,6 +469,9 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
                     user={user}
                     onTap={() => handleGroupTap(group)}
                     onLeft={() => refreshGroups()}
+                    activeSwipeId={activeSwipeId}
+                    onSwipeOpen={setActiveSwipeId}
+                    scrollContainerRef={groupsScrollRef}
                   />
                 ))}
                 
