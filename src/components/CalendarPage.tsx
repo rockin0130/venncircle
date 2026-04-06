@@ -1842,4 +1842,359 @@ const TimeGridView = ({
   );
 };
 
+// ── Week View (5-day scrollable layout) ──────────────────
+const WEEK_COL_WIDTH = 62;
+const WEEK_TIME_COL = 34;
+const WEEK_VISIBLE_DAYS = 5;
+const WEEK_HOUR_HEIGHT = 60;
+
+const WeekView = ({
+  selectedDate, setSelectedDate, getItemsForDate, groups, timeGridRef, onItemTap, colorMap, filterUsers, userFilterIds, currentUserId,
+}: {
+  selectedDate: Date;
+  setSelectedDate: (d: Date | ((prev: Date) => Date)) => void;
+  getItemsForDate: (d: number, m: number, y: number) => CalItem[];
+  groups: Group[];
+  timeGridRef: React.RefObject<HTMLDivElement | null>;
+  onItemTap?: (item: CalItem) => void;
+  colorMap?: { byId: Map<string, string>; byProvider: Map<string, string>; defaultColor?: string | null };
+  filterUsers: FilterUser[];
+  userFilterIds: Set<string>;
+  currentUserId: string;
+}) => {
+  const { profile } = useAuth();
+  const today = new Date();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [scrollOffset, setScrollOffset] = useState(0);
+
+  // Generate 60 days: 15 before today, 45 after
+  const allDates = useMemo(() => {
+    const dates: Date[] = [];
+    for (let i = -15; i <= 45; i++) dates.push(addDays(today, i));
+    return dates;
+  }, []);
+
+  // Today index in allDates array
+  const todayIdx = 15;
+
+  // Sync horizontal scroll
+  const handleScroll = useCallback(() => {
+    if (scrollContainerRef.current) {
+      setScrollOffset(scrollContainerRef.current.scrollLeft);
+    }
+  }, []);
+
+  // Scroll to today on mount
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = todayIdx * WEEK_COL_WIDTH;
+      setScrollOffset(todayIdx * WEEK_COL_WIDTH);
+    }
+  }, []);
+
+  // Build items per date
+  const dateItems = useMemo(() => {
+    return allDates.map((d) => ({
+      date: d,
+      items: getItemsForDate(d.getDate(), d.getMonth(), d.getFullYear()),
+      isToday: isSameDay(d, today),
+    }));
+  }, [allDates, getItemsForDate]);
+
+  // Get member dots for a date
+  const getMemberDots = useCallback((items: CalItem[]): string[] => {
+    const seen = new Set<string>();
+    const dots: string[] = [];
+    items.forEach((it) => {
+      const raw = it.raw as any;
+      const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+      const ownerIds = new Set<string>();
+      if (it.assignee === "me") ownerIds.add(ownerId);
+      else if (it.assignee === "partner") {
+        if (it.groupId) {
+          const grp = groups.find(g => g.id === it.groupId);
+          grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+            .forEach((m: any) => ownerIds.add(m.user_id));
+        }
+      } else if (it.assignee === "both") {
+        ownerIds.add(ownerId);
+        if (it.groupId) {
+          const grp = groups.find(g => g.id === it.groupId);
+          grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+            .forEach((m: any) => ownerIds.add(m.user_id));
+        }
+      } else ownerIds.add(ownerId);
+      if (it.type === "gcal") ownerIds.add(currentUserId);
+
+      ownerIds.forEach(uid => {
+        if (seen.has(uid)) return;
+        if (filterUsers.length > 0) {
+          const fu = filterUsers.find(u => u.id === uid);
+          if (fu) {
+            seen.add(uid);
+            dots.push(MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot);
+          }
+        } else {
+          if (!seen.has(currentUserId)) {
+            seen.add(currentUserId);
+            dots.push(MEMBER_COLORS[0].dot);
+          }
+        }
+      });
+    });
+    return dots.slice(0, 3);
+  }, [filterUsers, groups, currentUserId]);
+
+  // Layout overlapping events in a column
+  const layoutEventsInCol = (items: CalItem[]) => {
+    const timed = items.filter((it) => !it.allDay && it.hour != null);
+    const sorted = [...timed].sort((a, b) => (a.hour ?? 0) - (b.hour ?? 0));
+    const positioned: { item: CalItem; col: number; totalCols: number }[] = [];
+
+    sorted.forEach((item) => {
+      const startH = item.hour!;
+      const endH = item.endHour ?? startH + 1;
+      const overlapping = positioned.filter((p) => {
+        const pStart = p.item.hour!;
+        const pEnd = p.item.endHour ?? pStart + 1;
+        return startH < pEnd && endH > pStart;
+      });
+      const usedCols = new Set(overlapping.map((o) => o.col));
+      let col = 0;
+      while (usedCols.has(col)) col++;
+      positioned.push({ item, col, totalCols: 1 });
+      const group = [...overlapping, { item, col, totalCols: 1 }];
+      const maxCol = Math.max(...group.map((g) => g.col)) + 1;
+      group.forEach((g) => { g.totalCols = maxCol; });
+      overlapping.forEach((o) => { o.totalCols = maxCol; });
+    });
+
+    return positioned;
+  };
+
+  const getPersonColor = (item: CalItem): string => {
+    if (filterUsers.length === 0) return resolveItemColor(item, groups, colorMap);
+    const raw = item.raw as any;
+    const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+    if (item.assignee === "both") return "#8B5CF6";
+    if (item.type === "gcal") {
+      const fu = filterUsers.find(u => u.id === currentUserId);
+      return fu ? MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot : resolveItemColor(item, groups, colorMap);
+    }
+    const targetId = item.assignee === "partner" ? undefined : ownerId;
+    if (targetId) {
+      const fu = filterUsers.find(u => u.id === targetId);
+      if (fu) return MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot;
+    }
+    return resolveItemColor(item, groups, colorMap);
+  };
+
+  // Get a lighter bg version of a color
+  const getLightBg = (color: string): string => color + "18";
+  const getDarkText = (color: string): string => color;
+
+  // Member avatar dot for event cards
+  const MemberDot = ({ item }: { item: CalItem }) => {
+    const raw = item.raw as any;
+    const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+    const memberIds: string[] = [];
+
+    if (item.assignee === "me") memberIds.push(ownerId);
+    else if (item.assignee === "both") {
+      memberIds.push(ownerId);
+      if (item.groupId) {
+        const grp = groups.find(g => g.id === item.groupId);
+        grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+          .forEach((m: any) => memberIds.push(m.user_id));
+      }
+    } else if (item.assignee === "partner") {
+      if (item.groupId) {
+        const grp = groups.find(g => g.id === item.groupId);
+        grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+          .forEach((m: any) => memberIds.push(m.user_id));
+      }
+    }
+
+    return (
+      <div className="flex -space-x-1 mt-auto">
+        {memberIds.map((uid) => {
+          const fu = filterUsers.find(u => u.id === uid);
+          const memberColor = fu ? MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot : MEMBER_COLORS[0].dot;
+          const initial = fu ? fu.initial : (uid === currentUserId ? (profile?.display_name?.charAt(0)?.toUpperCase() || "?") : "?");
+          const avatarUrl = fu?.avatarUrl || (uid === currentUserId ? profile?.avatar_url : null);
+          return avatarUrl ? (
+            <img key={uid} src={avatarUrl} alt={initial}
+              className="rounded-full object-cover border"
+              style={{ width: 12, height: 12, borderColor: "hsl(var(--card))" }}
+              onError={(e) => {
+                const span = document.createElement("span");
+                span.className = "inline-flex items-center justify-center rounded-full font-bold leading-none";
+                span.style.width = "12px";
+                span.style.height = "12px";
+                span.style.fontSize = "6px";
+                span.style.backgroundColor = memberColor;
+                span.style.color = "white";
+                span.textContent = initial;
+                (e.target as HTMLElement).replaceWith(span);
+              }}
+            />
+          ) : (
+            <span key={uid}
+              className="inline-flex items-center justify-center rounded-full font-bold leading-none text-white"
+              style={{ width: 12, height: 12, fontSize: 6, backgroundColor: memberColor }}>
+              {initial}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const totalWidth = allDates.length * WEEK_COL_WIDTH;
+
+  return (
+    <div>
+      {/* Synced scrollable container */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="overflow-x-auto overflow-y-hidden"
+        style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
+      >
+        <style>{`.week-scroll::-webkit-scrollbar { display: none; }`}</style>
+        <div className="week-scroll" style={{ width: totalWidth + WEEK_TIME_COL }}>
+          {/* ── Day Strip ── */}
+          <div className="flex" style={{ paddingLeft: WEEK_TIME_COL }}>
+            {dateItems.map((col, i) => {
+              const dots = getMemberDots(col.items);
+              return (
+                <div key={i} className="flex flex-col items-center py-1.5"
+                  style={{ width: WEEK_COL_WIDTH, flexShrink: 0 }}>
+                  <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {DAYS_ABBR[col.date.getDay()]}
+                  </span>
+                  <span className={cn(
+                    "w-7 h-7 flex items-center justify-center rounded-full text-[13px] font-semibold mt-0.5",
+                    col.isToday ? "text-primary-foreground" : "text-foreground"
+                  )}
+                    style={col.isToday ? { backgroundColor: "#1a1a1a", color: "white" } : undefined}
+                  >
+                    {col.date.getDate()}
+                  </span>
+                  <div className="flex gap-[2px] mt-0.5 h-[5px]">
+                    {dots.map((c, di) => (
+                      <span key={di} className="rounded-full" style={{ width: 5, height: 5, backgroundColor: c }} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── All-day strip ── */}
+          {dateItems.some((c) => c.items.some((it) => it.allDay || it.isDueDateTask)) && (
+            <div className="flex border-t border-b border-border">
+              <div className="flex items-center justify-end pr-1 text-[9px] text-muted-foreground"
+                style={{ width: WEEK_TIME_COL, flexShrink: 0 }}>all day</div>
+              {dateItems.map((col, ci) => (
+                <div key={ci} className="border-l border-border p-0.5"
+                  style={{ width: WEEK_COL_WIDTH, flexShrink: 0, minHeight: 24 }}>
+                  {col.items.filter((it) => it.allDay || it.isDueDateTask).map((it) => {
+                    const color = it.isDueDateTask ? TODO_COLOR : getPersonColor(it);
+                    return (
+                      <button key={it.id} onClick={() => onItemTap?.(it)}
+                        className="w-full flex items-center gap-0.5 text-left rounded px-0.5 py-0.5 mb-0.5 hover:opacity-80 active:opacity-60 transition-opacity truncate"
+                        style={{ backgroundColor: getLightBg(color) }}>
+                        <MemberDot item={it} />
+                        <span className="text-[8px] font-medium truncate" style={{ color: getDarkText(color) }}>
+                          {it.title}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Time grid ── */}
+          <div ref={timeGridRef} className="overflow-y-auto relative" style={{ maxHeight: 310 }}>
+            <div className="flex" style={{ height: 24 * WEEK_HOUR_HEIGHT }}>
+              {/* Time labels */}
+              <div className="relative" style={{ width: WEEK_TIME_COL, flexShrink: 0 }}>
+                {HOURS.map((h) => (
+                  <div key={h} className="absolute w-full text-right pr-1 text-[9px] text-muted-foreground"
+                    style={{ top: h * WEEK_HOUR_HEIGHT - 5 }}>
+                    {h === 0 ? "" : h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`}
+                  </div>
+                ))}
+              </div>
+
+              {/* Day columns */}
+              {dateItems.map((col, ci) => {
+                const positioned = layoutEventsInCol(col.items);
+                return (
+                  <div key={ci} className="relative border-l border-border"
+                    style={{ width: WEEK_COL_WIDTH, flexShrink: 0 }}>
+                    {/* Hour lines */}
+                    {HOURS.map((h) => (
+                      <div key={h} className="absolute border-t border-border/60"
+                        style={{ top: h * WEEK_HOUR_HEIGHT, width: "100%" }} />
+                    ))}
+
+                    {/* Now line */}
+                    {col.isToday && (() => {
+                      const now = new Date();
+                      const nowPos = (now.getHours() + now.getMinutes() / 60) * WEEK_HOUR_HEIGHT;
+                      return (
+                        <div className="absolute z-10" style={{ top: nowPos, width: "100%" }}>
+                          <div className="w-2 h-2 rounded-full absolute -left-1 -top-[3px]" style={{ backgroundColor: "hsl(var(--destructive))" }} />
+                          <div className="h-[2px] w-full" style={{ backgroundColor: "hsl(var(--destructive))" }} />
+                        </div>
+                      );
+                    })()}
+
+                    {/* Event cards */}
+                    {positioned.map(({ item, col: colIdx, totalCols }) => {
+                      const color = getPersonColor(item);
+                      const top = item.hour! * WEEK_HOUR_HEIGHT;
+                      const endH = item.endHour ?? item.hour! + 1;
+                      const duration = Math.max(endH - item.hour!, 0.25);
+                      const height = Math.max(duration * WEEK_HOUR_HEIGHT, 20);
+                      const colW = (WEEK_COL_WIDTH - 2) / totalCols;
+                      const left = colIdx * colW + 1;
+
+                      return (
+                        <button key={item.id} onClick={() => onItemTap?.(item)}
+                          className="absolute overflow-hidden cursor-pointer text-left hover:brightness-105 active:brightness-95 transition-all flex flex-col"
+                          style={{
+                            top, height, width: colW, left,
+                            backgroundColor: getLightBg(color),
+                            borderLeft: `3px solid ${color}`,
+                            borderRadius: "0 7px 7px 0",
+                          }}>
+                          <p className="text-[9px] font-medium leading-tight px-1 pt-0.5 truncate"
+                            style={{ color: getDarkText(color) }}>
+                            {item.title}
+                          </p>
+                          {height > 24 && (
+                            <p className="text-[7px] px-1 truncate" style={{ color: getDarkText(color), opacity: 0.7 }}>
+                              {item.type === "gcal" ? new Date(item.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : formatTime(item.time)}
+                            </p>
+                          )}
+                          {height > 36 && <div className="px-1 pb-0.5"><MemberDot item={item} /></div>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default CalendarPage;
