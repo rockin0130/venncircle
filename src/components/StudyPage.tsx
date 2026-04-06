@@ -189,7 +189,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const [fullscreen, setFullscreen] = useState(false);
   const [chartFilter, setChartFilter] = useState("mine");
   const [chartDropdownOpen, setChartDropdownOpen] = useState(false);
-  const [sessionsFilter, setSessionsFilter] = useState("mine");
+  const [sessionsFilter, setSessionsFilter] = useState<string[]>(["mine"]);
   const [editMode, setEditMode] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [similarityPrompt, setSimilarityPrompt] = useState<{ newName: string; existing: string } | null>(null);
@@ -700,10 +700,34 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   // Filtered today sessions for group view
   const filteredGroupTodaySessions = useMemo(() => {
     if (isPersonal) return todaySessions;
-    if (sessionsFilter === "mine") return groupSessions.filter(s => s.user_id === user?.id && s.started_at.startsWith(today));
-    if (sessionsFilter === "together") return [];
-    return groupSessions.filter(s => s.user_id === sessionsFilter && s.started_at.startsWith(today));
+    if (sessionsFilter.includes("together")) return [];
+    const selectedUserIds = sessionsFilter.map(k => k === "mine" ? user?.id : k).filter(Boolean) as string[];
+    return groupSessions.filter(s => selectedUserIds.includes(s.user_id) && s.started_at.startsWith(today));
   }, [isPersonal, sessionsFilter, groupSessions, todaySessions, user, today]);
+
+  // Whether to show column view (together or multi-select)
+  const showColumnView = useMemo(() => {
+    if (isPersonal) return false;
+    if (sessionsFilter.includes("together")) return true;
+    return sessionsFilter.length > 1;
+  }, [isPersonal, sessionsFilter]);
+
+  // Members to show in column view
+  const columnMembers = useMemo(() => {
+    if (isPersonal) return [];
+    if (sessionsFilter.includes("together")) return groupMembers;
+    const selectedUserIds = sessionsFilter.map(k => k === "mine" ? user?.id : k).filter(Boolean) as string[];
+    return groupMembers.filter(m => selectedUserIds.includes(m.user_id));
+  }, [isPersonal, sessionsFilter, groupMembers, user]);
+
+  // Total time for header
+  const sessionsTotalSeconds = useMemo(() => {
+    if (isPersonal) return todaySessions.reduce((sum, s) => sum + s.duration_seconds, 0);
+    if (showColumnView) {
+      return columnMembers.reduce((sum, m) => sum + m.todayTotal, 0);
+    }
+    return filteredGroupTodaySessions.reduce((sum, s) => sum + s.duration_seconds, 0);
+  }, [isPersonal, todaySessions, showColumnView, columnMembers, filteredGroupTodaySessions]);
 
   // Weekly sessions count
   const weekSessionsCount = useMemo(() => sessions.filter(s => weekDays.some(d => s.started_at.startsWith(d.date))).length, [sessions, weekDays]);
@@ -1019,34 +1043,50 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
             <h3 className="text-sm font-semibold text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>
               Today's sessions
             </h3>
-            <span className="text-xs text-muted-foreground">
-              {isPersonal ? todaySessions.length : filteredGroupTodaySessions.length} sessions
+            <span className="text-xs" style={{ color: "#6C47FF", fontWeight: 500 }}>
+              {fmtDuration(sessionsTotalSeconds)} total
             </span>
           </div>
 
-          {/* Filter pills (group view) */}
+          {/* Filter pills (group view) — multi-select */}
           {!isPersonal && sessionsFilterOptions.length > 0 && (
             <div className="flex gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
-              {sessionsFilterOptions.map(opt => (
-                <button
-                  key={opt.key}
-                  onClick={() => setSessionsFilter(opt.key)}
-                  className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
-                  style={{
-                    background: sessionsFilter === opt.key ? "#1a1a1a" : "#F4F3F0",
-                    color: sessionsFilter === opt.key ? "#fff" : "#888",
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              {sessionsFilterOptions.map(opt => {
+                const isActive = sessionsFilter.includes(opt.key);
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => {
+                      if (opt.key === "together") {
+                        setSessionsFilter(["together"]);
+                      } else {
+                        setSessionsFilter(prev => {
+                          const withoutTogether = prev.filter(k => k !== "together");
+                          if (withoutTogether.includes(opt.key)) {
+                            const next = withoutTogether.filter(k => k !== opt.key);
+                            return next.length === 0 ? [opt.key] : next;
+                          }
+                          return [...withoutTogether, opt.key];
+                        });
+                      }
+                    }}
+                    className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
+                    style={{
+                      background: isActive ? "#1a1a1a" : "#F4F3F0",
+                      color: isActive ? "#fff" : "#888",
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           )}
 
-          {/* Together view: horizontal columns */}
-          {!isPersonal && sessionsFilter === "together" ? (
+          {/* Column view: Together or multi-select */}
+          {!isPersonal && showColumnView ? (
             <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
-              {groupMembers.map(m => {
+              {columnMembers.map(m => {
                 const mSessions = m.todaySessions.filter((s: StudySession) => !s.is_active);
                 return (
                   <div key={m.user_id} className="flex-shrink-0" style={{ width: 150 }}>
