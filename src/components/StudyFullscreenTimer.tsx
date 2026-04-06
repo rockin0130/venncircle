@@ -4,11 +4,11 @@ import { Waves, Music, CloudRain } from "lucide-react";
 interface StudyFullscreenTimerProps {
   subject: string;
   groupName?: string;
-  startedAt: string;
+  initialElapsed: number;
   todayTotal: number;
   goalHours: number;
-  onStop: () => void;
-  onDismiss: () => void;
+  onStop: (totalElapsed: number) => void;
+  onDismiss: (totalElapsed: number) => void;
 }
 
 const AMBIENT = [
@@ -28,23 +28,27 @@ function fmtTimer(seconds: number) {
 const StudyFullscreenTimer = ({
   subject,
   groupName,
-  startedAt,
+  initialElapsed,
   todayTotal,
   goalHours,
   onStop,
   onDismiss,
 }: StudyFullscreenTimerProps) => {
-  const [elapsed, setElapsed] = useState(0);
+  const [elapsed, setElapsed] = useState(initialElapsed);
   const [activeSound, setActiveSound] = useState<string | null>(null);
   const touchStartY = useRef<number | null>(null);
+  const mountTimeRef = useRef(Date.now());
+  const elapsedRef = useRef(initialElapsed);
 
   useEffect(() => {
-    const update = () =>
-      setElapsed(Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
-    update();
-    const id = setInterval(update, 1000);
+    mountTimeRef.current = Date.now();
+    const id = setInterval(() => {
+      const val = initialElapsed + Math.floor((Date.now() - mountTimeRef.current) / 1000);
+      elapsedRef.current = val;
+      setElapsed(val);
+    }, 1000);
     return () => clearInterval(id);
-  }, [startedAt]);
+  }, [initialElapsed]);
 
   const currentTotal = todayTotal + elapsed;
   const progress = Math.min(currentTotal / (goalHours * 3600), 1);
@@ -66,7 +70,7 @@ const StudyFullscreenTimer = ({
     (e: React.TouchEvent) => {
       if (touchStartY.current !== null) {
         const diff = e.changedTouches[0].clientY - touchStartY.current;
-        if (diff > 100) onDismiss();
+        if (diff > 100) onDismiss(elapsedRef.current);
         touchStartY.current = null;
       }
     },
@@ -80,7 +84,6 @@ const StudyFullscreenTimer = ({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Label */}
       <div className="mb-8 text-center">
         <span
           className="text-xs tracking-[0.15em] uppercase"
@@ -91,26 +94,12 @@ const StudyFullscreenTimer = ({
         </span>
       </div>
 
-      {/* Ring */}
       <div className="relative flex items-center justify-center" style={{ width: SIZE, height: SIZE }}>
         <svg width={SIZE} height={SIZE} className="absolute inset-0">
+          <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={STROKE} />
           <circle
-            cx={SIZE / 2}
-            cy={SIZE / 2}
-            r={R}
-            fill="none"
-            stroke="rgba(255,255,255,0.08)"
-            strokeWidth={STROKE}
-          />
-          <circle
-            cx={SIZE / 2}
-            cy={SIZE / 2}
-            r={R}
-            fill="none"
-            stroke="#6C47FF"
-            strokeWidth={STROKE}
-            strokeLinecap="round"
-            strokeDasharray={`${C - offset} ${offset}`}
+            cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="#6C47FF" strokeWidth={STROKE}
+            strokeLinecap="round" strokeDasharray={`${C - offset} ${offset}`}
             transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
             style={{ transition: "stroke-dasharray 0.5s ease" }}
           />
@@ -119,25 +108,16 @@ const StudyFullscreenTimer = ({
           )}
         </svg>
         <button
-          onClick={onStop}
+          onClick={() => onStop(elapsedRef.current)}
           className="relative z-10 flex flex-col items-center justify-center cursor-pointer"
           style={{ width: SIZE - 30, height: SIZE - 30 }}
         >
-          <span
-            className="text-[10px] uppercase tracking-[0.12em]"
-            style={{ color: "rgba(255,255,255,0.35)" }}
-          >
+          <span className="text-[10px] uppercase tracking-[0.12em]" style={{ color: "rgba(255,255,255,0.35)" }}>
             Session
           </span>
           <span
             className="tabular-nums"
-            style={{
-              fontSize: 38,
-              fontWeight: 500,
-              color: "#fff",
-              fontFamily: "DM Sans, sans-serif",
-              lineHeight: 1.1,
-            }}
+            style={{ fontSize: 38, fontWeight: 500, color: "#fff", fontFamily: "DM Sans, sans-serif", lineHeight: 1.1 }}
           >
             {fmtTimer(elapsed)}
           </span>
@@ -150,31 +130,21 @@ const StudyFullscreenTimer = ({
         </button>
       </div>
 
-      {/* Ambient sounds */}
       <div className="flex gap-4 mt-10">
         {AMBIENT.map(({ key, label, icon: Icon }) => {
           const isActive = activeSound === key;
           return (
-            <button
-              key={key}
-              onClick={() => setActiveSound(isActive ? null : key)}
-              className="flex flex-col items-center gap-1.5"
-            >
+            <button key={key} onClick={() => setActiveSound(isActive ? null : key)} className="flex flex-col items-center gap-1.5">
               <div
                 className="w-10 h-10 rounded-[10px] flex items-center justify-center transition-colors"
                 style={{
                   background: isActive ? "rgba(108,71,255,0.2)" : "rgba(255,255,255,0.06)",
-                  border: isActive
-                    ? "1px solid rgba(108,71,255,0.4)"
-                    : "1px solid rgba(255,255,255,0.06)",
+                  border: isActive ? "1px solid rgba(108,71,255,0.4)" : "1px solid rgba(255,255,255,0.06)",
                 }}
               >
                 <Icon size={18} color={isActive ? "#6C47FF" : "rgba(255,255,255,0.4)"} />
               </div>
-              <span
-                className="text-[9px]"
-                style={{ color: isActive ? "#6C47FF" : "rgba(255,255,255,0.3)" }}
-              >
+              <span className="text-[9px]" style={{ color: isActive ? "#6C47FF" : "rgba(255,255,255,0.3)" }}>
                 {label}
               </span>
             </button>
@@ -182,11 +152,7 @@ const StudyFullscreenTimer = ({
         })}
       </div>
 
-      {/* Hint */}
-      <p
-        className="absolute bottom-8 text-[10px] text-center"
-        style={{ color: "rgba(255,255,255,0.2)" }}
-      >
+      <p className="absolute bottom-8 text-[10px] text-center" style={{ color: "rgba(255,255,255,0.2)" }}>
         Tap the ring to stop · swipe down to exit
       </p>
     </div>
