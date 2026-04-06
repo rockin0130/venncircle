@@ -1,4 +1,5 @@
-import { Home, Compass, Sparkles, MessageCircle, User } from "lucide-react";
+import { Home, Compass, MessageCircle, User } from "lucide-react";
+import VennIcon from "@/components/VennIcon";
 
 export type Tab =
   | "home" | "shared-interests" | "ai" | "chat" | "profile"
