@@ -62,7 +62,7 @@ interface FeedPost {
 
 const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps) => {
   const { user, leaveGroup, updateGroupSharedPages, inviteToGroup, refreshGroups, groups } = useAuth();
-  const { friendships, friendProfiles } = useFriendships();
+  const { friendships, activeFriends } = useFriendships();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addInterestOpen, setAddInterestOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
