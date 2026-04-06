@@ -1842,19 +1842,19 @@ const TimeGridView = ({
   );
 };
 
-// ── Week View (5-day sliding window) ─────────────────────
-const WEEK_TIME_COL = 36;
-const WEEK_VISIBLE_DAYS = 5;
+// ── Week View (4-day sliding window) ─────────────────────
+const WEEK_TIME_COL = 38;
+const WEEK_VISIBLE_DAYS = 4;
 const WEEK_HOUR_HEIGHT = 60;
 
 // Specific light backgrounds and borders per member
 const MEMBER_CARD_STYLES: Record<string, { bg: string; border: string; text: string }> = {
-  "#3B82F6": { bg: "#EEF4FF", border: "#6C47FF", text: "#2E3A8C" },
-  "#6C47FF": { bg: "#EEF4FF", border: "#6C47FF", text: "#2E3A8C" },
-  "#10B981": { bg: "#F0FDF4", border: "#059669", text: "#064E3B" },
-  "#059669": { bg: "#F0FDF4", border: "#059669", text: "#064E3B" },
-  "#EC4899": { bg: "#FFF0F0", border: "#E05C5C", text: "#7F1D1D" },
-  "#E05C5C": { bg: "#FFF0F0", border: "#E05C5C", text: "#7F1D1D" },
+  "#3B82F6": { bg: "#EEF4FF", border: "#6C47FF", text: "#3730A3" },
+  "#6C47FF": { bg: "#EEF4FF", border: "#6C47FF", text: "#3730A3" },
+  "#10B981": { bg: "#F0FDF4", border: "#059669", text: "#065F46" },
+  "#059669": { bg: "#F0FDF4", border: "#059669", text: "#065F46" },
+  "#EC4899": { bg: "#FFF0F0", border: "#E05C5C", text: "#B91C1C" },
+  "#E05C5C": { bg: "#FFF0F0", border: "#E05C5C", text: "#B91C1C" },
   "#F59E0B": { bg: "#FFF8E1", border: "#D97706", text: "#78350F" },
   "#14B8A6": { bg: "#F0FDFA", border: "#0D9488", text: "#134E4A" },
   "#F97316": { bg: "#FFF7ED", border: "#EA580C", text: "#7C2D12" },
@@ -2093,19 +2093,24 @@ const WeekView = ({
       <div className="flex" style={{ flexShrink: 0 }}>
         <div style={{ width: WEEK_TIME_COL, flexShrink: 0 }} />
         {dateItems.map((col) => (
-          <div key={getLocalDateKey(col.date)} className="flex-1 flex flex-col items-center py-1.5">
-            <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-              {DAYS_ABBR[col.date.getDay()]}
-            </span>
-            <span className={cn(
-              "w-7 h-7 flex items-center justify-center rounded-full text-[13px] font-semibold mt-0.5",
-              !col.isToday && "text-foreground"
-            )}
-              style={col.isToday ? { backgroundColor: "#1a1a1a", color: "white" } : undefined}
-            >
-              {col.date.getDate()}
-            </span>
-            <div className="flex gap-[2px] mt-0.5 h-[5px]">
+          <div key={getLocalDateKey(col.date)} className="flex-1 flex flex-col items-center"
+            style={{ padding: "8px 6px 5px" }}>
+            <div className="flex items-center gap-1">
+              <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>
+                {DAYS_ABBR[col.date.getDay()]}
+              </span>
+              {col.isToday ? (
+                <span className="inline-flex items-center justify-center rounded-full text-white"
+                  style={{ width: 20, height: 20, fontSize: 10, fontWeight: 500, backgroundColor: "#1a1a1a" }}>
+                  {col.date.getDate()}
+                </span>
+              ) : (
+                <span style={{ fontSize: 11, fontWeight: 400, color: "#aaa" }}>
+                  {col.date.getDate()}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-[2px] mt-1 h-[5px]">
               {getMemberDots(col.items).map((c, di) => (
                 <span key={di} className="rounded-full" style={{ width: 5, height: 5, backgroundColor: c }} />
               ))}
@@ -2114,35 +2119,33 @@ const WeekView = ({
         ))}
       </div>
 
-      {/* ── All-day strip (pinned, not scrollable) ── */}
-      {hasAllDay && (
-        <div className="flex" style={{ flexShrink: 0, borderTop: "0.5px solid hsl(var(--border))", borderBottom: "0.5px solid hsl(var(--border))" }}>
-          <div className="flex items-center justify-end pr-1 text-[9px] text-muted-foreground"
-            style={{ width: WEEK_TIME_COL, flexShrink: 0 }}>all day</div>
-          {dateItems.map((col, ci) => {
-            const allDayItems = col.items.filter((it) => it.allDay || it.isDueDateTask);
-            return (
-              <div key={ci} className="flex-1 p-0.5 border-l border-border"
-                style={{ minHeight: 24 }}>
-                {allDayItems.map((it) => {
-                  const color = it.isDueDateTask ? TODO_COLOR : getPersonColor(it);
-                  const style = getCardStyle(color);
-                  return (
-                    <button key={it.id} onClick={() => onItemTap?.(it)}
-                      className="w-full flex items-center gap-0.5 text-left rounded px-0.5 py-0.5 mb-0.5 hover:opacity-80 active:opacity-60 transition-opacity truncate"
-                      style={{ backgroundColor: style.bg }}>
-                      <MemberDot item={it} />
-                      <span className="text-[8px] font-medium truncate" style={{ color: style.text }}>
-                        {it.title}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* ── All-day pill row (pinned between header and time grid) ── */}
+      <div className="flex" style={{ flexShrink: 0, borderTop: "0.5px solid hsl(var(--border))", borderBottom: "0.5px solid hsl(var(--border))" }}>
+        <div className="flex items-center justify-end pr-1"
+          style={{ width: WEEK_TIME_COL, flexShrink: 0, fontSize: 9, color: "#aaa" }}>all day</div>
+        {dateItems.map((col, ci) => {
+          const allDayItems = col.items.filter((it) => it.allDay || it.isDueDateTask);
+          return (
+            <div key={ci} className="flex-1 p-0.5 border-l border-border"
+              style={{ minHeight: 28 }}>
+              {allDayItems.map((it) => {
+                const color = it.isDueDateTask ? TODO_COLOR : getPersonColor(it);
+                const style = getCardStyle(color);
+                return (
+                  <button key={it.id} onClick={() => onItemTap?.(it)}
+                    className="w-full flex items-center gap-0.5 text-left px-1 py-0.5 mb-0.5 hover:opacity-80 active:opacity-60 transition-opacity truncate"
+                    style={{ backgroundColor: style.bg, borderRadius: 99 }}>
+                    <MemberDot item={it} />
+                    <span className="text-[8px] font-medium truncate" style={{ color: style.text }}>
+                      {it.title}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
 
       {/* ── Time grid (fills remaining height) ── */}
       <div ref={timeGridRef} className="overflow-y-auto relative flex-1 min-h-0">
@@ -2151,7 +2154,7 @@ const WeekView = ({
           <div className="relative" style={{ width: WEEK_TIME_COL, flexShrink: 0 }}>
             {HOURS.map((h) => (
               <div key={h} className="absolute w-full text-right pr-1 text-muted-foreground"
-                style={{ top: h * WEEK_HOUR_HEIGHT - 5, fontSize: 10 }}>
+                style={{ top: h * WEEK_HOUR_HEIGHT - 5, fontSize: 9 }}>
                 {h === 0 ? "" : h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`}
               </div>
             ))}
@@ -2162,7 +2165,7 @@ const WeekView = ({
             const positioned = layoutEventsInCol(col.items);
             return (
               <div key={getLocalDateKey(col.date)} className="relative border-l border-border flex-1"
-                style={col.isToday ? { backgroundColor: "rgba(108,71,255,0.02)" } : undefined}>
+                style={col.isToday ? { backgroundColor: "rgba(108,71,255,0.015)" } : undefined}>
                 {/* Hour lines */}
                 {HOURS.map((h) => (
                   <div key={h} className="absolute border-t border-border/60"
@@ -2184,7 +2187,7 @@ const WeekView = ({
                 {/* Event cards */}
                 {positioned.map(({ item, col: colIdx, totalCols }) => {
                   const color = getPersonColor(item);
-                  const style = getCardStyle(color);
+                  const cardStyle = getCardStyle(color);
                   const top = item.hour! * WEEK_HOUR_HEIGHT;
                   const endH = item.endHour ?? item.hour! + 1;
                   const duration = Math.max(endH - item.hour!, 0.25);
@@ -2199,16 +2202,16 @@ const WeekView = ({
                         top, height,
                         width: `calc(${pct}% - 2px)`,
                         left: `calc(${leftPct}% + 1px)`,
-                        backgroundColor: style.bg,
-                        borderLeft: `3px solid ${style.border}`,
+                        backgroundColor: cardStyle.bg,
+                        borderLeft: `3px solid ${cardStyle.border}`,
                         borderRadius: "0 7px 7px 0",
                       }}>
                       <p className="text-[9px] font-medium leading-tight px-1 pt-0.5 truncate"
-                        style={{ color: style.text }}>
+                        style={{ color: cardStyle.text }}>
                         {item.title}
                       </p>
                       {height > 24 && (
-                        <p className="text-[7px] px-1 truncate" style={{ color: style.text, opacity: 0.7 }}>
+                        <p className="text-[7px] px-1 truncate" style={{ color: cardStyle.text, opacity: 0.7 }}>
                           {item.type === "gcal" ? new Date(item.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : formatTime(item.time)}
                         </p>
                       )}
