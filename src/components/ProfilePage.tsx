@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Search,
   Info,
@@ -10,7 +10,8 @@ import {
   Apple,
   ShoppingCart,
   Star,
-  Pencil,
+  Camera,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
@@ -80,7 +81,7 @@ function timeAgo(date: Date) {
 const cardStyle = { background: "#fff", borderRadius: 16, border: "0.5px solid rgba(0,0,0,0.07)" } as const;
 
 const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProps) => {
-  const { profile, user, groups, signOut } = useAuth();
+  const { profile, user, groups, signOut, refreshProfile } = useAuth();
   const {
     habits,
     workouts,
@@ -89,6 +90,95 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
   const { activeFriends } = useFriendships();
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showAddFriend, setShowAddFriend] = useState(false);
+  const [showPhotoSheet, setShowPhotoSheet] = useState(false);
+  const [showCropEditor, setShowCropEditor] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [cropScale, setCropScale] = useState(1);
+  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const cropContainerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const pinchRef = useRef<{ dist0: number; scale0: number } | null>(null);
+
+  const handlePhotoSelected = (file: File) => {
+    const url = URL.createObjectURL(file);
+    setSelectedFile(file);
+    setSelectedImage(url);
+    setCropScale(1);
+    setCropOffset({ x: 0, y: 0 });
+    setShowPhotoSheet(false);
+    setShowCropEditor(true);
+  };
+
+  const handleCropConfirm = async () => {
+    if (!selectedFile || !user) return;
+    setUploading(true);
+    try {
+      // Create canvas to crop
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; img.src = selectedImage!; });
+      const canvas = document.createElement("canvas");
+      const size = 400;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d")!;
+      const imgAspect = img.width / img.height;
+      let drawW: number, drawH: number;
+      if (imgAspect > 1) { drawH = size / cropScale; drawW = drawH * imgAspect; }
+      else { drawW = size / cropScale; drawH = drawW / imgAspect; }
+      const dx = (size - drawW) / 2 + cropOffset.x * (size / 300);
+      const dy = (size - drawH) / 2 + cropOffset.y * (size / 300);
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(img, dx, dy, drawW, drawH);
+      const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), "image/jpeg", 0.9));
+      const path = `avatars/${user.id}/${Date.now()}.jpg`;
+      const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, blob, { upsert: true });
+      if (uploadErr) throw uploadErr;
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      const { error: updateErr } = await supabase.from("profiles").update({ avatar_url: urlData.publicUrl }).eq("id", user.id);
+      if (updateErr) throw updateErr;
+      await refreshProfile();
+      setShowCropEditor(false);
+      setSelectedImage(null);
+      setSelectedFile(null);
+    } catch (e: any) {
+      const { toast } = await import("sonner");
+      toast.error("Failed to upload photo");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Touch handlers for crop editor
+  const handleCropTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchRef.current = { dist0: Math.hypot(dx, dy), scale0: cropScale };
+    } else if (e.touches.length === 1) {
+      dragRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, origX: cropOffset.x, origY: cropOffset.y };
+    }
+  };
+  const handleCropTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const newScale = Math.max(0.5, Math.min(5, pinchRef.current.scale0 * (dist / pinchRef.current.dist0)));
+      setCropScale(newScale);
+    } else if (e.touches.length === 1 && dragRef.current) {
+      const dx = e.touches[0].clientX - dragRef.current.startX;
+      const dy = e.touches[0].clientY - dragRef.current.startY;
+      setCropOffset({ x: dragRef.current.origX + dx, y: dragRef.current.origY + dy });
+    }
+  };
+  const handleCropTouchEnd = () => { dragRef.current = null; pinchRef.current = null; };
 
   // ─── Sobriety data ───
   const [sobrietyDays, setSobrietyDays] = useState<number | null>(null);
@@ -230,12 +320,12 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
             )}
           </div>
           <button
-            onClick={() => setShowEditProfile(true)}
+            onClick={() => setShowPhotoSheet(true)}
             className="absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] rounded-full flex items-center justify-center"
             style={{ background: "#222", border: "2px solid #fff" }}
-            aria-label="Edit photo"
+            aria-label="Change photo"
           >
-            <Pencil size={10} color="#fff" />
+            <Camera size={10} color="#fff" />
           </button>
         </div>
         <p style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A", fontFamily: "'DM Sans', sans-serif" }}>
@@ -438,6 +528,111 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
 
       <EditProfileModal open={showEditProfile} onOpenChange={setShowEditProfile} />
       <AddFriendModal open={showAddFriend} onOpenChange={setShowAddFriend} />
+
+      {/* Hidden file inputs */}
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handlePhotoSelected(e.target.files[0]); e.target.value = ""; }} />
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handlePhotoSelected(e.target.files[0]); e.target.value = ""; }} />
+
+      {/* Photo picker action sheet */}
+      {showPhotoSheet && (
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center" onClick={() => setShowPhotoSheet(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative w-full max-w-md mx-4 mb-6 animate-in slide-in-from-bottom-4 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div style={{ background: "#fff", borderRadius: 14, overflow: "hidden" }}>
+              <button
+                className="w-full py-4 text-center"
+                style={{ fontSize: 17, fontWeight: 400, color: "#007AFF", borderBottom: "0.5px solid rgba(0,0,0,0.1)" }}
+                onClick={() => { setShowPhotoSheet(false); cameraInputRef.current?.click(); }}
+              >
+                Take Photo
+              </button>
+              <button
+                className="w-full py-4 text-center"
+                style={{ fontSize: 17, fontWeight: 400, color: "#007AFF" }}
+                onClick={() => { setShowPhotoSheet(false); fileInputRef.current?.click(); }}
+              >
+                Choose from Library
+              </button>
+            </div>
+            <button
+              className="w-full py-4 text-center mt-2"
+              style={{ fontSize: 17, fontWeight: 600, color: "#007AFF", background: "#fff", borderRadius: 14 }}
+              onClick={() => setShowPhotoSheet(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Crop / position editor */}
+      {showCropEditor && selectedImage && (
+        <div className="fixed inset-0 z-[10000] flex flex-col" style={{ background: "#000" }}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 pt-12 pb-3">
+            <p style={{ fontSize: 17, fontWeight: 600, color: "#fff" }}>Move and Scale</p>
+            <button onClick={() => { setShowCropEditor(false); setSelectedImage(null); setSelectedFile(null); }}>
+              <X size={22} color="#fff" />
+            </button>
+          </div>
+
+          {/* Crop area */}
+          <div
+            ref={cropContainerRef}
+            className="flex-1 relative flex items-center justify-center overflow-hidden"
+            onTouchStart={handleCropTouchStart}
+            onTouchMove={handleCropTouchMove}
+            onTouchEnd={handleCropTouchEnd}
+          >
+            {/* Photo behind mask */}
+            <img
+              src={selectedImage}
+              alt=""
+              className="absolute select-none pointer-events-none"
+              draggable={false}
+              style={{
+                transform: `translate(${cropOffset.x}px, ${cropOffset.y}px) scale(${cropScale})`,
+                maxWidth: "100%",
+                maxHeight: "100%",
+                objectFit: "contain",
+                transition: dragRef.current || pinchRef.current ? "none" : "transform 0.1s ease",
+              }}
+            />
+            {/* Circle mask overlay */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+              <defs>
+                <mask id="crop-mask">
+                  <rect width="100%" height="100%" fill="white" />
+                  <circle cx="50%" cy="50%" r="140" fill="black" />
+                </mask>
+              </defs>
+              <rect width="100%" height="100%" fill="rgba(0,0,0,0.6)" mask="url(#crop-mask)" />
+            </svg>
+            {/* Circle outline */}
+            <div
+              className="absolute rounded-full pointer-events-none"
+              style={{ width: 280, height: 280, border: "2px solid rgba(255,255,255,0.5)" }}
+            />
+          </div>
+
+          {/* Bottom buttons */}
+          <div className="flex items-center justify-between px-6 pb-10 pt-4">
+            <button
+              onClick={() => { setShowCropEditor(false); setSelectedImage(null); setSelectedFile(null); }}
+              style={{ fontSize: 16, fontWeight: 500, color: "#fff", padding: "10px 28px", borderRadius: 12, background: "rgba(255,255,255,0.15)" }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCropConfirm}
+              disabled={uploading}
+              style={{ fontSize: 16, fontWeight: 600, color: "#fff", padding: "10px 28px", borderRadius: 12, background: "#6C47FF", opacity: uploading ? 0.6 : 1 }}
+            >
+              {uploading ? "Saving…" : "Confirm"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
