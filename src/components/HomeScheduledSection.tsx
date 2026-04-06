@@ -367,14 +367,31 @@ const HomeScheduledSection = ({
   const getContextTag = useCallback((item: UnifiedScheduledItem) => {
     if (item.groupId) {
       const group = groups.find(g => g.id === item.groupId);
-      if (group) {
-        // Family groups use green
-        const isFamily = group.name.toLowerCase() === "family" || group.category === "home";
-        if (isFamily) return { label: group.name, bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-300" };
-        return { label: group.name, bg: "bg-violet-100 dark:bg-violet-900/30", text: "text-violet-700 dark:text-violet-300" };
-      }
+      if (group) return { label: group.name, coverUrl: (group as any).cover_image_url || null, group };
     }
-    return { label: "Mine", bg: "bg-sky-100 dark:bg-sky-900/30", text: "text-sky-700 dark:text-sky-300" };
+    return null;
+  }, [groups]);
+
+  const GROUP_PILL_COLORS = ["#93C5FD", "#86EFAC", "#C4B5FD", "#FCD34D", "#FCA5A5", "#67E8F9", "#A7F3D0", "#FDBA74"];
+
+  const renderGroupPill = useCallback((tag: { label: string; coverUrl: string | null; group: any }) => {
+    const groupIndex = groups.findIndex(g => g.id === tag.group.id);
+    const color = GROUP_PILL_COLORS[groupIndex >= 0 ? groupIndex % GROUP_PILL_COLORS.length : 0];
+    return (
+      <span
+        className="inline-flex items-center gap-1"
+        style={{ fontSize: 10, fontWeight: 500, padding: "2px 8px 2px 3px", borderRadius: 99, background: "#fff", border: "0.5px solid rgba(0,0,0,0.08)" }}
+      >
+        {tag.coverUrl ? (
+          <img src={tag.coverUrl} className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
+        ) : (
+          <span className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-bold text-white flex-shrink-0" style={{ background: color }}>
+            {tag.label[0]}
+          </span>
+        )}
+        <span className="truncate max-w-[60px]">{tag.label}</span>
+      </span>
+    );
   }, [groups]);
 
   // Toggle handler
@@ -464,11 +481,7 @@ const HomeScheduledSection = ({
                   className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-border bg-card text-xs font-medium"
                 >
                   <span className="truncate max-w-[140px]">{item.title}</span>
-                  {tag.label !== "Mine" && (
-                    <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full", tag.bg, tag.text)}>
-                      {tag.label}
-                    </span>
-                  )}
+                  {tag && renderGroupPill(tag)}
                 </div>
               );
             })}
@@ -627,9 +640,7 @@ const HomeScheduledSection = ({
                               </span>
                             )}
                             {/* Context tag */}
-                            <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full", tag.bg, tag.text)}>
-                              {tag.label}
-                            </span>
+                            {tag && renderGroupPill(tag)}
                             {item.kind === "gcal" && (
                               <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">Google</span>
                             )}
