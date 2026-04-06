@@ -422,6 +422,7 @@ const HomeScheduledSection = ({
       filterUsers: allFilterUsers,
       currentUserId: user?.id || "",
       currentUserInitial: profile?.display_name?.charAt(0)?.toUpperCase() || "?",
+      currentUserAvatarUrl: profile?.avatar_url,
     });
   }, [user, groups, allFilterUsers, profile]);
 
