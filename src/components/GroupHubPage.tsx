@@ -166,25 +166,31 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
     setEditingName(false);
   };
 
-  const handleLeave = async () => {
-    setLeaving(true);
-    const result = await leaveGroup(currentGroup.id);
-    if (result.error) { toast.error(result.error); setLeaving(false); }
-    else { toast.success("Left group"); await refreshGroups(); onBack(); }
+  const handleSetRole = async (targetUserId: string, newRole: string) => {
+    const { data, error } = await supabase.rpc("set_member_role" as any, {
+      _group_id: currentGroup.id,
+      _target_user_id: targetUserId,
+      _new_role: newRole,
+    });
+    if (error) { toast.error(error.message); return; }
+    const result = data as any;
+    if (result?.error) { toast.error(result.error); return; }
+    toast.success(newRole === "admin" ? "Promoted to admin" : "Removed admin role");
+    setMemberMenuOpen(null);
+    await refreshGroups();
   };
 
-  const handleDelete = async () => {
-    setDeleting(true);
-    try {
-      const { data, error } = await supabase.rpc("delete_group", { _group_id: currentGroup.id });
-      if (error) { toast.error(`Failed to delete group: ${error.message}`); setDeleting(false); return; }
-      const result = data as any;
-      if (result?.error) { toast.error(result.error); setDeleting(false); return; }
-      toast.success("Group deleted");
-      setSettingsOpen(false);
-      await refreshGroups();
-      onBack();
-    } catch { toast.error("Failed to delete group"); setDeleting(false); }
+  const handleAddMember = async (friendUserId: string) => {
+    const result = await inviteToGroup(currentGroup.id, friendUserId);
+    if (result.error) toast.error(result.error);
+    else { toast.success("Invite sent!"); setAddMemberOpen(false); await refreshGroups(); }
+  };
+
+  const handleLeaveFlowDone = async () => {
+    setLeaveFlowOpen(false);
+    setSettingsOpen(false);
+    await refreshGroups();
+    onBack();
   };
 
   const handleLike = async (postId: string, currentlyLiked: boolean) => {
