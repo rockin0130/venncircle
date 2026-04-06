@@ -439,12 +439,13 @@ const ChatListPage = ({
             {/* Friends dropdown */}
             {newDmOpen && (
               <div
-                className="mx-5 mb-2 bg-white rounded-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200"
+                className="absolute right-4 z-20 mt-1 w-auto min-w-[180px] max-w-[280px] bg-white overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200"
                 style={{
-                  border: "0.5px solid rgba(0,0,0,0.07)",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                  border: "0.5px solid rgba(0,0,0,0.08)",
+                  boxShadow: "0 6px 20px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.06)",
                   maxHeight: 220,
                   overflowY: "auto",
+                  borderRadius: 14,
                 }}
               >
                 {friendsWithoutDm.length === 0 && activeFriends.length === 0 && (
