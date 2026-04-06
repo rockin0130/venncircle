@@ -1617,6 +1617,7 @@ const EventList = ({
   const { activeGroup, user, profile } = useAuth();
   const currentUserId = user?.id || "";
   const currentUserName = profile?.display_name || "";
+  const isPersonalOrAll = !activeGroup || (activeGroup as any)?._personal;
   const todoItems = items.filter((i) => i.isDueDateTask);
   const allDayItems = items.filter((i) => i.allDay && !i.isDueDateTask);
   const timedItems = items.filter((i) => !i.allDay);
