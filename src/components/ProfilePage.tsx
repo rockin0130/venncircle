@@ -81,7 +81,7 @@ function timeAgo(date: Date) {
 const cardStyle = { background: "#fff", borderRadius: 16, border: "0.5px solid rgba(0,0,0,0.07)" } as const;
 
 const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProps) => {
-  const { profile, user, groups, signOut } = useAuth();
+  const { profile, user, groups, signOut, refreshProfile } = useAuth();
   const {
     habits,
     workouts,
@@ -90,6 +90,95 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
   const { activeFriends } = useFriendships();
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showAddFriend, setShowAddFriend] = useState(false);
+  const [showPhotoSheet, setShowPhotoSheet] = useState(false);
+  const [showCropEditor, setShowCropEditor] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [cropScale, setCropScale] = useState(1);
+  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const cropContainerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const pinchRef = useRef<{ dist0: number; scale0: number } | null>(null);
+
+  const handlePhotoSelected = (file: File) => {
+    const url = URL.createObjectURL(file);
+    setSelectedFile(file);
+    setSelectedImage(url);
+    setCropScale(1);
+    setCropOffset({ x: 0, y: 0 });
+    setShowPhotoSheet(false);
+    setShowCropEditor(true);
+  };
+
+  const handleCropConfirm = async () => {
+    if (!selectedFile || !user) return;
+    setUploading(true);
+    try {
+      // Create canvas to crop
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; img.src = selectedImage!; });
+      const canvas = document.createElement("canvas");
+      const size = 400;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d")!;
+      const imgAspect = img.width / img.height;
+      let drawW: number, drawH: number;
+      if (imgAspect > 1) { drawH = size / cropScale; drawW = drawH * imgAspect; }
+      else { drawW = size / cropScale; drawH = drawW / imgAspect; }
+      const dx = (size - drawW) / 2 + cropOffset.x * (size / 300);
+      const dy = (size - drawH) / 2 + cropOffset.y * (size / 300);
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(img, dx, dy, drawW, drawH);
+      const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), "image/jpeg", 0.9));
+      const path = `avatars/${user.id}/${Date.now()}.jpg`;
+      const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, blob, { upsert: true });
+      if (uploadErr) throw uploadErr;
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      const { error: updateErr } = await supabase.from("profiles").update({ avatar_url: urlData.publicUrl }).eq("id", user.id);
+      if (updateErr) throw updateErr;
+      await refreshProfile();
+      setShowCropEditor(false);
+      setSelectedImage(null);
+      setSelectedFile(null);
+    } catch (e: any) {
+      const { toast } = await import("sonner");
+      toast.error("Failed to upload photo");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Touch handlers for crop editor
+  const handleCropTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchRef.current = { dist0: Math.hypot(dx, dy), scale0: cropScale };
+    } else if (e.touches.length === 1) {
+      dragRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, origX: cropOffset.x, origY: cropOffset.y };
+    }
+  };
+  const handleCropTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const newScale = Math.max(0.5, Math.min(5, pinchRef.current.scale0 * (dist / pinchRef.current.dist0)));
+      setCropScale(newScale);
+    } else if (e.touches.length === 1 && dragRef.current) {
+      const dx = e.touches[0].clientX - dragRef.current.startX;
+      const dy = e.touches[0].clientY - dragRef.current.startY;
+      setCropOffset({ x: dragRef.current.origX + dx, y: dragRef.current.origY + dy });
+    }
+  };
+  const handleCropTouchEnd = () => { dragRef.current = null; pinchRef.current = null; };
 
   // ─── Sobriety data ───
   const [sobrietyDays, setSobrietyDays] = useState<number | null>(null);
