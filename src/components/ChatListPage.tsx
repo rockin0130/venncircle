@@ -461,7 +461,7 @@ const ChatListPage = ({
                     <button
                       key={f.friend.id}
                       onClick={() => handleStartDm(f.friend!.id)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left active:bg-[rgba(0,0,0,0.03)] transition-colors"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left active:bg-[rgba(0,0,0,0.03)] transition-colors"
                     >
                       <div
                         className="w-[30px] h-[30px] rounded-full overflow-hidden flex items-center justify-center shrink-0"
