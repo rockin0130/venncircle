@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { ArrowLeft, Settings, ChevronRight, Plus, Trash2, LogOut, Pencil, X, Check, Loader2, MoreHorizontal, Heart, MessageCircle, Share2, Image, Activity, Smile, Camera } from "lucide-react";
+import { ArrowLeft, Settings, ChevronRight, Plus, Trash2, LogOut, Pencil, X, Check, Loader2, MoreHorizontal, Heart, MessageCircle, Share2, Image, Activity, Smile, Camera, UserPlus, ShieldCheck, ShieldOff } from "lucide-react";
 import { useAuth, Group, ShareablePage, SHAREABLE_PAGES, PAGE_LABELS, PAGE_ICONS } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import GroupFeedCompose from "@/components/GroupFeedCompose";
 import GroupFeedPost from "@/components/GroupFeedPost";
+import LeaveGroupFlow from "@/components/LeaveGroupFlow";
+import { useFriendships } from "@/hooks/useFriendships";
 
 interface GroupHubPageProps {
   group: Group;
