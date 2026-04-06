@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight, Droplets, Dumbbell } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, GroupMember } from "@/context/AuthContext";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
 import { formatTime } from "@/lib/formatTime";
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { normalizeCalendarAssignees, getAssignedAvatarMembers, getAvatarPalette } from "@/lib/calendarAssignees";
+import { MEMBER_COLORS, type FilterUser } from "@/components/CalendarUserFilter";
 
 type UnifiedScheduledItem = {
   id: string;
@@ -215,8 +217,39 @@ const HomeScheduledSection = ({
   isViewingMemberName,
   showWater = false,
 }: Props) => {
-  const { groups, activeGroup, user } = useAuth();
+  const { groups, activeGroup, user, profile } = useAuth();
   const { filteredHabits, toggleHabit, getHabitStreak, getWorkoutsForDate } = useAppContext();
+
+  // Build a unified FilterUser list from all groups (same approach as Calendar's useCalendarFilterUsers in "All" mode)
+  const allFilterUsers = useMemo<FilterUser[]>(() => {
+    const users: FilterUser[] = [];
+    users.push({
+      id: user?.id || "me",
+      label: "Me",
+      avatarUrl: profile?.avatar_url || null,
+      initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?",
+      colorIndex: 0,
+    });
+    let colorIdx = 1;
+    const seen = new Set<string>();
+    seen.add(user?.id || "");
+    groups.forEach((g) => {
+      g.members
+        .filter((m: GroupMember) => m.status === "active" && !seen.has(m.user_id))
+        .forEach((m) => {
+          seen.add(m.user_id);
+          const name = m.display_name || "Member";
+          users.push({
+            id: m.user_id,
+            label: name.split(" ")[0],
+            avatarUrl: m.avatar_url,
+            initial: name.charAt(0).toUpperCase(),
+            colorIndex: colorIdx++ % MEMBER_COLORS.length,
+          });
+        });
+    });
+    return users;
+  }, [user, profile, groups]);
   const dateStr = selectedDate ? fmtDateStr(selectedDate) : fmtDateStr(new Date());
   const isTodayForHabits = dateStr === fmtDateStr(new Date());
   const [nowMinutes, setNowMinutes] = useState(() => {
@@ -353,14 +386,27 @@ const HomeScheduledSection = ({
     else onToggleGcal(item.id);
   };
 
-  // Avatar initials for shared items
-  const getAvatarInitials = (item: UnifiedScheduledItem): string[] => {
-    if (item.assignee === "both") {
-      const myInit = user?.email?.charAt(0)?.toUpperCase() || "M";
-      return [myInit, "P"];
-    }
-    return [];
-  };
+  // Get avatar members for shared items using the same logic as Calendar
+  const getItemAvatarMembers = useCallback((item: UnifiedScheduledItem) => {
+    const assigneeValue = (item.assignee || "me") as "me" | "partner" | "both";
+    const assignedIds = normalizeCalendarAssignees({
+      item: {
+        assignee: assigneeValue,
+        groupId: item.groupId,
+        type: item.kind === "gcal" ? "gcal" : "event",
+        raw: { ...item.raw, ownerUserId: item.ownerUserId, user_id: item.ownerUserId },
+      },
+      currentUserId: user?.id || "",
+      groups,
+    });
+    if (assignedIds.length <= 1) return [];
+    return getAssignedAvatarMembers({
+      assignedUserIds: assignedIds,
+      filterUsers: allFilterUsers,
+      currentUserId: user?.id || "",
+      currentUserInitial: profile?.display_name?.charAt(0)?.toUpperCase() || "?",
+    });
+  }, [user, groups, allFilterUsers, profile]);
 
   // Empty state
   if (totalItems === 0) {
@@ -537,7 +583,7 @@ const HomeScheduledSection = ({
                 {items.map(item => {
                   const isNow = nowItemId === item.id;
                   const tag = getContextTag(item);
-                  const avatars = getAvatarInitials(item);
+                  const avatarMembers = getItemAvatarMembers(item);
                   const timeDisplay = formatTimeRange(item);
 
                   return (
@@ -591,19 +637,23 @@ const HomeScheduledSection = ({
                         </div>
 
                         {/* Avatars for shared items */}
-                        {avatars.length > 0 && (
+                        {avatarMembers.length > 0 && (
                           <div className="flex -space-x-1.5 flex-shrink-0">
-                            {avatars.map((init, i) => (
-                              <div
-                                key={i}
-                                className={cn(
-                                  "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-primary-foreground ring-2 ring-card",
-                                  i === 0 ? "bg-user-a" : "bg-user-b"
-                                )}
-                              >
-                                {init}
-                              </div>
-                            ))}
+                            {avatarMembers.map((member) => {
+                              const palette = getAvatarPalette(member.colorIndex);
+                              return (
+                                <span
+                                  key={member.id}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold leading-none ring-2 ring-card"
+                                  style={{
+                                    backgroundColor: palette.avatarBackground,
+                                    color: palette.avatarText,
+                                  }}
+                                >
+                                  {member.initial}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
