@@ -558,37 +558,65 @@ const HomeScheduledSection = ({
               {/* Scheduled workouts in Flexible */}
               {period === "flexible" && scheduledWorkouts.length > 0 && (
                 <div className="space-y-2 mb-2">
-                  {scheduledWorkouts.map(workout => (
-                    <button
-                      key={workout.id}
-                      onClick={() => onNavigate?.("workout")}
-                      className={cn(
-                        "w-full text-left rounded-xl bg-card border active:scale-[0.99] transition-all",
-                        workout.done && "opacity-45"
-                      )}
-                      style={{ padding: "10px 12px", borderRadius: 12, borderWidth: "0.5px", borderColor: "rgba(0,0,0,0.07)" }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Dumbbell size={16} className={cn("flex-shrink-0", workout.done ? "text-muted-foreground" : "text-primary")} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            {workout.done && <Check size={14} className="text-habit-green flex-shrink-0" />}
-                            <p className={cn("text-[15px] font-medium leading-tight truncate", workout.done && "line-through text-muted-foreground")}>
-                              {workout.emoji} {workout.title}
-                            </p>
-                          </div>
-                          {workout.scheduledDate && !workout.done && (
-                            <span className="text-[11px] text-muted-foreground font-medium mt-0.5 block">Planned</span>
-                          )}
-                        </div>
-                        {workout.tag && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary flex-shrink-0">
-                            {workout.tag}
-                          </span>
+                  {scheduledWorkouts.map(workout => {
+                    const workoutGroup = workout.groupId ? groups.find(g => g.id === workout.groupId) : null;
+                    const workoutContextTag = workoutGroup
+                      ? { label: workoutGroup.name, coverUrl: (workoutGroup as any).cover_image_url || null, group: workoutGroup }
+                      : null;
+                    return (
+                      <button
+                        key={workout.id}
+                        onClick={() => onNavigate?.("workout")}
+                        className={cn(
+                          "w-full text-left rounded-xl bg-card border active:scale-[0.99] transition-all",
+                          workout.done && "opacity-45"
                         )}
-                      </div>
-                    </button>
-                  ))}
+                        style={{ padding: "10px 12px", borderRadius: 12, borderWidth: "0.5px", borderColor: "rgba(0,0,0,0.07)" }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Dumbbell size={16} className={cn("flex-shrink-0", workout.done ? "text-muted-foreground" : "text-primary")} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              {workout.done && <Check size={14} className="text-habit-green flex-shrink-0" />}
+                              <p className={cn("text-[15px] font-medium leading-tight truncate", workout.done && "line-through text-muted-foreground")}>
+                                {workout.emoji} {workout.title}
+                              </p>
+                            </div>
+                            {workout.scheduledDate && !workout.done && (
+                              <span className="text-[11px] text-muted-foreground font-medium mt-0.5 block">Planned</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {workoutContextTag ? (
+                              renderGroupPill(workoutContextTag)
+                            ) : (
+                              <span
+                                className="inline-flex items-center gap-1"
+                                style={{ fontSize: 10, fontWeight: 500, padding: "2px 8px 2px 3px", borderRadius: 99, background: "#fff", border: "0.5px solid rgba(0,0,0,0.08)" }}
+                              >
+                                {profile?.avatar_url ? (
+                                  <img src={profile.avatar_url} className="w-3 h-3 rounded-full object-cover flex-shrink-0" />
+                                ) : (
+                                  <span
+                                    className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white flex-shrink-0"
+                                    style={{ background: MEMBER_COLORS[0].dot }}
+                                  >
+                                    {profile?.display_name?.[0]?.toUpperCase() || "?"}
+                                  </span>
+                                )}
+                                <span className="truncate max-w-[40px]">Mine</span>
+                              </span>
+                            )}
+                            {workout.tag && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                                {workout.tag}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
               {/* Cards */}
