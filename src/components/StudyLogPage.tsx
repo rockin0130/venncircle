@@ -510,7 +510,7 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
                 See all
                 <ChevronRight size={13} />
               </button>
-            <div className="relative">
+              <div className="relative">
               <button
                 onClick={() => setSubjectDropdownOpen(!subjectDropdownOpen)}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
