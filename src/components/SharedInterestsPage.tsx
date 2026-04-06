@@ -216,7 +216,7 @@ const SwipeableGroupCard = ({
           }}
           onClick={() => setConfirmOpen(true)}
         >
-          {isOwner ? "Delete Group" : "Leave Group"}
+          Leave Group
         </div>
 
         {/* Foreground card */}
