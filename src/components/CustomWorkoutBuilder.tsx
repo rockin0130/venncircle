@@ -276,6 +276,30 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate, recentWorkou
                   selectedContexts={selectedContexts}
                   onChangeContexts={setSelectedContexts}
                 />
+
+                {/* Recent workouts */}
+                {recentUniqueWorkouts.length > 0 && (
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recent</label>
+                    <div className="mt-1.5 space-y-1">
+                      {recentUniqueWorkouts.map((w) => (
+                        <button
+                          key={w.id}
+                          onClick={() => prefillFromRecent(w)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-secondary/80 transition-colors text-left"
+                          style={{ background: "#F9F8F6" }}
+                        >
+                          <span className="text-base">{w.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{w.title}</p>
+                            <p className="text-[10px] text-muted-foreground">{w.duration} · {w.cal} kcal</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Name input */}
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name</label>
