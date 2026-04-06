@@ -158,9 +158,9 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
   const pct = weeklyGoal > 0 ? (clamped / weeklyGoal) * 100 : 0;
   const remaining = Math.max(0, weeklyGoal - clamped);
 
-  // SVG ring — 82px, 8px stroke
-  const SIZE = 82;
-  const STROKE = 8;
+  // SVG ring — 72px, 7px stroke
+  const SIZE = 72;
+  const STROKE = 7;
   const R = (SIZE - STROKE) / 2;
   const C = 2 * Math.PI * R;
   const offset = C - (pct / 100) * C;
@@ -170,7 +170,7 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
   };
 
   return (
-    <div className="mb-5 rounded-2xl p-5" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
+    <div className="mb-5 p-5" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)", borderRadius: 16 }}>
       {/* Top section: Ring + Goal info */}
       <div className="flex items-center gap-5 mb-4">
         {/* Progress ring */}
@@ -190,7 +190,7 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
         {/* Goal info + adjuster */}
         <div className="flex-1 min-w-0">
           <p style={{ fontSize: 12, color: "#999", fontWeight: 500 }}>Weekly goal</p>
-          <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", marginTop: 2 }}>
+          <p style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", marginTop: 2 }}>
             {clamped >= weeklyGoal ? "Goal reached! 🎉" : `${remaining} workout${remaining !== 1 ? "s" : ""} to go`}
           </p>
           <div className="flex items-center gap-2.5 mt-2">
@@ -214,13 +214,13 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
       <div className="grid grid-cols-3 gap-2.5">
         {/* Done */}
         <div className="flex flex-col items-center justify-center py-3 px-2" style={{ background: "#F9F8F6", borderRadius: 12 }}>
-          <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>{weekDone}</span>
+          <span style={{ fontSize: 17, fontWeight: 500, color: "#1A1A1A" }}>{weekDone}</span>
           <span style={{ fontSize: 11, color: "#999", marginTop: 2 }}>Done</span>
         </div>
 
         {/* Kcal */}
         <div className="flex flex-col items-center justify-center py-3 px-2" style={{ background: "#F9F8F6", borderRadius: 12 }}>
-          <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>{weekCals.toLocaleString()}</span>
+          <span style={{ fontSize: 17, fontWeight: 500, color: "#1A1A1A" }}>{weekCals.toLocaleString()}</span>
           <span style={{ fontSize: 11, color: "#999", marginTop: 2 }}>kcal</span>
         </div>
 
@@ -232,7 +232,7 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
             style={{ background: "#F9F8F6", borderRadius: 12 }}
           >
             <div className="flex items-center gap-1">
-              <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>{totalDist}</span>
+              <span style={{ fontSize: 17, fontWeight: 500, color: "#1A1A1A" }}>{totalDist}</span>
             </div>
             <div className="flex items-center gap-1 mt-0.5">
               <span style={{ fontSize: 11, color: "#999" }}>
@@ -953,7 +953,7 @@ const WorkoutsPage = ({
   const todayFormatted = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 
   return (
-    <div className="px-5 pb-24">
+    <div className="px-5 pb-24" style={{ background: "#F4F3F0", minHeight: "100vh" }}>
 
       {showCongrats && (
         <CongratsPopup type="workout" show={true} onClose={() => setShowCongrats(false)} />
@@ -1034,22 +1034,17 @@ const WorkoutsPage = ({
       {/* ── NEW HEADER ── */}
       <header className="pt-12 pb-3 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Workouts</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{todayFormatted}</p>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", fontFamily: "'DM Sans', sans-serif" }}>Workouts</h1>
+          <p style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{todayFormatted}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowLog(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary border border-border text-xs font-semibold text-foreground hover:bg-accent transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
+            style={{ background: "transparent", border: "0.5px solid rgba(0,0,0,0.15)", color: "#1a1a1a" }}
           >
             <ClipboardList size={13} />
             Log
-          </button>
-          <button
-            onClick={() => setShowCustomBuilder(true)}
-            className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm hover:bg-primary/90 transition-colors active:scale-95"
-          >
-            <Plus size={18} />
           </button>
           {onOpenMore && (
             <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0" }} aria-label="More">
@@ -1121,14 +1116,7 @@ const WorkoutsPage = ({
           </div>
         )}
 
-        {/* Quick Add */}
-        <QuickAddSection
-          workouts={userFilteredWorkouts}
-          onAddActivity={addManualActivity}
-          onOpenCustomBuilder={() => setShowCustomBuilder(true)}
-          onAddWorkouts={addWorkouts}
-          selectedDate={selectedDate}
-        />
+        {/* Quick Add removed */}
 
         {/* Custom Workout Builder Modal */}
         <CustomWorkoutBuilder
@@ -1136,17 +1124,25 @@ const WorkoutsPage = ({
           onClose={() => setShowCustomBuilder(false)}
           onAdd={addWorkouts}
           selectedDate={selectedDate}
+          recentWorkouts={displayWorkouts}
         />
 
         {/* Today's Workouts Section */}
         <section className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Today's Workouts</h3>
-              {appleFitnessSyncEnabled && healthKitLoading && (
-                <Loader2 size={12} className="animate-spin text-muted-foreground" aria-hidden />
-              )}
-            </div>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span style={{ fontSize: 17, fontWeight: 500, color: "#1a1a1a", fontFamily: "'DM Sans', sans-serif" }} className="mr-auto">
+              Today's workouts
+            </span>
+            {appleFitnessSyncEnabled && healthKitLoading && (
+              <Loader2 size={12} className="animate-spin text-muted-foreground" aria-hidden />
+            )}
+            <button
+              onClick={() => setShowCustomBuilder(true)}
+              className="flex items-center gap-1 active:scale-95 transition-transform"
+              style={{ fontSize: 10, fontWeight: 500, color: "#1a1a1a", background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.09)", borderRadius: 999, padding: "3px 9px" }}
+            >
+              <Plus size={10} /> Custom
+            </button>
             <WorkoutAiSuggest
               selectedDate={selectedDate}
               recentWorkouts={displayWorkouts}
@@ -1456,14 +1452,17 @@ const WorkoutCard = ({
 
       <motion.div
         layout
-        className={`bg-card rounded-xl border overflow-hidden transition-all ${
-          workout.done ? "border-habit-green/50" : "border-border"
-        } ${accentBorder ? "border-l-[3px]" : ""}`}
-        style={accentBorder?.startsWith("#") ? { borderLeftColor: accentBorder, borderLeftWidth: 3 } : undefined}
+        className={`overflow-hidden transition-all ${accentBorder ? "border-l-[3px]" : ""}`}
+        style={{
+          background: "#fff",
+          borderRadius: accentBorder ? "0 14px 14px 0" : 14,
+          border: "0.5px solid rgba(0,0,0,0.07)",
+          ...(accentBorder?.startsWith("#") ? { borderLeftColor: accentBorder, borderLeftWidth: 2.5 } : {}),
+        }}
       >
-        <div className="p-3.5 flex items-center gap-3">
+        <div style={{ padding: "11px 13px" }} className="flex items-center gap-3">
           {/* Emoji icon in colored square */}
-          <div className="w-[34px] h-[34px] rounded-lg bg-primary/8 flex items-center justify-center flex-shrink-0">
+          <div className="flex-shrink-0 flex items-center justify-center" style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(0,0,0,0.04)" }}>
             <span className="text-lg">{workout.emoji}</span>
           </div>
 
@@ -1471,31 +1470,27 @@ const WorkoutCard = ({
           <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowDetail(true)}>
             <div className="flex items-center gap-1.5 min-w-0">
               {isHealthKitEntry && (
-                <span className="text-[12px] shrink-0 leading-none" title="Apple Health">
-                  🍎
-                </span>
+                <span className="text-[12px] shrink-0 leading-none" title="Apple Health">🍎</span>
               )}
-              <p className={`text-[14px] font-semibold truncate ${workout.done ? "line-through text-muted-foreground" : ""}`}>{workout.title}</p>
+              <p style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }} className="truncate">{workout.title}</p>
             </div>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: "#F4F3F0", color: "#888" }}>
                 <Clock size={9} /> {workout.duration}
               </span>
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
-                <Flame size={9} /> {workout.cal} cal
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: "#F4F3F0", color: "#888" }}>
+                <Flame size={9} /> {workout.cal} kcal
               </span>
               {workout.tag && (
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${tagColor}`}>
-                  {workout.tag}
-                </span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${tagColor}`}>{workout.tag}</span>
               )}
               {distFmt && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: "#F4F3F0", color: "#888" }}>
                   <Footprints size={9} /> {distFmt.value} {distFmt.unit}
                 </span>
               )}
               {workout.heartRateAvg != null && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium text-muted-foreground">
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: "#F4F3F0", color: "#888" }}>
                   <Heart size={9} /> {workout.heartRateAvg} bpm
                 </span>
               )}
@@ -1514,20 +1509,13 @@ const WorkoutCard = ({
           <div
             role={readOnly ? undefined : "button"}
             onClick={readOnly ? undefined : (e) => { e.stopPropagation(); onToggle(workout.id); }}
-            className={`relative w-7 h-7 flex items-center justify-center flex-shrink-0 ${readOnly ? "pointer-events-none" : "cursor-pointer"}`}
+            className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${readOnly ? "pointer-events-none" : "cursor-pointer"} transition-all`}
+            style={{
+              background: workout.done ? "#1a1a1a" : "transparent",
+              border: workout.done ? "none" : "2px solid rgba(0,0,0,0.15)",
+            }}
           >
-            <svg className="absolute inset-0 w-7 h-7 -rotate-90" viewBox="0 0 28 28">
-              <circle cx="14" cy="14" r="11" fill="none" stroke="currentColor" className="text-muted-foreground/20" strokeWidth="2" />
-              {(progress || 0) > 0 && !workout.done && (
-                <circle cx="14" cy="14" r="11" fill="none" stroke="currentColor" className="text-habit-green" strokeWidth="2"
-                  strokeDasharray={`${((progress || 0) / 100) * 69.12} 69.12`} strokeLinecap="round" />
-              )}
-            </svg>
-            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all z-10 ${
-              workout.done ? "bg-habit-green border-habit-green" : "border-transparent"
-            }`}>
-              {workout.done && <Check size={12} className="text-primary-foreground" />}
-            </div>
+            {workout.done && <Check size={14} color="#fff" />}
           </div>
         </div>
       </motion.div>

@@ -131,11 +131,12 @@ const WorkoutAiSuggest = ({ selectedDate, recentWorkouts, onAddWorkout }: Props)
       <button
         onClick={() => generate()}
         disabled={loading}
-        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
+        className="flex items-center gap-1 active:scale-95 transition-transform disabled:opacity-50"
+        style={{ fontSize: 10, fontWeight: 500, color: "#6C47FF", background: "#FAF5FF", border: "0.5px solid rgba(108,71,255,0.2)", borderRadius: 999, padding: "3px 9px" }}
         title="Get AI workout suggestions"
       >
-        {loading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-        {loading ? "Generating…" : "AI Suggest"}
+        {loading ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+        {loading ? "Generating…" : "AI"}
       </button>
 
       {(suggestions || error) && (
