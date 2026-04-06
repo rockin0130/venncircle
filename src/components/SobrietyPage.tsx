@@ -172,7 +172,7 @@ const SobrietyPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
   const filterUsers = useMemo(() => {
     if (!user || !isGroupView || !activeGroup) return [] as DisplayUser[];
 
-    const mineName = profile?.display_name?.split(" ")[0] || "Mine";
+    const mineName = "Me";
     const others = activeGroup.members
       .filter((member: GroupMember) => member.status === "active" && member.user_id !== user.id)
       .map((member) => {
