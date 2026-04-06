@@ -528,6 +528,111 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
 
       <EditProfileModal open={showEditProfile} onOpenChange={setShowEditProfile} />
       <AddFriendModal open={showAddFriend} onOpenChange={setShowAddFriend} />
+
+      {/* Hidden file inputs */}
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handlePhotoSelected(e.target.files[0]); e.target.value = ""; }} />
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handlePhotoSelected(e.target.files[0]); e.target.value = ""; }} />
+
+      {/* Photo picker action sheet */}
+      {showPhotoSheet && (
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center" onClick={() => setShowPhotoSheet(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative w-full max-w-md mx-4 mb-6 animate-in slide-in-from-bottom-4 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div style={{ background: "#fff", borderRadius: 14, overflow: "hidden" }}>
+              <button
+                className="w-full py-4 text-center"
+                style={{ fontSize: 17, fontWeight: 400, color: "#007AFF", borderBottom: "0.5px solid rgba(0,0,0,0.1)" }}
+                onClick={() => { setShowPhotoSheet(false); cameraInputRef.current?.click(); }}
+              >
+                Take Photo
+              </button>
+              <button
+                className="w-full py-4 text-center"
+                style={{ fontSize: 17, fontWeight: 400, color: "#007AFF" }}
+                onClick={() => { setShowPhotoSheet(false); fileInputRef.current?.click(); }}
+              >
+                Choose from Library
+              </button>
+            </div>
+            <button
+              className="w-full py-4 text-center mt-2"
+              style={{ fontSize: 17, fontWeight: 600, color: "#007AFF", background: "#fff", borderRadius: 14 }}
+              onClick={() => setShowPhotoSheet(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Crop / position editor */}
+      {showCropEditor && selectedImage && (
+        <div className="fixed inset-0 z-[10000] flex flex-col" style={{ background: "#000" }}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 pt-12 pb-3">
+            <p style={{ fontSize: 17, fontWeight: 600, color: "#fff" }}>Move and Scale</p>
+            <button onClick={() => { setShowCropEditor(false); setSelectedImage(null); setSelectedFile(null); }}>
+              <X size={22} color="#fff" />
+            </button>
+          </div>
+
+          {/* Crop area */}
+          <div
+            ref={cropContainerRef}
+            className="flex-1 relative flex items-center justify-center overflow-hidden"
+            onTouchStart={handleCropTouchStart}
+            onTouchMove={handleCropTouchMove}
+            onTouchEnd={handleCropTouchEnd}
+          >
+            {/* Photo behind mask */}
+            <img
+              src={selectedImage}
+              alt=""
+              className="absolute select-none pointer-events-none"
+              draggable={false}
+              style={{
+                transform: `translate(${cropOffset.x}px, ${cropOffset.y}px) scale(${cropScale})`,
+                maxWidth: "100%",
+                maxHeight: "100%",
+                objectFit: "contain",
+                transition: dragRef.current || pinchRef.current ? "none" : "transform 0.1s ease",
+              }}
+            />
+            {/* Circle mask overlay */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+              <defs>
+                <mask id="crop-mask">
+                  <rect width="100%" height="100%" fill="white" />
+                  <circle cx="50%" cy="50%" r="140" fill="black" />
+                </mask>
+              </defs>
+              <rect width="100%" height="100%" fill="rgba(0,0,0,0.6)" mask="url(#crop-mask)" />
+            </svg>
+            {/* Circle outline */}
+            <div
+              className="absolute rounded-full pointer-events-none"
+              style={{ width: 280, height: 280, border: "2px solid rgba(255,255,255,0.5)" }}
+            />
+          </div>
+
+          {/* Bottom buttons */}
+          <div className="flex items-center justify-between px-6 pb-10 pt-4">
+            <button
+              onClick={() => { setShowCropEditor(false); setSelectedImage(null); setSelectedFile(null); }}
+              style={{ fontSize: 16, fontWeight: 500, color: "#fff", padding: "10px 28px", borderRadius: 12, background: "rgba(255,255,255,0.15)" }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCropConfirm}
+              disabled={uploading}
+              style={{ fontSize: 16, fontWeight: 600, color: "#fff", padding: "10px 28px", borderRadius: 12, background: "#6C47FF", opacity: uploading ? 0.6 : 1 }}
+            >
+              {uploading ? "Saving…" : "Confirm"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
