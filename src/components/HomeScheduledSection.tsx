@@ -217,8 +217,39 @@ const HomeScheduledSection = ({
   isViewingMemberName,
   showWater = false,
 }: Props) => {
-  const { groups, activeGroup, user } = useAuth();
+  const { groups, activeGroup, user, profile } = useAuth();
   const { filteredHabits, toggleHabit, getHabitStreak, getWorkoutsForDate } = useAppContext();
+
+  // Build a unified FilterUser list from all groups (same approach as Calendar's useCalendarFilterUsers in "All" mode)
+  const allFilterUsers = useMemo<FilterUser[]>(() => {
+    const users: FilterUser[] = [];
+    users.push({
+      id: user?.id || "me",
+      label: "Me",
+      avatarUrl: profile?.avatar_url || null,
+      initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?",
+      colorIndex: 0,
+    });
+    let colorIdx = 1;
+    const seen = new Set<string>();
+    seen.add(user?.id || "");
+    groups.forEach((g) => {
+      g.members
+        .filter((m: GroupMember) => m.status === "active" && !seen.has(m.user_id))
+        .forEach((m) => {
+          seen.add(m.user_id);
+          const name = m.display_name || "Member";
+          users.push({
+            id: m.user_id,
+            label: name.split(" ")[0],
+            avatarUrl: m.avatar_url,
+            initial: name.charAt(0).toUpperCase(),
+            colorIndex: colorIdx++ % MEMBER_COLORS.length,
+          });
+        });
+    });
+    return users;
+  }, [user, profile, groups]);
   const dateStr = selectedDate ? fmtDateStr(selectedDate) : fmtDateStr(new Date());
   const isTodayForHabits = dateStr === fmtDateStr(new Date());
   const [nowMinutes, setNowMinutes] = useState(() => {
