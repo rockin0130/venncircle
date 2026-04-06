@@ -101,8 +101,206 @@ const MemberDots = ({ members }: { members: { display_name: string | null; user_
 
 type SplitMode = "equal" | "groups-expanded" | "feed-expanded";
 
+const SwipeableGroupCard = ({
+  group,
+  gi,
+  user,
+  onTap,
+  onLeave,
+  onDelete,
+}: {
+  group: Group;
+  gi: number;
+  user: { id: string } | null;
+  onTap: () => void;
+  onLeave: (group: Group) => void;
+  onDelete: (group: Group) => void;
+}) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const startX = useRef(0);
+  const currentX = useRef(0);
+  const swiped = useRef(false);
+  const [offset, setOffset] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [removed, setRemoved] = useState(false);
+
+  const isOwner = group.created_by === user?.id;
+  const REVEAL_WIDTH = 100;
+
+  const handleStart = (clientX: number) => {
+    startX.current = clientX;
+    currentX.current = offset;
+  };
+
+  const handleMove = (clientX: number) => {
+    const diff = clientX - startX.current + currentX.current;
+    const clamped = Math.max(-REVEAL_WIDTH, Math.min(0, diff));
+    setOffset(clamped);
+  };
+
+  const handleEnd = () => {
+    if (offset < -REVEAL_WIDTH / 2) {
+      setOffset(-REVEAL_WIDTH);
+      swiped.current = true;
+    } else {
+      setOffset(0);
+      swiped.current = false;
+    }
+  };
+
+  const snapBack = () => {
+    setOffset(0);
+    swiped.current = false;
+  };
+
+  const handleAction = async () => {
+    setLeaving(true);
+    if (isOwner) {
+      const { error } = await supabase.rpc("delete_group", { _group_id: group.id });
+      if (error) {
+        toast.error("Failed to delete group");
+        setLeaving(false);
+        return;
+      }
+      toast.success(`"${group.name}" deleted`);
+      setRemoved(true);
+      setTimeout(() => onDelete(group), 300);
+    } else {
+      onLeave(group);
+      setRemoved(true);
+    }
+    setConfirmOpen(false);
+  };
+
+  // Click outside to snap back
+  useEffect(() => {
+    if (!swiped.current) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        snapBack();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [offset]);
+
+  if (removed) {
+    return <div className="h-0 overflow-hidden transition-all duration-300" />;
+  }
+
+  const activeMembers = group.members.filter((m) => m.status === "active");
+  const validPages = (group.shared_pages || [])
+    .filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p))
+    .slice(0, 4) as ShareablePage[];
+  const extraPages = Math.max(
+    (group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).length - 4,
+    0
+  );
+  const coverUrl = group.cover_image_url || null;
+
+  return (
+    <>
+      <div ref={cardRef} className="relative overflow-hidden" style={{ borderRadius: 14, height: 76 }}>
+        {/* Background action button */}
+        <div
+          className="absolute right-0 top-0 bottom-0 flex items-center justify-center text-white text-xs font-semibold cursor-pointer select-none"
+          style={{
+            width: REVEAL_WIDTH,
+            background: "#E05C5C",
+            borderRadius: "0 14px 14px 0",
+          }}
+          onClick={() => setConfirmOpen(true)}
+        >
+          {isOwner ? "Delete Group" : "Leave Group"}
+        </div>
+
+        {/* Foreground card */}
+        <div
+          className="absolute top-0 left-0 right-0 bottom-0 w-full flex bg-card touch-pan-y"
+          style={{
+            transform: `translateX(${offset}px)`,
+            transition: offset === 0 || offset === -REVEAL_WIDTH ? "transform 0.25s cubic-bezier(.4,0,.2,1)" : "none",
+            borderRadius: 14,
+            border: "0.5px solid rgba(0,0,0,0.07)",
+            willChange: "transform",
+          }}
+          onMouseDown={(e) => handleStart(e.clientX)}
+          onMouseMove={(e) => { if (e.buttons === 1) handleMove(e.clientX); }}
+          onMouseUp={handleEnd}
+          onTouchStart={(e) => handleStart(e.touches[0].clientX)}
+          onTouchMove={(e) => handleMove(e.touches[0].clientX)}
+          onTouchEnd={handleEnd}
+          onClick={() => { if (Math.abs(offset) < 5) onTap(); }}
+        >
+          <div className="flex-1 min-w-0 px-3 py-2.5 flex flex-col justify-center bg-card" style={{ borderRadius: "14px 0 0 14px" }}>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="text-[13px] font-medium text-foreground truncate">{group.name}</p>
+              <div className="shrink-0">
+                <MemberDots members={activeMembers} />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {validPages.map((page) => (
+                <span
+                  key={page}
+                  className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
+                >
+                  {PAGE_LABELS[page] || page}
+                </span>
+              ))}
+              {extraPages > 0 && (
+                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  +{extraPages}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="w-[100px] shrink-0 overflow-hidden" style={{ borderRadius: "0 14px 14px 0" }}>
+            {coverUrl ? (
+              <img src={coverUrl} alt="" className="w-full h-full object-cover block" />
+            ) : (
+              <div className={`w-full h-full ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex flex-col items-center justify-center gap-0.5`}>
+                <Camera size={12} className="text-muted-foreground/50" />
+                <span className="text-[8px] font-medium text-muted-foreground/70">Add photo</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isOwner ? "Delete" : "Leave"} {group.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isOwner
+                ? "This will permanently delete the group and all its shared content for all members."
+                : "You'll lose access to shared content."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={leaving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleAction}
+              disabled={leaving}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {leaving ? "..." : isOwner ? "Delete" : "Leave"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+};
+
 const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHub, onOpenMore }: SharedInterestsPageProps) => {
-  const { groups, user } = useAuth();
+  const { groups, user, leaveGroup, refreshGroups } = useAuth();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
   const [splitMode, setSplitMode] = useState<SplitMode>("equal");
@@ -114,6 +312,20 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
     () => groups.filter((g: any) => !g._personal && g.id !== "__personal__"),
     [groups]
   );
+
+  const handleLeaveGroup = async (group: Group) => {
+    const result = await leaveGroup(group.id);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success(`Left "${group.name}"`);
+      refreshGroups();
+    }
+  };
+
+  const handleDeleteGroup = () => {
+    refreshGroups();
+  };
 
   useEffect(() => {
     if (!user || allGroups.length === 0) {
