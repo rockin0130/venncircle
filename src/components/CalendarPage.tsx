@@ -57,8 +57,9 @@ function getGroupColorIndex(groupId: string | null | undefined, groups: Group[])
   return idx >= 0 ? idx % GROUP_COLOR_CLASSES.length : 0;
 }
 
-type ViewMode = "month" | "list" | "day" | "3day" | "week";
-const VIEW_LABELS: Record<ViewMode, string> = { month: "M", list: "List", day: "D", "3day": "3D", week: "W" };
+type ViewMode = "month" | "list" | "week";
+const VIEW_LABELS: Record<ViewMode, string> = { month: "Month", list: "List", week: "Week" };
+const DAYS_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // ── Helpers ────────────────────────────────────────────────
 
