@@ -258,7 +258,7 @@ const HeroCard = ({ workouts, weeklyGoal, onGoalChange }: { workouts: Workout[];
             >
               {filterLabel}
             </button>
-          )
+          )}
 
           {/* Dropdown */}
           {distDropdownOpen && activityNames.length > 1 && (
