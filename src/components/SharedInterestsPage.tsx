@@ -98,26 +98,70 @@ const SwipeableGroupCard = ({
   user,
   onTap,
   onLeft,
+  activeSwipeId,
+  onSwipeOpen,
+  scrollContainerRef,
 }: {
   group: Group;
   gi: number;
   user: { id: string } | null;
   onTap: () => void;
   onLeft: () => void;
+  activeSwipeId: string | null;
+  onSwipeOpen: (id: string | null) => void;
+  scrollContainerRef: React.RefObject<HTMLElement | null>;
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
   const currentX = useRef(0);
-  const swiped = useRef(false);
   const [offset, setOffset] = useState(0);
   const [leaveFlowOpen, setLeaveFlowOpen] = useState(false);
   const [removed, setRemoved] = useState(false);
 
   const REVEAL_WIDTH = 100;
+  const isSwiped = activeSwipeId === group.id;
+
+  // Auto-reset when another card becomes active
+  useEffect(() => {
+    if (!isSwiped && offset !== 0) {
+      setOffset(0);
+    }
+  }, [isSwiped]);
+
+  // Snap back on scroll
+  useEffect(() => {
+    const container = scrollContainerRef?.current;
+    if (!container) return;
+    const onScroll = () => {
+      if (isSwiped) onSwipeOpen(null);
+    };
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => container.removeEventListener("scroll", onScroll);
+  }, [isSwiped, onSwipeOpen, scrollContainerRef]);
+
+  // Click outside to snap back
+  useEffect(() => {
+    if (!isSwiped) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        onSwipeOpen(null);
+      }
+    };
+    document.addEventListener("mousedown", handler, true);
+    document.addEventListener("touchstart", handler, true);
+    return () => {
+      document.removeEventListener("mousedown", handler, true);
+      document.removeEventListener("touchstart", handler, true);
+    };
+  }, [isSwiped, onSwipeOpen]);
 
   const handleStart = (clientX: number) => {
     startX.current = clientX;
     currentX.current = offset;
+    // If another card is open, close it
+    if (activeSwipeId && activeSwipeId !== group.id) {
+      onSwipeOpen(null);
+    }
   };
 
   const handleMove = (clientX: number) => {
@@ -129,33 +173,12 @@ const SwipeableGroupCard = ({
   const handleEnd = () => {
     if (offset < -REVEAL_WIDTH / 2) {
       setOffset(-REVEAL_WIDTH);
-      swiped.current = true;
+      onSwipeOpen(group.id);
     } else {
       setOffset(0);
-      swiped.current = false;
+      if (isSwiped) onSwipeOpen(null);
     }
   };
-
-  const snapBack = () => {
-    setOffset(0);
-    swiped.current = false;
-  };
-
-  // Click outside to snap back
-  useEffect(() => {
-    if (!swiped.current) return;
-    const handler = (e: MouseEvent | TouchEvent) => {
-      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
-        snapBack();
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("touchstart", handler);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("touchstart", handler);
-    };
-  }, [offset]);
 
   if (removed) {
     return <div className="h-0 overflow-hidden transition-all duration-300" />;
@@ -173,7 +196,7 @@ const SwipeableGroupCard = ({
 
   return (
     <>
-      <div ref={cardRef} className="relative overflow-hidden" style={{ borderRadius: 14, height: 76 }}>
+      <div ref={cardRef} className="relative" style={{ borderRadius: 14, height: 76, overflow: "hidden" }}>
         {/* Background action button */}
         <div
           className="absolute right-0 top-0 bottom-0 flex items-center justify-center text-white text-xs font-semibold cursor-pointer select-none"
@@ -187,9 +210,9 @@ const SwipeableGroupCard = ({
           Leave Group
         </div>
 
-        {/* Foreground card */}
+        {/* Foreground card — z-10 so it fully covers the red button at rest */}
         <div
-          className="absolute top-0 left-0 right-0 bottom-0 w-full flex bg-card touch-pan-y"
+          className="absolute top-0 left-0 right-0 bottom-0 w-full flex bg-card touch-pan-y z-10"
           style={{
             transform: `translateX(${offset}px)`,
             transition: offset === 0 || offset === -REVEAL_WIDTH ? "transform 0.25s cubic-bezier(.4,0,.2,1)" : "none",
