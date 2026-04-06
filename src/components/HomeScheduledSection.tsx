@@ -300,9 +300,15 @@ const HomeScheduledSection = ({
     return map;
   }, [filteredHabits, enabledHabitCategories]);
 
-  // Ensure flexible always appears if water is enabled
+  // Workouts scheduled for the viewed date (owned by logged-in user)
+  const scheduledWorkouts = useMemo(() => {
+    if (!user) return [];
+    return getWorkoutsForDate(dateStr).filter(w => w.ownerUserId === user.id || (!w.ownerUserId));
+  }, [getWorkoutsForDate, dateStr, user]);
+
+  // Ensure flexible always appears if water is enabled or workouts exist
   const activePeriods = (["morning", "afternoon", "evening", "flexible"] as Period[]).filter(
-    p => periodMap[p].length > 0 || habitsByPeriod[p].length > 0 || (p === "flexible" && showWater)
+    p => periodMap[p].length > 0 || habitsByPeriod[p].length > 0 || (p === "flexible" && (showWater || scheduledWorkouts.length > 0))
   );
 
   // Progress (include habits in count)
