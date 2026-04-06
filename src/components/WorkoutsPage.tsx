@@ -1095,6 +1095,28 @@ const WorkoutsPage = ({
           onPhotoSent={(url) => handlePhotoSent(photoPromptWorkout.id, url)}
         />
       )}
+
+      {/* Share to Feed Prompt */}
+      {feedShareWorkout && (() => {
+        const targetGroup = groups.find((g) => g.id === feedShareWorkout.groupId);
+        if (!targetGroup) return null;
+        const stats: Record<string, string | number> = {};
+        if (feedShareWorkout.duration) stats["Duration"] = feedShareWorkout.duration;
+        if (feedShareWorkout.cal) stats["Calories"] = feedShareWorkout.cal;
+        if (feedShareWorkout.distance) stats["Distance"] = `${feedShareWorkout.distance} ${feedShareWorkout.distanceUnit || "km"}`;
+        return (
+          <ShareToFeedSheet
+            open
+            onClose={() => setFeedShareWorkout(null)}
+            groupId={targetGroup.id}
+            groupName={targetGroup.name}
+            userId={user?.id || ""}
+            caption={`${feedShareWorkout.emoji} Completed ${feedShareWorkout.title}!`}
+            interestTag="workout"
+            stats={stats}
+          />
+        );
+      })()}
     </>
     </div>
   );
