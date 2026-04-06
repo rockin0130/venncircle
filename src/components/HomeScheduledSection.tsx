@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight, Droplets } from "lucide-react";
+import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight, Droplets, Dumbbell } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
 import { formatTime } from "@/lib/formatTime";
@@ -216,7 +216,7 @@ const HomeScheduledSection = ({
   showWater = false,
 }: Props) => {
   const { groups, activeGroup, user } = useAuth();
-  const { filteredHabits, toggleHabit, getHabitStreak } = useAppContext();
+  const { filteredHabits, toggleHabit, getHabitStreak, getWorkoutsForDate } = useAppContext();
   const dateStr = selectedDate ? fmtDateStr(selectedDate) : fmtDateStr(new Date());
   const isTodayForHabits = dateStr === fmtDateStr(new Date());
   const [nowMinutes, setNowMinutes] = useState(() => {
@@ -300,17 +300,23 @@ const HomeScheduledSection = ({
     return map;
   }, [filteredHabits, enabledHabitCategories]);
 
-  // Ensure flexible always appears if water is enabled
+  // Workouts scheduled for the viewed date (owned by logged-in user)
+  const scheduledWorkouts = useMemo(() => {
+    if (!user) return [];
+    return getWorkoutsForDate(dateStr).filter(w => w.ownerUserId === user.id || (!w.ownerUserId));
+  }, [getWorkoutsForDate, dateStr, user]);
+
+  // Ensure flexible always appears if water is enabled or workouts exist
   const activePeriods = (["morning", "afternoon", "evening", "flexible"] as Period[]).filter(
-    p => periodMap[p].length > 0 || habitsByPeriod[p].length > 0 || (p === "flexible" && showWater)
+    p => periodMap[p].length > 0 || habitsByPeriod[p].length > 0 || (p === "flexible" && (showWater || scheduledWorkouts.length > 0))
   );
 
   // Progress (include habits in count)
   const allPeriodHabits = useMemo(() => {
     return Object.values(habitsByPeriod).flat();
   }, [habitsByPeriod]);
-  const totalItems = unifiedItems.length + allPeriodHabits.length;
-  const doneItems = unifiedItems.filter(i => i.done).length + allPeriodHabits.filter(h => h.completionDates.includes(dateStr)).length;
+  const totalItems = unifiedItems.length + allPeriodHabits.length + scheduledWorkouts.length;
+  const doneItems = unifiedItems.filter(i => i.done).length + allPeriodHabits.filter(h => h.completionDates.includes(dateStr)).length + scheduledWorkouts.filter(w => w.done).length;
   const progressPercent = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
 
   // NOW item: the item whose time window contains current time
@@ -430,7 +436,7 @@ const HomeScheduledSection = ({
           const items = periodMap[period];
           const periodHabits = habitsByPeriod[period];
           const config = PERIOD_CONFIG[period];
-          const totalCount = items.length + periodHabits.length + (period === "flexible" && showWater ? 1 : 0);
+          const totalCount = items.length + periodHabits.length + (period === "flexible" ? (showWater ? 1 : 0) + scheduledWorkouts.length : 0);
           return (
             <div key={period}>
               {/* Period separator */}
@@ -490,6 +496,42 @@ const HomeScheduledSection = ({
                 </div>
               )}
 
+              {/* Scheduled workouts in Flexible */}
+              {period === "flexible" && scheduledWorkouts.length > 0 && (
+                <div className="space-y-2 mb-2">
+                  {scheduledWorkouts.map(workout => (
+                    <button
+                      key={workout.id}
+                      onClick={() => onNavigate?.("workout")}
+                      className={cn(
+                        "w-full text-left rounded-xl bg-card border active:scale-[0.99] transition-all",
+                        workout.done && "opacity-45"
+                      )}
+                      style={{ padding: "10px 12px", borderRadius: 12, borderWidth: "0.5px", borderColor: "rgba(0,0,0,0.07)" }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Dumbbell size={16} className={cn("flex-shrink-0", workout.done ? "text-muted-foreground" : "text-primary")} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            {workout.done && <Check size={14} className="text-habit-green flex-shrink-0" />}
+                            <p className={cn("text-[15px] font-medium leading-tight truncate", workout.done && "line-through text-muted-foreground")}>
+                              {workout.emoji} {workout.title}
+                            </p>
+                          </div>
+                          {workout.scheduledDate && !workout.done && (
+                            <span className="text-[11px] text-muted-foreground font-medium mt-0.5 block">Planned</span>
+                          )}
+                        </div>
+                        {workout.tag && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary flex-shrink-0">
+                            {workout.tag}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
               {/* Cards */}
               <div className="space-y-2">
                 {items.map(item => {
