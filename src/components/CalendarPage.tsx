@@ -1961,7 +1961,7 @@ const WeekView = ({
   }, [filterUsers, groups, currentUserId]);
 
   const layoutEventsInCol = (items: CalItem[]) => {
-    const timed = items.filter((it) => !it.allDay && it.hour != null);
+    const timed = items.filter((it) => !it.allDay && !it.isDueDateTask && it.hour != null);
     const sorted = [...timed].sort((a, b) => (a.hour ?? 0) - (b.hour ?? 0));
     const positioned: { item: CalItem; col: number; totalCols: number }[] = [];
     sorted.forEach((item) => {
@@ -2080,7 +2080,7 @@ const WeekView = ({
     );
   };
 
-  const hasAllDay = dateItems.some((c) => c.items.some((it) => it.allDay || it.isDueDateTask));
+  // Always show all-day row (min height ensures it's visible even when empty)
 
   return (
     <div
