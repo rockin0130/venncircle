@@ -27,6 +27,7 @@ interface StudyPageProps {
 const DEFAULT_SUBJECTS = ["Math", "Reading", "Work"];
 const DAILY_GOAL_HOURS = 4;
 const MEMBER_COLORS = ["#6C47FF", "#F59E0B", "#10B981", "#EF4444", "#3B82F6", "#EC4899", "#14B8A6", "#8B5CF6"];
+const RESUME_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
 
 // ═══ Subject similarity ═══
 const ABBREVIATION_MAP: Record<string, string> = {
@@ -60,12 +61,10 @@ function findSubjectMatch(newName: string, existingSubjects: string[], allSessio
   const norm = normalizeSubject(newName);
   const allKnown = [...new Set([...existingSubjects, ...allSessionSubjects])];
 
-  // Exact case-insensitive match
   for (const ex of allKnown) {
     if (normalizeSubject(ex) === norm) return { type: "exact", existing: ex };
   }
 
-  // Abbreviation match
   const newKey = getCanonicalKey(newName);
   if (newKey) {
     for (const ex of allKnown) {
@@ -74,14 +73,12 @@ function findSubjectMatch(newName: string, existingSubjects: string[], allSessio
     }
   }
 
-  // Plural/singular
   const withoutS = norm.endsWith("s") ? norm.slice(0, -1) : norm + "s";
   for (const ex of allKnown) {
     const exNorm = normalizeSubject(ex);
     if (exNorm === withoutS) return { type: "similar", existing: ex };
   }
 
-  // Levenshtein-like prefix check
   for (const ex of allKnown) {
     const exNorm = normalizeSubject(ex);
     if (norm.length >= 3 && exNorm.startsWith(norm)) return { type: "similar", existing: ex };
@@ -105,12 +102,13 @@ function saveSubjects(subs: string[]) {
 
 // ═══ Helpers ═══
 function fmtDuration(seconds: number) {
+  if (seconds <= 0) return "0s";
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
+  if (seconds < 60) return `${s}s`;
   if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
+  return `${m}m ${s}s`;
 }
 
 function fmtTimer(seconds: number) {
@@ -199,6 +197,14 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const addInputRef = useRef<HTMLInputElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
 
+  // Resume state
+  const [lastStoppedSession, setLastStoppedSession] = useState<StudySession | null>(null);
+  const [lastStoppedAt, setLastStoppedAt] = useState<number | null>(null);
+
+  // Ref to hold the active session ID to prevent re-render issues
+  const activeSessionIdRef = useRef<string | null>(null);
+  const startedAtRef = useRef<string | null>(null);
+
   const isPersonal = !activeGroup || (activeGroup as any)?._personal;
   const groupId = isPersonal ? null : activeGroup?.id || null;
 
@@ -259,16 +265,64 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   // ── Active session ──
   const activeSession = useMemo(() => sessions.find(s => s.is_active), [sessions]);
 
+  // Keep refs in sync
   useEffect(() => {
     if (activeSession) {
-      const update = () => setActiveTick(Math.floor((Date.now() - new Date(activeSession.started_at).getTime()) / 1000));
+      activeSessionIdRef.current = activeSession.id;
+      startedAtRef.current = activeSession.started_at;
+    } else {
+      activeSessionIdRef.current = null;
+      startedAtRef.current = null;
+    }
+  }, [activeSession]);
+
+  useEffect(() => {
+    if (activeSession) {
+      const update = () => {
+        if (startedAtRef.current) {
+          setActiveTick(Math.floor((Date.now() - new Date(startedAtRef.current).getTime()) / 1000));
+        }
+      };
       update();
       tickRef.current = setInterval(update, 1000);
       return () => { if (tickRef.current) clearInterval(tickRef.current); };
     } else {
-      setActiveTick(0);
+      // Don't reset activeTick to 0 here — only reset when explicitly starting a new session
     }
   }, [activeSession]);
+
+  // ── Stop session on navigate away / page unload ──
+  useEffect(() => {
+    const stopActiveSession = async () => {
+      const sessionId = activeSessionIdRef.current;
+      const started = startedAtRef.current;
+      if (!sessionId || !started) return;
+      const duration = Math.max(Math.floor((Date.now() - new Date(started).getTime()) / 1000), 1);
+      const endedAt = new Date().toISOString();
+      // Use sendBeacon-style: fire and forget
+      await supabase
+        .from("study_sessions")
+        .update({ is_active: false, ended_at: endedAt, duration_seconds: duration } as any)
+        .eq("id", sessionId);
+    };
+
+    const handleBeforeUnload = () => {
+      stopActiveSession();
+    };
+
+    const handleVisibilityChange = () => {
+      // Don't stop on visibility change — screen lock shouldn't stop timer
+      // The started_at is already saved, so duration is always recoverable
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   // ── Click outside to exit edit mode ──
   useEffect(() => {
@@ -360,36 +414,108 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     });
   }, [groupId, activeGroup, groupSessions, today, memberProfiles, user]);
 
+  // ── Resume logic ──
+  // Check if within 2-minute ring resume window
+  const ringResumeSession = useMemo(() => {
+    if (activeSession) return null; // Already active, no resume
+    if (!lastStoppedSession || !lastStoppedAt) return null;
+    const elapsed = Date.now() - lastStoppedAt;
+    if (elapsed > RESUME_WINDOW_MS) return null;
+    // Must be same subject
+    if (lastStoppedSession.subject !== selectedSubject) return null;
+    return lastStoppedSession;
+  }, [activeSession, lastStoppedSession, lastStoppedAt, selectedSubject, activeTick]); // activeTick forces re-eval
+
+  // Check for "Resume" pill on today's session list (after 2-min window)
+  const listResumeSessionId = useMemo(() => {
+    if (activeSession) return null; // Don't show resume if active
+    // Find most recent completed session today
+    const completed = todaySessions.filter(s => !s.is_active && s.duration_seconds > 0);
+    if (completed.length === 0) return null;
+    const mostRecent = completed[0]; // Already sorted desc
+    if (!mostRecent.ended_at) return null;
+    const elapsed = Date.now() - new Date(mostRecent.ended_at).getTime();
+    // Show Resume pill after 2-min window but within same day
+    if (elapsed <= RESUME_WINDOW_MS) return null; // Ring resume handles this
+    return mostRecent.id;
+  }, [activeSession, todaySessions, activeTick]);
+
   // ── Actions ──
+  const stopSession = useCallback(async (session: StudySession) => {
+    const duration = Math.max(Math.floor((Date.now() - new Date(session.started_at).getTime()) / 1000), 1);
+    const endedAt = new Date().toISOString();
+    await supabase
+      .from("study_sessions")
+      .update({ is_active: false, ended_at: endedAt, duration_seconds: duration } as any)
+      .eq("id", session.id);
+    setLastStoppedSession({ ...session, ended_at: endedAt, duration_seconds: duration, is_active: false });
+    setLastStoppedAt(Date.now());
+    setFullscreen(false);
+    setActiveTick(0);
+    fetchSessions();
+    fetchGroupSessions();
+  }, [fetchSessions, fetchGroupSessions]);
+
+  const startNewSession = useCallback(async () => {
+    if (!user) return;
+    const startedAt = new Date().toISOString();
+    await supabase
+      .from("study_sessions")
+      .insert({ user_id: user.id, subject: selectedSubject, group_id: groupId, is_active: true, started_at: startedAt } as any);
+    setLastStoppedSession(null);
+    setLastStoppedAt(null);
+    setActiveTick(0);
+    setFullscreen(true);
+    fetchSessions();
+    fetchGroupSessions();
+  }, [user, selectedSubject, groupId, fetchSessions, fetchGroupSessions]);
+
+  const resumeSession = useCallback(async (sessionToResume: StudySession) => {
+    // Resume = set is_active back to true, clear ended_at
+    // The started_at stays the same so elapsed time accumulates
+    await supabase
+      .from("study_sessions")
+      .update({ is_active: true, ended_at: null } as any)
+      .eq("id", sessionToResume.id);
+    setLastStoppedSession(null);
+    setLastStoppedAt(null);
+    setFullscreen(true);
+    fetchSessions();
+    fetchGroupSessions();
+  }, [fetchSessions, fetchGroupSessions]);
+
   const toggleSession = async () => {
     if (!user) return;
     if (activeSession) {
-      const duration = Math.floor((Date.now() - new Date(activeSession.started_at).getTime()) / 1000);
-      await supabase
-        .from("study_sessions")
-        .update({ is_active: false, ended_at: new Date().toISOString(), duration_seconds: duration } as any)
-        .eq("id", activeSession.id);
-      setFullscreen(false);
-      fetchSessions();
-      fetchGroupSessions();
+      await stopSession(activeSession);
+    } else if (ringResumeSession) {
+      await resumeSession(ringResumeSession);
     } else {
-      // Save to group AND personal (dual-write for group context)
-      if (groupId) {
-        // Insert group session
-        await supabase
-          .from("study_sessions")
-          .insert({ user_id: user.id, subject: selectedSubject, group_id: groupId, is_active: true, started_at: new Date().toISOString() } as any);
-      } else {
-        // Personal only
-        await supabase
-          .from("study_sessions")
-          .insert({ user_id: user.id, subject: selectedSubject, group_id: null, is_active: true, started_at: new Date().toISOString() } as any);
-      }
-      setFullscreen(true);
-      fetchSessions();
-      fetchGroupSessions();
+      await startNewSession();
     }
   };
+
+  const handleResumeFromList = async (sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return;
+    await resumeSession(session);
+  };
+
+  // Stop on unmount (navigating away from Study page)
+  useEffect(() => {
+    return () => {
+      const sessionId = activeSessionIdRef.current;
+      const started = startedAtRef.current;
+      if (sessionId && started) {
+        const duration = Math.max(Math.floor((Date.now() - new Date(started).getTime()) / 1000), 1);
+        supabase
+          .from("study_sessions")
+          .update({ is_active: false, ended_at: new Date().toISOString(), duration_seconds: duration } as any)
+          .eq("id", sessionId)
+          .then(() => {});
+      }
+    };
+  }, []);
 
   const removeSubject = (sub: string) => {
     const updated = subjects.filter(s => s !== sub);
@@ -412,7 +538,6 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     const match = findSubjectMatch(trimmed, subjects, allSessionSubjects);
 
     if (match.type === "exact") {
-      // Silently map to existing
       if (!subjects.includes(match.existing)) {
         const updated = [...subjects, match.existing];
         setSubjects(updated);
@@ -422,12 +547,10 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
       setNewSubjectText("");
       setAddingSubject(false);
     } else if (match.type === "similar") {
-      // Show prompt
       setSimilarityPrompt({ newName: trimmed, existing: match.existing });
       setNewSubjectText("");
       setAddingSubject(false);
     } else {
-      // Create new
       if (!subjects.includes(trimmed)) {
         const updated = [...subjects, trimmed];
         setSubjects(updated);
@@ -442,7 +565,6 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const handleSimilarityResponse = (isSame: boolean) => {
     if (!similarityPrompt) return;
     if (isSame) {
-      // Merge — use existing
       if (!subjects.includes(similarityPrompt.existing)) {
         const updated = [...subjects, similarityPrompt.existing];
         setSubjects(updated);
@@ -450,7 +572,6 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
       }
       setSelectedSubject(similarityPrompt.existing);
     } else {
-      // Keep separate
       if (!subjects.includes(similarityPrompt.newName)) {
         const updated = [...subjects, similarityPrompt.newName];
         setSubjects(updated);
@@ -531,6 +652,25 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   // Weekly sessions count
   const weekSessionsCount = useMemo(() => sessions.filter(s => weekDays.some(d => s.started_at.startsWith(d.date))).length, [sessions, weekDays]);
 
+  // ── Ring display values ──
+  const ringDisplayTime = useMemo(() => {
+    if (activeSession) return fmtTimer(activeTick);
+    if (ringResumeSession) return fmtTimer(ringResumeSession.duration_seconds);
+    return fmtTimer(todayTotal);
+  }, [activeSession, activeTick, ringResumeSession, todayTotal]);
+
+  const ringLabel = useMemo(() => {
+    if (activeSession) return "Session";
+    if (ringResumeSession) return "Paused";
+    return "Today";
+  }, [activeSession, ringResumeSession]);
+
+  const ringAction = useMemo(() => {
+    if (activeSession) return "tap to expand";
+    if (ringResumeSession) return "Resume session";
+    return "tap to start";
+  }, [activeSession, ringResumeSession]);
+
   // ── Show Log page ──
   if (showLog) {
     return <StudyLogPage onBack={() => setShowLog(false)} onOpenMore={onOpenMore} />;
@@ -546,7 +686,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
         startedAt={activeSession.started_at}
         todayTotal={todayTotal - activeTick}
         goalHours={DAILY_GOAL_HOURS}
-        onStop={toggleSession}
+        onStop={() => stopSession(activeSession)}
         onDismiss={() => setFullscreen(false)}
       />
     );
@@ -634,6 +774,17 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
                     {fmtHours(todayTotal)} / {DAILY_GOAL_HOURS}h
                   </span>
                   <span className="text-[10px] mt-0.5" style={{ color: "#6C47FF" }}>tap to expand</span>
+                </>
+              ) : ringResumeSession ? (
+                <>
+                  <span className="text-[10px]" style={{ color: "rgba(108,71,255,0.5)" }}>Paused</span>
+                  <span className="tabular-nums" style={{ fontSize: 24, fontWeight: 500, color: "#6C47FF", fontFamily: "DM Sans, sans-serif" }}>
+                    {fmtTimer(ringResumeSession.duration_seconds)}
+                  </span>
+                  <span className="text-[11px]" style={{ color: "rgba(108,71,255,0.6)" }}>
+                    {fmtHours(todayTotal)} / {DAILY_GOAL_HOURS}h
+                  </span>
+                  <span className="text-[10px] mt-0.5 font-medium" style={{ color: "#6C47FF" }}>Resume session</span>
                 </>
               ) : (
                 <>
@@ -912,9 +1063,20 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
                           )}
                         </div>
                       </div>
-                      <span className="text-sm font-medium" style={{ color: "#6C47FF" }}>
-                        {s.is_active ? fmtDuration(activeTick) : fmtDuration(s.duration_seconds)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {!s.is_active && !activeSession && listResumeSessionId === s.id && (
+                          <button
+                            onClick={() => handleResumeFromList(s.id)}
+                            className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                            style={{ background: "#EDE9FE", color: "#6C47FF" }}
+                          >
+                            Resume
+                          </button>
+                        )}
+                        <span className="text-sm font-medium" style={{ color: "#6C47FF" }}>
+                          {s.is_active ? fmtDuration(activeTick) : fmtDuration(s.duration_seconds)}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
