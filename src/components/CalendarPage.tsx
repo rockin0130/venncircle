@@ -1882,6 +1882,7 @@ const WeekView = ({
   const { profile } = useAuth();
   const todayRef = useRef(new Date());
   const [windowStart, setWindowStart] = useState(0);
+  const [weekScrollbarWidth, setWeekScrollbarWidth] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
@@ -1922,6 +1923,26 @@ const WeekView = ({
       timeGridRef.current.scrollTop = 8 * WEEK_HOUR_HEIGHT;
     }
   }, []);
+
+  useEffect(() => {
+    const grid = timeGridRef.current;
+    if (!grid) return;
+
+    const updateScrollbarWidth = () => {
+      setWeekScrollbarWidth(Math.max(grid.offsetWidth - grid.clientWidth, 0));
+    };
+
+    updateScrollbarWidth();
+
+    const resizeObserver = new ResizeObserver(updateScrollbarWidth);
+    resizeObserver.observe(grid);
+    window.addEventListener("resize", updateScrollbarWidth);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateScrollbarWidth);
+    };
+  }, [timeGridRef, dateItems.length]);
 
   const getMemberDots = useCallback((items: CalItem[]): string[] => {
     const seen = new Set<string>();
@@ -2066,8 +2087,8 @@ const WeekView = ({
       <div className={cn("flex -space-x-1", compact ? "items-center shrink-0" : "mt-auto")}>
         {memberIds.map((uid) => {
           const info = resolveMemberInfo(uid);
-          const size = compact ? 10 : 12;
-          const fontSize = compact ? 5.5 : 6;
+          const size = compact ? 16 : 12;
+          const fontSize = compact ? 8 : 6;
 
           return info.avatarUrl ? (
             <img
@@ -2098,6 +2119,8 @@ const WeekView = ({
     );
   };
 
+  const weekHeaderCompensationStyle = weekScrollbarWidth > 0 ? { paddingRight: weekScrollbarWidth } : undefined;
+
   return (
     <div
       onTouchStart={handleTouchStart}
@@ -2106,7 +2129,7 @@ const WeekView = ({
       style={{ background: "#fff", height: "calc(100vh - 200px)" }}
     >
       {/* ── Day Strip ── */}
-      <div className="flex" style={{ flexShrink: 0 }}>
+      <div className="flex" style={{ flexShrink: 0, ...weekHeaderCompensationStyle }}>
         <div style={{ width: WEEK_TIME_COL, flexShrink: 0 }} />
         {dateItems.map((col) => (
           <div key={getLocalDateKey(col.date)} className="flex-1 flex flex-col items-center"
@@ -2136,13 +2159,21 @@ const WeekView = ({
       </div>
 
       {/* ── All-day pill row (always visible, pinned between header and time grid) ── */}
-      <div className="flex" style={{ flexShrink: 0, borderTop: "0.5px solid hsl(var(--border))", borderBottom: "0.5px solid hsl(var(--border))" }}>
+      <div
+        className="flex"
+        style={{
+          flexShrink: 0,
+          borderTop: "0.5px solid hsl(var(--border))",
+          borderBottom: "0.5px solid hsl(var(--border))",
+          ...weekHeaderCompensationStyle,
+        }}
+      >
         <div className="flex items-center justify-end pr-1"
-          style={{ width: WEEK_TIME_COL, flexShrink: 0, fontSize: 8, color: "#aaa" }}>all<br/>day</div>
+          style={{ width: WEEK_TIME_COL, flexShrink: 0, fontSize: 8, color: "hsl(var(--muted-foreground))" }}>all<br/>day</div>
         {dateItems.map((col, ci) => {
           const allDayItems = col.items.filter((it) => isWeekAllDayItem(it));
           return (
-            <div key={ci} className="flex-1 px-1 py-1 border-l border-border" style={{ minHeight: 28 }}>
+            <div key={ci} className="flex-1 px-1.5 py-1.5 border-l border-border" style={{ minHeight: 40 }}>
               {allDayItems.map((it) => {
                 const color = it.isDueDateTask ? TODO_COLOR : getPersonColor(it);
                 const style = getCardStyle(color);
@@ -2150,11 +2181,17 @@ const WeekView = ({
                   <button
                     key={it.id}
                     onClick={() => onItemTap?.(it)}
-                    className="w-full flex items-center gap-1 text-left px-2 py-1 mb-0.5 hover:opacity-80 active:opacity-60 transition-opacity truncate"
-                    style={{ backgroundColor: style.bg, borderRadius: 99, minHeight: 20 }}
+                    className="w-full flex items-center gap-1.5 text-left px-3 py-1.5 mb-1 hover:opacity-80 active:opacity-60 transition-opacity truncate"
+                    style={{
+                      backgroundColor: style.bg,
+                      color: style.text,
+                      border: `1px solid ${style.border}`,
+                      borderRadius: 999,
+                      minHeight: 30,
+                    }}
                   >
                     <MemberDot item={it} compact />
-                    <span className="text-[9px] font-medium truncate" style={{ color: style.text }}>
+                    <span className="text-[12px] font-semibold leading-none truncate">
                       {it.title}
                     </span>
                   </button>
