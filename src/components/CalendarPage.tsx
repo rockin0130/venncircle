@@ -803,31 +803,10 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
 
   // Scroll time grid to 8am
   useEffect(() => {
-    if ((viewMode === "day" || viewMode === "3day") && timeGridRef.current) {
+    if (viewMode === "week" && timeGridRef.current) {
       timeGridRef.current.scrollTop = 8 * 60;
     }
   }, [viewMode]);
-
-  // ── Day/3-Day swipe handlers ──────────────────────────
-
-  const handleDaySwipe = useCallback((_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (Math.abs(info.offset.x) > 50) {
-      setSelectedDate((prev) => addDays(prev, info.offset.x > 0 ? -1 : 1));
-    }
-  }, []);
-
-  const handleThreeDaySwipe = useCallback((_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (Math.abs(info.offset.x) > 50) {
-      setSelectedDate((prev) => addDays(prev, info.offset.x > 0 ? -3 : 3));
-    }
-  }, []);
-
-  // Sync currentDate when selectedDate changes (for day/3day views)
-  useEffect(() => {
-    if (viewMode === "day" || viewMode === "3day") {
-      setCurrentDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
-    }
-  }, [selectedDate, viewMode]);
 
   // ── Month swipe for month view ────────────────────────
 
@@ -1020,11 +999,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
       <header className="pt-10 pb-2">
         <div className="flex items-center justify-between">
           {/* Left: Month Year */}
-          {viewMode === "list" ? (
-            <button onClick={goToday} className="flex items-center gap-2 hover:bg-secondary rounded-lg px-2 py-1 transition-colors">
-              <h1 className="text-xl font-bold text-foreground">{listVisibleMonth}</h1>
-            </button>
-          ) : viewMode === "day" || viewMode === "3day" ? (
+          {viewMode === "week" ? (
             <Popover>
               <PopoverTrigger asChild>
                 <button className="flex items-center gap-2 hover:bg-secondary rounded-lg px-2 py-1 transition-colors">
@@ -1080,18 +1055,18 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
           <div className="flex items-center gap-1.5">
             {/* D / W / M pill toggle */}
             <div className="flex bg-secondary rounded-full p-0.5">
-              {(["day", "3day", "month"] as ViewMode[]).map((mode) => (
+              {(["week", "month"] as ViewMode[]).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
                   className={cn(
-                    "px-2 py-0.5 text-[10px] font-semibold rounded-full transition-all",
+                    "px-3 py-0.5 text-[10px] font-semibold rounded-full transition-all",
                     viewMode === mode
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  {mode === "day" ? "D" : mode === "3day" ? "W" : "M"}
+                  {VIEW_LABELS[mode]}
                 </button>
               ))}
             </div>
