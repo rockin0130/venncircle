@@ -357,6 +357,7 @@ const WorkoutsPage = ({
   const [editExReps, setEditExReps] = useState("");
   const [loggingWorkout, setLoggingWorkout] = useState<Workout | null>(null);
   const [photoPromptWorkout, setPhotoPromptWorkout] = useState<Workout | null>(null);
+  const [feedShareWorkout, setFeedShareWorkout] = useState<Workout | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [nudgeCooldown, setNudgeCooldown] = useState<Set<string>>(new Set());
