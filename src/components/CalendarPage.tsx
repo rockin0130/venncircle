@@ -1255,66 +1255,20 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
         </div>
       )}
 
-      {/* ── DAY VIEW (with date strip + swipe) ──────────── */}
-      {viewMode === "day" && (
-        <div>
-          {/* Date strip */}
-          <DateStrip
-            dates={dateStripDates}
-            selectedDate={selectedDate}
-            onSelectDate={(d) => setSelectedDate(d)}
-          />
-          {/* Swipeable time grid */}
-          <motion.div
-            key={getLocalDateKey(selectedDate)}
-            onPanEnd={handleDaySwipe}
-            style={{ touchAction: "pan-y" }}
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <TimeGridView
-              dates={[selectedDate]}
-              getItemsForDate={getItemsForDate}
-              groups={groups}
-              timeGridRef={timeGridRef}
-              onItemTap={handleItemTap}
-              hideColumnHeaders
-              colorMap={calendarColorMap}
-            />
-          </motion.div>
-        </div>
-      )}
-
-      {/* ── 3-DAY VIEW (with date strip + swipe 3 days) ── */}
-      {viewMode === "3day" && (
-        <div>
-          {/* Date strip for 3-day */}
-          <DateStrip
-            dates={dateStripDates}
-            selectedDate={selectedDate}
-            onSelectDate={(d) => setSelectedDate(d)}
-            rangeLength={3}
-          />
-          {/* Swipeable time grid */}
-          <motion.div
-            key={getLocalDateKey(selectedDate)}
-            onPanEnd={handleThreeDaySwipe}
-            style={{ touchAction: "pan-y" }}
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <TimeGridView
-              dates={threeDayDates}
-              getItemsForDate={getItemsForDate}
-              groups={groups}
-              timeGridRef={timeGridRef}
-              onItemTap={handleItemTap}
-              colorMap={calendarColorMap}
-            />
-          </motion.div>
-        </div>
+      {/* ── WEEK VIEW (new 5-day layout) ──────────────── */}
+      {viewMode === "week" && (
+        <WeekView
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          getItemsForDate={getItemsForDate}
+          groups={groups}
+          timeGridRef={timeGridRef}
+          onItemTap={handleItemTap}
+          colorMap={calendarColorMap}
+          filterUsers={calFilterUsers}
+          userFilterIds={userFilterIds}
+          currentUserId={user?.id || ""}
+        />
       )}
 
       {/* ── Search Modal ────────────────────────────────── */}
