@@ -386,14 +386,28 @@ const HomeScheduledSection = ({
     else onToggleGcal(item.id);
   };
 
-  // Avatar initials for shared items
-  const getAvatarInitials = (item: UnifiedScheduledItem): string[] => {
-    if (item.assignee === "both") {
-      const myInit = user?.email?.charAt(0)?.toUpperCase() || "M";
-      return [myInit, "P"];
-    }
-    return [];
-  };
+  // Get avatar members for shared items using the same logic as Calendar
+  const getItemAvatarMembers = useCallback((item: UnifiedScheduledItem) => {
+    const assigneeValue = (item.assignee || "me") as "me" | "partner" | "both";
+    if (assigneeValue === "me") return [];
+    const assignedIds = normalizeCalendarAssignees({
+      item: {
+        assignee: assigneeValue,
+        groupId: item.groupId,
+        type: item.kind === "gcal" ? "gcal" : "event",
+        raw: { ...item.raw, ownerUserId: item.ownerUserId, user_id: item.ownerUserId },
+      },
+      currentUserId: user?.id || "",
+      groups,
+    });
+    if (assignedIds.length <= 1 && assigneeValue === "me") return [];
+    return getAssignedAvatarMembers({
+      assignedUserIds: assignedIds,
+      filterUsers: allFilterUsers,
+      currentUserId: user?.id || "",
+      currentUserInitial: profile?.display_name?.charAt(0)?.toUpperCase() || "?",
+    });
+  }, [user, groups, allFilterUsers, profile]);
 
   // Empty state
   if (totalItems === 0) {
