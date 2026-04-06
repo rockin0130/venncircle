@@ -2,6 +2,17 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Plus, Maximize2, Minimize2, MoreHorizontal, Camera } from "lucide-react";
 import { useAuth, Group, ShareablePage, PAGE_LABELS, SHAREABLE_PAGES } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface FeedItem {
   id: string;
