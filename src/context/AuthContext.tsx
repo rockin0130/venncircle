@@ -411,8 +411,72 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user, session?.access_token]);
 
   const refreshProfile = async () => {
-    if (user) await fetchProfile(user.id);
+    if (user) {
+      await fetchProfile(user.id);
+    }
   };
+
+  // Keep group members' avatar_url in sync with the latest profile
+  useEffect(() => {
+    if (!profile || !user) return;
+    setGroups((prev) => {
+      let changed = false;
+      const next = prev.map((g) => {
+        const updatedMembers = g.members.map((m) => {
+          if (m.user_id === user.id && m.avatar_url !== profile.avatar_url) {
+            changed = true;
+            return { ...m, avatar_url: profile.avatar_url, display_name: profile.display_name };
+          }
+          return m;
+        });
+        return changed ? { ...g, members: updatedMembers } : g;
+      });
+      return changed ? next : prev;
+    });
+  }, [profile?.avatar_url, profile?.display_name, user]);
+
+  // Realtime subscription for other users' profile changes (avatar updates)
+  useEffect(() => {
+    if (!user || groups.length === 0) return;
+    const otherMemberIds = new Set<string>();
+    for (const g of groups) {
+      for (const m of g.members) {
+        if (m.user_id !== user.id) otherMemberIds.add(m.user_id);
+      }
+    }
+    if (otherMemberIds.size === 0) return;
+
+    const channel = supabase
+      .channel('profile-avatar-sync')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles' },
+        (payload) => {
+          const updated = payload.new as any;
+          if (!updated?.id || updated.id === user.id) return;
+          if (!otherMemberIds.has(updated.id)) return;
+          setGroups((prev) =>
+            prev.map((g) => ({
+              ...g,
+              members: g.members.map((m) =>
+                m.user_id === updated.id
+                  ? { ...m, avatar_url: updated.avatar_url ?? null, display_name: updated.display_name ?? m.display_name }
+                  : m
+              ),
+            }))
+          );
+          // Update partner if applicable
+          if (partner && updated.id === partner.id) {
+            setPartner((prev) => prev ? { ...prev, avatar_url: updated.avatar_url ?? null, display_name: updated.display_name ?? prev.display_name } : prev);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, groups.length]);
 
   const refreshGroups = async () => {
     await fetchGroups();
