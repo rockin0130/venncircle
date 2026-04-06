@@ -1617,6 +1617,7 @@ const EventList = ({
   const { activeGroup, user, profile } = useAuth();
   const currentUserId = user?.id || "";
   const currentUserName = profile?.display_name || "";
+  const isPersonalOrAll = !activeGroup || (activeGroup as any)?._personal;
   const todoItems = items.filter((i) => i.isDueDateTask);
   const allDayItems = items.filter((i) => i.allDay && !i.isDueDateTask);
   const timedItems = items.filter((i) => !i.allDay);
@@ -1642,12 +1643,31 @@ const EventList = ({
     return resolveItemColor(item, groups, colorMap);
   };
 
+  // Group pill renderer for Mine/All views
+  const renderGroupPill = (group: any) => {
+    const coverUrl = group.cover_image_url;
+    const initial = (group.name || "G")[0].toUpperCase();
+    const color = GROUP_COLORS[groups.indexOf(group) % GROUP_COLORS.length] || GROUP_COLORS[0];
+    return (
+      <span className="inline-flex items-center gap-1 flex-shrink-0" style={{ fontSize: 10, fontWeight: 500, padding: "1px 6px", borderRadius: 99, background: "hsl(var(--secondary))", border: "0.5px solid hsl(var(--border))" }}>
+        {coverUrl ? (
+          <img src={coverUrl} className="w-3 h-3 rounded-full object-cover flex-shrink-0" alt="" />
+        ) : (
+          <span className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white flex-shrink-0" style={{ background: color }}>
+            {initial}
+          </span>
+        )}
+        <span className="truncate max-w-[60px]">{group.name}</span>
+      </span>
+    );
+  };
+
   return (
     <div className={compact ? "space-y-0.5" : "divide-y divide-border"}>
       {todoItems.length > 0 && (
         <div className="py-0.5">
           {todoItems.map((item) => {
-            const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
+            const group = isPersonalOrAll && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
             return (
               <button key={item.id} onClick={() => onItemTap?.(item)}
                 className="w-full flex items-center gap-2.5 py-1.5 px-1 text-left hover:bg-secondary/50 rounded-lg transition-colors active:bg-secondary">
@@ -1656,9 +1676,7 @@ const EventList = ({
                 <span className={`text-[13px] font-medium flex-1 truncate ${item.done ? "line-through opacity-40" : "text-foreground"}`}>
                   {item.title}
                 </span>
-                {group && (
-                  <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
-                )}
+                {group && renderGroupPill(group)}
                 <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
               </button>
             );
@@ -1670,7 +1688,7 @@ const EventList = ({
         <div className="py-0.5">
           {allDayItems.map((item) => {
             const color = getPersonColor(item);
-            const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
+            const group = isPersonalOrAll && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
             return (
               <button key={item.id} onClick={() => onItemTap?.(item)}
                 className="w-full flex items-center gap-2.5 py-1.5 px-1 text-left hover:bg-secondary/50 rounded-lg transition-colors active:bg-secondary">
@@ -1683,9 +1701,7 @@ const EventList = ({
                 {item.isMultiDay && (
                   <span className="text-[10px] text-muted-foreground">multi-day</span>
                 )}
-                {group && (
-                  <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
-                )}
+                {group && renderGroupPill(group)}
                 <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
               </button>
             );
@@ -1695,7 +1711,7 @@ const EventList = ({
 
       {timedItems.map((item) => {
         const color = getPersonColor(item);
-        const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
+        const group = isPersonalOrAll && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
         const displayTime = item.type === "gcal" && item.time
           ? new Date(item.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
           : formatTime(item.time);
@@ -1715,9 +1731,7 @@ const EventList = ({
               </span>
             </div>
             {item.type === "gcal" && <GoogleBadge />}
-            {group && (
-              <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
-            )}
+            {group && renderGroupPill(group)}
             <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
           </button>
         );
