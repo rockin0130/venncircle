@@ -456,8 +456,7 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
                     gi={gi}
                     user={user}
                     onTap={() => handleGroupTap(group)}
-                    onLeave={handleLeaveGroup}
-                    onDelete={handleDeleteGroup}
+                    onLeft={() => refreshGroups()}
                   />
                 ))}
                 
