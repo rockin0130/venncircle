@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight, Droplets, Dumbbell } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, GroupMember } from "@/context/AuthContext";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
 import { formatTime } from "@/lib/formatTime";
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { normalizeCalendarAssignees, getAssignedAvatarMembers, getAvatarPalette } from "@/lib/calendarAssignees";
+import { MEMBER_COLORS, type FilterUser } from "@/components/CalendarUserFilter";
 
 type UnifiedScheduledItem = {
   id: string;
