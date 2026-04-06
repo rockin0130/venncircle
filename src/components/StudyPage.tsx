@@ -1,10 +1,20 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Clock, MoreHorizontal, ChevronDown, X } from "lucide-react";
+import { Clock, MoreHorizontal, ChevronDown, X, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import PageGroupSelector from "@/components/PageGroupSelector";
 import StudyFullscreenTimer from "@/components/StudyFullscreenTimer";
 import StudyLogPage from "@/components/StudyLogPage";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // ═══ Types ═══
 interface StudySession {
@@ -193,6 +203,12 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const [editMode, setEditMode] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [similarityPrompt, setSimilarityPrompt] = useState<{ newName: string; existing: string } | null>(null);
+  const [swipedSessionId, setSwipedSessionId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [fadingSessionId, setFadingSessionId] = useState<string | null>(null);
+  const swipeStartX = useRef<number | null>(null);
+  const swipeCurrentX = useRef<number>(0);
+  const swipeRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
@@ -637,7 +653,79 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
   };
 
-  // ── Ring ──
+  // ── Swipe-to-delete handlers ──
+  const canSwipeDelete = useMemo(() => {
+    if (isPersonal) return true;
+    return sessionsFilter.length === 1 && sessionsFilter[0] === "mine";
+  }, [isPersonal, sessionsFilter]);
+
+  const handleSwipeStart = useCallback((e: React.TouchEvent, sessionId: string) => {
+    if (!canSwipeDelete) return;
+    swipeStartX.current = e.touches[0].clientX;
+    swipeCurrentX.current = 0;
+  }, [canSwipeDelete]);
+
+  const handleSwipeMove = useCallback((e: React.TouchEvent, sessionId: string) => {
+    if (!canSwipeDelete || swipeStartX.current === null) return;
+    const diff = swipeStartX.current - e.touches[0].clientX;
+    const clamped = Math.max(0, Math.min(diff, 80));
+    swipeCurrentX.current = clamped;
+    const el = swipeRowRefs.current.get(sessionId);
+    if (el) el.style.transform = `translateX(-${clamped}px)`;
+    if (clamped > 10 && swipedSessionId !== sessionId) {
+      setSwipedSessionId(sessionId);
+    }
+  }, [canSwipeDelete, swipedSessionId]);
+
+  const handleSwipeEnd = useCallback((e: React.TouchEvent, sessionId: string) => {
+    if (!canSwipeDelete) return;
+    const el = swipeRowRefs.current.get(sessionId);
+    if (swipeCurrentX.current > 40) {
+      if (el) el.style.transform = `translateX(-72px)`;
+      setSwipedSessionId(sessionId);
+    } else {
+      if (el) el.style.transform = `translateX(0px)`;
+      if (swipedSessionId === sessionId) setSwipedSessionId(null);
+    }
+    swipeStartX.current = null;
+    swipeCurrentX.current = 0;
+  }, [canSwipeDelete, swipedSessionId]);
+
+  const resetSwipe = useCallback(() => {
+    if (swipedSessionId) {
+      const el = swipeRowRefs.current.get(swipedSessionId);
+      if (el) el.style.transform = `translateX(0px)`;
+      setSwipedSessionId(null);
+    }
+  }, [swipedSessionId]);
+
+  const handleDeleteSession = useCallback(async () => {
+    if (!deleteConfirmId) return;
+    setFadingSessionId(deleteConfirmId);
+    setDeleteConfirmId(null);
+    // Reset swipe on the row
+    const el = swipeRowRefs.current.get(deleteConfirmId);
+    if (el) el.style.transform = `translateX(0px)`;
+    setSwipedSessionId(null);
+
+    await supabase.from("study_sessions").delete().eq("id", deleteConfirmId);
+    // Small delay for fade animation
+    setTimeout(() => {
+      setFadingSessionId(null);
+      fetchSessions();
+      fetchGroupSessions();
+    }, 300);
+  }, [deleteConfirmId, fetchSessions, fetchGroupSessions]);
+
+  // Reset swipe on any interaction outside
+  useEffect(() => {
+    if (!swipedSessionId) return;
+    const handler = () => resetSwipe();
+    window.addEventListener("scroll", handler, true);
+    return () => window.removeEventListener("scroll", handler, true);
+  }, [swipedSessionId, resetSwipe]);
+
+
   const progress = Math.min(todayTotal / (DAILY_GOAL_HOURS * 3600), 1);
   const SIZE = 130;
   const STROKE = 9;
@@ -1054,23 +1142,46 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
           {!isPersonal && sessionsFilterOptions.length > 0 && (
             <div className="flex gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
               {sessionsFilterOptions.map(opt => {
-                const isActive = sessionsFilter.includes(opt.key);
+                const individualKeys = sessionsFilterOptions.filter(o => o.key !== "together").map(o => o.key);
+                const allIndividualsSelected = individualKeys.every(k => sessionsFilter.includes(k));
+                const isTogetherActive = sessionsFilter.includes("together") || allIndividualsSelected;
+                const isActive = opt.key === "together" ? isTogetherActive : sessionsFilter.includes(opt.key) || isTogetherActive;
                 return (
                   <button
                     key={opt.key}
                     onClick={() => {
                       if (opt.key === "together") {
-                        setSessionsFilter(["together"]);
+                        // If Together is already active (all highlighted), reset to Mine only
+                        if (isTogetherActive) {
+                          setSessionsFilter(["mine"]);
+                        } else {
+                          // Select all individual pills + together
+                          setSessionsFilter([...individualKeys, "together"]);
+                        }
                       } else {
                         setSessionsFilter(prev => {
                           const withoutTogether = prev.filter(k => k !== "together");
+                          if (isTogetherActive && !prev.includes("together")) {
+                            // Was in "all individuals selected" state, deselect this one
+                            return individualKeys.filter(k => k !== opt.key);
+                          }
+                          if (prev.includes("together")) {
+                            // Together was explicitly active, deselect this member
+                            return individualKeys.filter(k => k !== opt.key);
+                          }
                           if (withoutTogether.includes(opt.key)) {
                             const next = withoutTogether.filter(k => k !== opt.key);
                             return next.length === 0 ? [opt.key] : next;
                           }
-                          return [...withoutTogether, opt.key];
+                          const next = [...withoutTogether, opt.key];
+                          // Check if all individuals are now selected
+                          if (individualKeys.every(k => next.includes(k))) {
+                            return [...next, "together"];
+                          }
+                          return next;
                         });
                       }
+                      resetSwipe();
                     }}
                     className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
                     style={{
@@ -1148,54 +1259,89 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
               ) : (
                 <div className="space-y-1.5">
                   {(isPersonal ? todaySessions : filteredGroupTodaySessions).map(s => (
-                    <div key={s.id} className="flex items-center gap-3 p-2.5 rounded-xl" style={{ background: s.is_active ? "#FAF5FF" : "transparent" }}>
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#6C47FF" }}>
-                        <Clock size={13} color="#fff" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium flex items-center gap-1.5">
-                          {s.subject}
-                          {s.is_active && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "#EDE9FE", color: "#6C47FF" }}>
-                              live
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                          <span>{fmtTime(s.started_at)}{s.ended_at ? ` – ${fmtTime(s.ended_at)}` : " – now"}</span>
-                          {isPersonal && s.group_id && studyEnabledGroupIds.has(s.group_id) && groupInfoMap[s.group_id] && (() => {
-                            const gi = groupInfoMap[s.group_id];
-                            return (
-                              <span
-                                className="inline-flex items-center gap-1"
-                                style={{ fontSize: 9, fontWeight: 500, padding: "1px 6px", borderRadius: 99, background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.08)" }}
-                              >
-                                {gi.coverUrl ? (
-                                  <img src={gi.coverUrl} className="w-3 h-3 rounded-full object-cover flex-shrink-0" />
-                                ) : (
-                                  <span className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white flex-shrink-0" style={{ background: gi.color }}>
-                                    {gi.name[0]}
-                                  </span>
-                                )}
-                                {gi.name}
-                              </span>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!s.is_active && !activeSession && listResumeSessionId === s.id && (
+                    <div
+                      key={s.id}
+                      className="relative overflow-hidden rounded-xl"
+                      style={{
+                        opacity: fadingSessionId === s.id ? 0 : 1,
+                        transition: "opacity 0.3s ease",
+                      }}
+                      onClick={() => { if (swipedSessionId && swipedSessionId !== s.id) resetSwipe(); }}
+                    >
+                      {/* Delete button behind */}
+                      {canSwipeDelete && !s.is_active && (
+                        <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center" style={{ width: 72 }}>
                           <button
-                            onClick={() => handleResumeFromList(s.id)}
-                            className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                            style={{ background: "#EDE9FE", color: "#6C47FF" }}
+                            onClick={() => { setDeleteConfirmId(s.id); }}
+                            className="flex items-center justify-center gap-1 h-full w-full"
+                            style={{ background: "#EF4444", color: "#fff", fontSize: 12, fontWeight: 600 }}
                           >
-                            Resume
+                            <Trash2 size={14} />
+                            Delete
                           </button>
-                        )}
-                        <span className="text-sm font-medium" style={{ color: "#6C47FF" }}>
-                          {s.is_active ? fmtDuration(activeTick) : fmtDuration(s.duration_seconds)}
-                        </span>
+                        </div>
+                      )}
+                      {/* Swipeable row */}
+                      <div
+                        ref={el => { if (el) swipeRowRefs.current.set(s.id, el); }}
+                        className="flex items-center gap-3 p-2.5 rounded-xl relative"
+                        style={{
+                          background: s.is_active ? "#FAF5FF" : "#fff",
+                          transition: swipedSessionId === s.id ? "none" : "transform 0.2s ease",
+                          zIndex: 1,
+                        }}
+                        onTouchStart={e => handleSwipeStart(e, s.id)}
+                        onTouchMove={e => handleSwipeMove(e, s.id)}
+                        onTouchEnd={e => handleSwipeEnd(e, s.id)}
+                      >
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#6C47FF" }}>
+                          <Clock size={13} color="#fff" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium flex items-center gap-1.5">
+                            {s.subject}
+                            {s.is_active && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "#EDE9FE", color: "#6C47FF" }}>
+                                live
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                            <span>{fmtTime(s.started_at)}{s.ended_at ? ` – ${fmtTime(s.ended_at)}` : " – now"}</span>
+                            {isPersonal && s.group_id && studyEnabledGroupIds.has(s.group_id) && groupInfoMap[s.group_id] && (() => {
+                              const gi = groupInfoMap[s.group_id];
+                              return (
+                                <span
+                                  className="inline-flex items-center gap-1"
+                                  style={{ fontSize: 9, fontWeight: 500, padding: "1px 6px", borderRadius: 99, background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.08)" }}
+                                >
+                                  {gi.coverUrl ? (
+                                    <img src={gi.coverUrl} className="w-3 h-3 rounded-full object-cover flex-shrink-0" />
+                                  ) : (
+                                    <span className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white flex-shrink-0" style={{ background: gi.color }}>
+                                      {gi.name[0]}
+                                    </span>
+                                  )}
+                                  {gi.name}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {!s.is_active && !activeSession && listResumeSessionId === s.id && (
+                            <button
+                              onClick={() => handleResumeFromList(s.id)}
+                              className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                              style={{ background: "#EDE9FE", color: "#6C47FF" }}
+                            >
+                              Resume
+                            </button>
+                          )}
+                          <span className="text-sm font-medium" style={{ color: "#6C47FF" }}>
+                            {s.is_active ? fmtDuration(activeTick) : fmtDuration(s.duration_seconds)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1259,6 +1405,25 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
           </div>
         </div>
       </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this session?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteConfirmId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSession}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
