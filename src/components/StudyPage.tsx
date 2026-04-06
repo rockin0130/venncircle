@@ -479,22 +479,6 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     await resumeSession(session);
   };
 
-  // Stop on unmount (navigating away from Study page)
-  useEffect(() => {
-    return () => {
-      const sessionId = activeSessionIdRef.current;
-      const started = startedAtRef.current;
-      if (sessionId && started) {
-        const duration = Math.max(Math.floor((Date.now() - new Date(started).getTime()) / 1000), 1);
-        supabase
-          .from("study_sessions")
-          .update({ is_active: false, ended_at: new Date().toISOString(), duration_seconds: duration } as any)
-          .eq("id", sessionId)
-          .then(() => {});
-      }
-    };
-  }, []);
-
   const removeSubject = (sub: string) => {
     const updated = subjects.filter(s => s !== sub);
     setSubjects(updated);
