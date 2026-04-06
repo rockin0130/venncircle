@@ -113,7 +113,8 @@ const SwipeableGroupCard = ({
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
-  const currentX = useRef(0);
+  const startOffset = useRef(0);
+  const dragging = useRef(false);
   const [offset, setOffset] = useState(0);
   const [leaveFlowOpen, setLeaveFlowOpen] = useState(false);
   const [removed, setRemoved] = useState(false);
@@ -156,21 +157,25 @@ const SwipeableGroupCard = ({
   }, [isSwiped, onSwipeOpen]);
 
   const handleStart = (clientX: number) => {
+    dragging.current = true;
     startX.current = clientX;
-    currentX.current = offset;
-    // If another card is open, close it
+    startOffset.current = offset;
+    // Close any other open card immediately
     if (activeSwipeId && activeSwipeId !== group.id) {
       onSwipeOpen(null);
     }
   };
 
   const handleMove = (clientX: number) => {
-    const diff = clientX - startX.current + currentX.current;
+    if (!dragging.current) return;
+    const diff = clientX - startX.current + startOffset.current;
     const clamped = Math.max(-REVEAL_WIDTH, Math.min(0, diff));
     setOffset(clamped);
   };
 
   const handleEnd = () => {
+    if (!dragging.current) return;
+    dragging.current = false;
     if (offset < -REVEAL_WIDTH / 2) {
       setOffset(-REVEAL_WIDTH);
       onSwipeOpen(group.id);
