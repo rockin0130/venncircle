@@ -1688,7 +1688,7 @@ const EventList = ({
                   {item.title}
                 </span>
                 {group && renderGroupPill(group)}
-                <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
+                <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} currentUserAvatarUrl={profile?.avatar_url} />
               </button>
             );
           })}
@@ -1713,7 +1713,7 @@ const EventList = ({
                   <span className="text-[10px] text-muted-foreground">multi-day</span>
                 )}
                 {group && renderGroupPill(group)}
-                <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
+                <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} currentUserAvatarUrl={profile?.avatar_url} />
               </button>
             );
           })}
@@ -1743,7 +1743,7 @@ const EventList = ({
             </div>
             {item.type === "gcal" && <GoogleBadge />}
             {group && renderGroupPill(group)}
-            <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
+            <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} currentUserAvatarUrl={profile?.avatar_url} />
           </button>
         );
       })}
