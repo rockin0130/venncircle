@@ -1960,8 +1960,12 @@ const WeekView = ({
     return dots.slice(0, 3);
   }, [filterUsers, groups, currentUserId]);
 
+  const isWeekAllDayItem = useCallback((item: CalItem) => {
+    return Boolean(item.isDueDateTask || item.allDay || !item.time || item.time === "All day");
+  }, []);
+
   const layoutEventsInCol = (items: CalItem[]) => {
-    const timed = items.filter((it) => !it.allDay && !it.isDueDateTask && it.hour != null);
+    const timed = items.filter((it) => !isWeekAllDayItem(it) && it.hour != null);
     const sorted = [...timed].sort((a, b) => (a.hour ?? 0) - (b.hour ?? 0));
     const positioned: { item: CalItem; col: number; totalCols: number }[] = [];
     sorted.forEach((item) => {
@@ -2030,7 +2034,7 @@ const WeekView = ({
     return { initial: "M", color: MEMBER_COLORS[0].dot, avatarUrl: null };
   }, [filterUsers, currentUserId, profile, groups]);
 
-  const MemberDot = ({ item }: { item: CalItem }) => {
+  const getMemberIds = useCallback((item: CalItem) => {
     const raw = item.raw as any;
     const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
     const memberIds: string[] = [];
@@ -2050,28 +2054,42 @@ const WeekView = ({
           .forEach((m: any) => memberIds.push(m.user_id));
       }
     }
+
     if (memberIds.length === 0) memberIds.push(ownerId);
+    return memberIds;
+  }, [groups, currentUserId]);
+
+  const MemberDot = ({ item, compact = false }: { item: CalItem; compact?: boolean }) => {
+    const memberIds = getMemberIds(item);
 
     return (
-      <div className="flex -space-x-1 mt-auto">
+      <div className={cn("flex -space-x-1", compact ? "items-center shrink-0" : "mt-auto")}>
         {memberIds.map((uid) => {
           const info = resolveMemberInfo(uid);
+          const size = compact ? 10 : 12;
+          const fontSize = compact ? 5.5 : 6;
+
           return info.avatarUrl ? (
-            <img key={uid} src={info.avatarUrl} alt={info.initial}
+            <img
+              key={uid}
+              src={info.avatarUrl}
+              alt={info.initial}
               className="rounded-full object-cover border"
-              style={{ width: 12, height: 12, borderColor: "white" }}
+              style={{ width: size, height: size, borderColor: "white" }}
               onError={(e) => {
                 const span = document.createElement("span");
                 span.className = "inline-flex items-center justify-center rounded-full font-bold leading-none";
-                span.style.cssText = `width:12px;height:12px;font-size:6px;background:${info.color};color:white`;
+                span.style.cssText = `width:${size}px;height:${size}px;font-size:${fontSize}px;background:${info.color};color:white`;
                 span.textContent = info.initial;
                 (e.target as HTMLElement).replaceWith(span);
               }}
             />
           ) : (
-            <span key={uid}
+            <span
+              key={uid}
               className="inline-flex items-center justify-center rounded-full font-bold leading-none text-white"
-              style={{ width: 12, height: 12, fontSize: 6, backgroundColor: info.color }}>
+              style={{ width: size, height: size, fontSize, backgroundColor: info.color }}
+            >
               {info.initial}
             </span>
           );
@@ -2079,8 +2097,6 @@ const WeekView = ({
       </div>
     );
   };
-
-  // Always show all-day row (min height ensures it's visible even when empty)
 
   return (
     <div
@@ -2119,23 +2135,25 @@ const WeekView = ({
         ))}
       </div>
 
-      {/* ── All-day pill row (pinned between header and time grid) ── */}
+      {/* ── All-day pill row (always visible, pinned between header and time grid) ── */}
       <div className="flex" style={{ flexShrink: 0, borderTop: "0.5px solid hsl(var(--border))", borderBottom: "0.5px solid hsl(var(--border))" }}>
         <div className="flex items-center justify-end pr-1"
           style={{ width: WEEK_TIME_COL, flexShrink: 0, fontSize: 8, color: "#aaa" }}>all<br/>day</div>
         {dateItems.map((col, ci) => {
-          const allDayItems = col.items.filter((it) => it.allDay || it.isDueDateTask);
+          const allDayItems = col.items.filter((it) => isWeekAllDayItem(it));
           return (
-            <div key={ci} className="flex-1 p-0.5 border-l border-border"
-              style={{ minHeight: 28 }}>
+            <div key={ci} className="flex-1 px-1 py-1 border-l border-border" style={{ minHeight: 28 }}>
               {allDayItems.map((it) => {
                 const color = it.isDueDateTask ? TODO_COLOR : getPersonColor(it);
                 const style = getCardStyle(color);
                 return (
-                  <button key={it.id} onClick={() => onItemTap?.(it)}
-                    className="w-full flex items-center gap-0.5 text-left px-1 py-0.5 mb-0.5 hover:opacity-80 active:opacity-60 transition-opacity truncate"
-                    style={{ backgroundColor: style.bg, borderRadius: 99 }}>
-                    <MemberDot item={it} />
+                  <button
+                    key={it.id}
+                    onClick={() => onItemTap?.(it)}
+                    className="w-full flex items-center gap-1 text-left px-2 py-1 mb-0.5 hover:opacity-80 active:opacity-60 transition-opacity truncate"
+                    style={{ backgroundColor: style.bg, borderRadius: 99, minHeight: 20 }}
+                  >
+                    <MemberDot item={it} compact />
                     <span className="text-[9px] font-medium truncate" style={{ color: style.text }}>
                       {it.title}
                     </span>
