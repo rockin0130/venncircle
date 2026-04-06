@@ -1259,54 +1259,89 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
               ) : (
                 <div className="space-y-1.5">
                   {(isPersonal ? todaySessions : filteredGroupTodaySessions).map(s => (
-                    <div key={s.id} className="flex items-center gap-3 p-2.5 rounded-xl" style={{ background: s.is_active ? "#FAF5FF" : "transparent" }}>
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#6C47FF" }}>
-                        <Clock size={13} color="#fff" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium flex items-center gap-1.5">
-                          {s.subject}
-                          {s.is_active && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "#EDE9FE", color: "#6C47FF" }}>
-                              live
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                          <span>{fmtTime(s.started_at)}{s.ended_at ? ` – ${fmtTime(s.ended_at)}` : " – now"}</span>
-                          {isPersonal && s.group_id && studyEnabledGroupIds.has(s.group_id) && groupInfoMap[s.group_id] && (() => {
-                            const gi = groupInfoMap[s.group_id];
-                            return (
-                              <span
-                                className="inline-flex items-center gap-1"
-                                style={{ fontSize: 9, fontWeight: 500, padding: "1px 6px", borderRadius: 99, background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.08)" }}
-                              >
-                                {gi.coverUrl ? (
-                                  <img src={gi.coverUrl} className="w-3 h-3 rounded-full object-cover flex-shrink-0" />
-                                ) : (
-                                  <span className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white flex-shrink-0" style={{ background: gi.color }}>
-                                    {gi.name[0]}
-                                  </span>
-                                )}
-                                {gi.name}
-                              </span>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!s.is_active && !activeSession && listResumeSessionId === s.id && (
+                    <div
+                      key={s.id}
+                      className="relative overflow-hidden rounded-xl"
+                      style={{
+                        opacity: fadingSessionId === s.id ? 0 : 1,
+                        transition: "opacity 0.3s ease",
+                      }}
+                      onClick={() => { if (swipedSessionId && swipedSessionId !== s.id) resetSwipe(); }}
+                    >
+                      {/* Delete button behind */}
+                      {canSwipeDelete && !s.is_active && (
+                        <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center" style={{ width: 72 }}>
                           <button
-                            onClick={() => handleResumeFromList(s.id)}
-                            className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                            style={{ background: "#EDE9FE", color: "#6C47FF" }}
+                            onClick={() => { setDeleteConfirmId(s.id); }}
+                            className="flex items-center justify-center gap-1 h-full w-full"
+                            style={{ background: "#EF4444", color: "#fff", fontSize: 12, fontWeight: 600 }}
                           >
-                            Resume
+                            <Trash2 size={14} />
+                            Delete
                           </button>
-                        )}
-                        <span className="text-sm font-medium" style={{ color: "#6C47FF" }}>
-                          {s.is_active ? fmtDuration(activeTick) : fmtDuration(s.duration_seconds)}
-                        </span>
+                        </div>
+                      )}
+                      {/* Swipeable row */}
+                      <div
+                        ref={el => { if (el) swipeRowRefs.current.set(s.id, el); }}
+                        className="flex items-center gap-3 p-2.5 rounded-xl relative"
+                        style={{
+                          background: s.is_active ? "#FAF5FF" : "#fff",
+                          transition: swipedSessionId === s.id ? "none" : "transform 0.2s ease",
+                          zIndex: 1,
+                        }}
+                        onTouchStart={e => handleSwipeStart(e, s.id)}
+                        onTouchMove={e => handleSwipeMove(e, s.id)}
+                        onTouchEnd={e => handleSwipeEnd(e, s.id)}
+                      >
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#6C47FF" }}>
+                          <Clock size={13} color="#fff" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium flex items-center gap-1.5">
+                            {s.subject}
+                            {s.is_active && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "#EDE9FE", color: "#6C47FF" }}>
+                                live
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                            <span>{fmtTime(s.started_at)}{s.ended_at ? ` – ${fmtTime(s.ended_at)}` : " – now"}</span>
+                            {isPersonal && s.group_id && studyEnabledGroupIds.has(s.group_id) && groupInfoMap[s.group_id] && (() => {
+                              const gi = groupInfoMap[s.group_id];
+                              return (
+                                <span
+                                  className="inline-flex items-center gap-1"
+                                  style={{ fontSize: 9, fontWeight: 500, padding: "1px 6px", borderRadius: 99, background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.08)" }}
+                                >
+                                  {gi.coverUrl ? (
+                                    <img src={gi.coverUrl} className="w-3 h-3 rounded-full object-cover flex-shrink-0" />
+                                  ) : (
+                                    <span className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white flex-shrink-0" style={{ background: gi.color }}>
+                                      {gi.name[0]}
+                                    </span>
+                                  )}
+                                  {gi.name}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {!s.is_active && !activeSession && listResumeSessionId === s.id && (
+                            <button
+                              onClick={() => handleResumeFromList(s.id)}
+                              className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                              style={{ background: "#EDE9FE", color: "#6C47FF" }}
+                            >
+                              Resume
+                            </button>
+                          )}
+                          <span className="text-sm font-medium" style={{ color: "#6C47FF" }}>
+                            {s.is_active ? fmtDuration(activeTick) : fmtDuration(s.duration_seconds)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))}
