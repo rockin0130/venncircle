@@ -19,6 +19,7 @@ import StudyPage from "@/components/StudyPage";
 
 import AuthPage from "@/components/AuthPage";
 import ProfileSetupPage from "@/components/ProfileSetupPage";
+import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
 import SharedInterestsPage from "@/components/SharedInterestsPage";
 import GroupHubPage from "@/components/GroupHubPage";
 import ProfilePage from "@/components/ProfilePage";
@@ -61,6 +62,18 @@ const Index = () => {
   }
 
   const needsProfileSetup = profile && !(profile as any).username;
+  const needsOnboarding = profile && !(profile as any).onboarding_completed;
+
+  if (needsOnboarding) {
+    return (
+      <OnboardingFlow
+        userId={user.id}
+        profile={profile}
+        onComplete={() => refreshProfile()}
+      />
+    );
+  }
+
   if (needsProfileSetup) {
     return (
       <ProfileSetupPage

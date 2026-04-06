@@ -1172,6 +1172,33 @@ export type Database = {
           },
         ]
       }
+      onboarding_preferences: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          preferences: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          preferences?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          preferences?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1182,7 +1209,12 @@ export type Database = {
           home_quick_access_position: string | null
           id: string
           invite_code: string | null
+          join_type: string | null
+          onboarding_completed: boolean | null
           partner_id: string | null
+          referral_code: string | null
+          referred_by: string | null
+          selected_interests: string[] | null
           timezone: string | null
           updated_at: string
           username: string | null
@@ -1196,7 +1228,12 @@ export type Database = {
           home_quick_access_position?: string | null
           id: string
           invite_code?: string | null
+          join_type?: string | null
+          onboarding_completed?: boolean | null
           partner_id?: string | null
+          referral_code?: string | null
+          referred_by?: string | null
+          selected_interests?: string[] | null
           timezone?: string | null
           updated_at?: string
           username?: string | null
@@ -1210,7 +1247,12 @@ export type Database = {
           home_quick_access_position?: string | null
           id?: string
           invite_code?: string | null
+          join_type?: string | null
+          onboarding_completed?: boolean | null
           partner_id?: string | null
+          referral_code?: string | null
+          referred_by?: string | null
+          selected_interests?: string[] | null
           timezone?: string | null
           updated_at?: string
           username?: string | null
@@ -1224,6 +1266,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      referrals: {
+        Row: {
+          created_at: string | null
+          id: string
+          premium_granted: boolean | null
+          referred_id: string
+          referrer_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          premium_granted?: boolean | null
+          referred_id: string
+          referrer_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          premium_granted?: boolean | null
+          referred_id?: string
+          referrer_id?: string
+        }
+        Relationships: []
       }
       shopping_list_items: {
         Row: {
