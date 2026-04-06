@@ -846,7 +846,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
                 <>
                   <span className="text-[10px] text-muted-foreground">Today</span>
                   <span className="tabular-nums" style={{ fontSize: 24, fontWeight: 500, color: "#1a1a1a", fontFamily: "DM Sans, sans-serif" }}>
-                    {fmtTimer(todayTotal)}
+                    {fmtTimer(0)}
                   </span>
                   <span className="text-[11px]" style={{ color: "rgba(108,71,255,0.6)" }}>
                     {fmtHours(todayTotal)} / {DAILY_GOAL_HOURS}h
