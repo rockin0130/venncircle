@@ -323,7 +323,7 @@ const ChatListPage = ({
           </div>
           <div className="flex items-center justify-between gap-2 mt-0.5">
             <p className="text-[11px] text-muted-foreground truncate">
-              {preview.lastMessage ? getMessagePreview(preview) : "No messages yet"}
+              {getMessagePreview(preview)}
             </p>
             {preview.unreadCount > 0 && (
               <span className="shrink-0 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-1" style={{ backgroundColor: "#6C47FF" }}>
