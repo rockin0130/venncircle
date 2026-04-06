@@ -914,24 +914,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   const getGroupName = (groupId: string | null | undefined) =>
     groupId ? groups.find((g) => g.id === groupId) : null;
 
-  // ── 3-day dates ───────────────────────────────────────
 
-  const threeDayDates = useMemo(() => {
-    const d = new Date(selYear, selMonth, selDay);
-    return [d, addDays(d, 1), addDays(d, 2)];
-  }, [selDay, selMonth, selYear]);
-
-  // ── Date strip for Day/3-Day views ────────────────────
-
-  const dateStripDates = useMemo(() => {
-    // Show a 7-day strip centered around selected date
-    const dates: Date[] = [];
-    const center = new Date(selYear, selMonth, selDay);
-    for (let i = -3; i <= 3; i++) {
-      dates.push(addDays(center, i));
-    }
-    return dates;
-  }, [selDay, selMonth, selYear]);
 
   // ── List view: generate dates for continuous scroll ───
 
