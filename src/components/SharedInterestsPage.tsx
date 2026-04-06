@@ -3,16 +3,7 @@ import { Plus, Maximize2, Minimize2, MoreHorizontal, Camera } from "lucide-react
 import { useAuth, Group, ShareablePage, PAGE_LABELS, SHAREABLE_PAGES } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import LeaveGroupFlow from "@/components/LeaveGroupFlow";
 
 interface FeedItem {
   id: string;
@@ -106,26 +97,22 @@ const SwipeableGroupCard = ({
   gi,
   user,
   onTap,
-  onLeave,
-  onDelete,
+  onLeft,
 }: {
   group: Group;
   gi: number;
   user: { id: string } | null;
   onTap: () => void;
-  onLeave: (group: Group) => void;
-  onDelete: (group: Group) => void;
+  onLeft: () => void;
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
   const currentX = useRef(0);
   const swiped = useRef(false);
   const [offset, setOffset] = useState(0);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [leaving, setLeaving] = useState(false);
+  const [leaveFlowOpen, setLeaveFlowOpen] = useState(false);
   const [removed, setRemoved] = useState(false);
 
-  const isOwner = group.created_by === user?.id;
   const REVEAL_WIDTH = 100;
 
   const handleStart = (clientX: number) => {
@@ -152,25 +139,6 @@ const SwipeableGroupCard = ({
   const snapBack = () => {
     setOffset(0);
     swiped.current = false;
-  };
-
-  const handleAction = async () => {
-    setLeaving(true);
-    if (isOwner) {
-      const { error } = await supabase.rpc("delete_group", { _group_id: group.id });
-      if (error) {
-        toast.error("Failed to delete group");
-        setLeaving(false);
-        return;
-      }
-      toast.success(`"${group.name}" deleted`);
-      setRemoved(true);
-      setTimeout(() => onDelete(group), 300);
-    } else {
-      onLeave(group);
-      setRemoved(true);
-    }
-    setConfirmOpen(false);
   };
 
   // Click outside to snap back
@@ -214,7 +182,7 @@ const SwipeableGroupCard = ({
             background: "#E05C5C",
             borderRadius: "0 14px 14px 0",
           }}
-          onClick={() => setConfirmOpen(true)}
+          onClick={() => setLeaveFlowOpen(true)}
         >
           Leave Group
         </div>
@@ -273,34 +241,24 @@ const SwipeableGroupCard = ({
         </div>
       </div>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{isOwner ? "Delete" : "Leave"} {group.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {isOwner
-                ? "This will permanently delete the group and all its shared content for all members."
-                : "You'll lose access to shared content."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={leaving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleAction}
-              disabled={leaving}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {leaving ? "..." : isOwner ? "Delete" : "Leave"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {user && (
+        <LeaveGroupFlow
+          group={group}
+          userId={user.id}
+          open={leaveFlowOpen}
+          onOpenChange={setLeaveFlowOpen}
+          onLeft={() => {
+            setRemoved(true);
+            setTimeout(() => onLeft(), 300);
+          }}
+        />
+      )}
     </>
   );
 };
 
 const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHub, onOpenMore }: SharedInterestsPageProps) => {
-  const { groups, user, leaveGroup, refreshGroups } = useAuth();
+  const { groups, user, refreshGroups } = useAuth();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
   const [splitMode, setSplitMode] = useState<SplitMode>("equal");
@@ -313,19 +271,6 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
     [groups]
   );
 
-  const handleLeaveGroup = async (group: Group) => {
-    const result = await leaveGroup(group.id);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success(`Left "${group.name}"`);
-      refreshGroups();
-    }
-  };
-
-  const handleDeleteGroup = () => {
-    refreshGroups();
-  };
 
   useEffect(() => {
     if (!user || allGroups.length === 0) {
@@ -498,8 +443,7 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
                     gi={gi}
                     user={user}
                     onTap={() => handleGroupTap(group)}
-                    onLeave={handleLeaveGroup}
-                    onDelete={handleDeleteGroup}
+                    onLeft={() => refreshGroups()}
                   />
                 ))}
                 

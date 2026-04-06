@@ -1838,6 +1838,10 @@ export type Database = {
           invite_code: string
         }[]
       }
+      set_member_role: {
+        Args: { _group_id: string; _new_role: string; _target_user_id: string }
+        Returns: Json
+      }
       toggle_event_completion: {
         Args: { _completed: boolean; _event_id: string }
         Returns: {
