@@ -1643,7 +1643,25 @@ const EventList = ({
     return resolveItemColor(item, groups, colorMap);
   };
 
-  return (
+  // Group pill renderer for Mine/All views
+  const renderGroupPill = (group: any) => {
+    const coverUrl = group.cover_image_url;
+    const initial = (group.name || "G")[0].toUpperCase();
+    const color = GROUP_COLORS[groups.indexOf(group) % GROUP_COLORS.length] || GROUP_COLORS[0];
+    return (
+      <span className="inline-flex items-center gap-1 flex-shrink-0" style={{ fontSize: 10, fontWeight: 500, padding: "1px 6px", borderRadius: 99, background: "hsl(var(--secondary))", border: "0.5px solid hsl(var(--border))" }}>
+        {coverUrl ? (
+          <img src={coverUrl} className="w-3 h-3 rounded-full object-cover flex-shrink-0" alt="" />
+        ) : (
+          <span className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white flex-shrink-0" style={{ background: color }}>
+            {initial}
+          </span>
+        )}
+        <span className="truncate max-w-[60px]">{group.name}</span>
+      </span>
+    );
+  };
+
     <div className={compact ? "space-y-0.5" : "divide-y divide-border"}>
       {todoItems.length > 0 && (
         <div className="py-0.5">
