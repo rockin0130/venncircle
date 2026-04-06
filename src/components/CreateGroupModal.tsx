@@ -17,7 +17,7 @@ interface CreateGroupModalProps {
 type Step = "friends" | "pages" | "name";
 
 const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: CreateGroupModalProps) => {
-  const { createGroup, inviteToGroup } = useAuth();
+  const { createGroup, inviteToGroup, joinGroup } = useAuth();
   const { activeFriends } = useFriendships();
 
   const [step, setStep] = useState<Step>("friends");
@@ -28,6 +28,9 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
   const [groupName, setGroupName] = useState("");
   const [creating, setCreating] = useState(false);
   const [addFriendOpen, setAddFriendOpen] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
+  const [inviteError, setInviteError] = useState("");
+  const [joining, setJoining] = useState(false);
 
   const resetState = () => {
     setStep("friends");
@@ -35,6 +38,9 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
     setSelectedPages(new Set(defaultPage ? [defaultPage] : []));
     setGroupName("");
     setCreating(false);
+    setInviteCode("");
+    setInviteError("");
+    setJoining(false);
   };
 
   const handleOpenChange = (v: boolean) => {
@@ -48,6 +54,11 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+    // Clear invite code when selecting friends
+    if (inviteCode) {
+      setInviteCode("");
+      setInviteError("");
+    }
   };
 
   const togglePage = (page: ShareablePage) => {
@@ -57,6 +68,33 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
       next.has(page) ? next.delete(page) : next.add(page);
       return next;
     });
+  };
+
+  const handleInviteCodeChange = (val: string) => {
+    setInviteCode(val);
+    setInviteError("");
+    // Clear friend selections when typing invite code
+    if (val.trim() && selectedFriends.size > 0) {
+      setSelectedFriends(new Set());
+    }
+  };
+
+  const handleJoinWithCode = async () => {
+    if (!inviteCode.trim()) return;
+    setJoining(true);
+    setInviteError("");
+    try {
+      const result = await joinGroup(inviteCode.trim());
+      if (result.error) {
+        setInviteError("Code not found — check and try again");
+      } else {
+        toast.success("Joined group! 🎉");
+        handleOpenChange(false);
+      }
+    } catch {
+      setInviteError("Code not found — check and try again");
+    }
+    setJoining(false);
   };
 
   const handleCreate = async () => {
@@ -99,7 +137,9 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
     }
   };
 
-  const canProceedFromFriends = selectedFriends.size > 0;
+  const hasInviteCode = inviteCode.trim().length > 0;
+  const hasFriends = selectedFriends.size > 0;
+  const canProceedFromFriends = hasFriends || hasInviteCode;
   const canProceedFromPages = selectedPages.size > 0;
 
   const allSteps: Step[] = ["friends", "pages", "name"];
@@ -224,12 +264,34 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
                 <span className="text-sm font-medium text-primary">Add a friend</span>
               </button>
 
+              {/* Divider with "or" */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground font-medium">or</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
+              {/* Invite code input */}
+              <div className="space-y-1.5">
+                <input
+                  value={inviteCode}
+                  onChange={(e) => handleInviteCodeChange(e.target.value)}
+                  placeholder="Enter invite code..."
+                  className="w-full px-4 py-3 rounded-xl bg-card border border-border text-sm outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                  maxLength={20}
+                />
+                {inviteError && (
+                  <p className="text-xs text-destructive px-1">{inviteError}</p>
+                )}
+              </div>
+
               <button
-                onClick={() => setStep("pages")}
-                disabled={!canProceedFromFriends}
-                className="w-full py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 transition-all"
+                onClick={hasInviteCode ? handleJoinWithCode : () => setStep("pages")}
+                disabled={!canProceedFromFriends || joining}
+                className="w-full py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2 transition-all"
               >
-                Next
+                {joining && <Loader2 size={14} className="animate-spin" />}
+                {hasInviteCode ? (joining ? "Joining..." : "Join Group") : "Next"}
               </button>
             </div>
           )}
