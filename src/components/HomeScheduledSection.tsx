@@ -637,19 +637,23 @@ const HomeScheduledSection = ({
                         </div>
 
                         {/* Avatars for shared items */}
-                        {avatars.length > 0 && (
+                        {avatarMembers.length > 0 && (
                           <div className="flex -space-x-1.5 flex-shrink-0">
-                            {avatars.map((init, i) => (
-                              <div
-                                key={i}
-                                className={cn(
-                                  "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-primary-foreground ring-2 ring-card",
-                                  i === 0 ? "bg-user-a" : "bg-user-b"
-                                )}
-                              >
-                                {init}
-                              </div>
-                            ))}
+                            {avatarMembers.map((member) => {
+                              const palette = getAvatarPalette(member.colorIndex);
+                              return (
+                                <span
+                                  key={member.id}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold leading-none ring-2 ring-card"
+                                  style={{
+                                    backgroundColor: palette.avatarBackground,
+                                    color: palette.avatarText,
+                                  }}
+                                >
+                                  {member.initial}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
