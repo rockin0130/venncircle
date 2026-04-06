@@ -1662,6 +1662,7 @@ const EventList = ({
     );
   };
 
+  return (
     <div className={compact ? "space-y-0.5" : "divide-y divide-border"}>
       {todoItems.length > 0 && (
         <div className="py-0.5">
