@@ -265,63 +265,41 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   // ── Active session ──
   const activeSession = useMemo(() => sessions.find(s => s.is_active), [sessions]);
 
+  // Stable active session ID to avoid tearing down intervals on every fetch
+  const activeSessionId = activeSession?.id ?? null;
+  const activeStartedAt = activeSession?.started_at ?? null;
+
   // Keep refs in sync
   useEffect(() => {
-    if (activeSession) {
-      activeSessionIdRef.current = activeSession.id;
-      startedAtRef.current = activeSession.started_at;
-    } else {
-      activeSessionIdRef.current = null;
-      startedAtRef.current = null;
-    }
-  }, [activeSession]);
+    activeSessionIdRef.current = activeSessionId;
+    startedAtRef.current = activeStartedAt;
+  }, [activeSessionId, activeStartedAt]);
 
+  // Timer tick — keyed on stable session ID, not the full object
   useEffect(() => {
-    if (activeSession) {
-      const update = () => {
-        if (startedAtRef.current) {
-          setActiveTick(Math.floor((Date.now() - new Date(startedAtRef.current).getTime()) / 1000));
-        }
-      };
-      update();
-      tickRef.current = setInterval(update, 1000);
-      return () => { if (tickRef.current) clearInterval(tickRef.current); };
-    } else {
-      // Don't reset activeTick to 0 here — only reset when explicitly starting a new session
-    }
-  }, [activeSession]);
+    if (!activeSessionId || !activeStartedAt) return;
+    const startMs = new Date(activeStartedAt).getTime();
+    const update = () => setActiveTick(Math.max(Math.floor((Date.now() - startMs) / 1000), 0));
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [activeSessionId, activeStartedAt]);
 
-  // ── Stop session on navigate away / page unload ──
+  // ── Stop session on page unload only (NOT on component unmount) ──
   useEffect(() => {
-    const stopActiveSession = async () => {
+    const handleBeforeUnload = () => {
       const sessionId = activeSessionIdRef.current;
       const started = startedAtRef.current;
       if (!sessionId || !started) return;
       const duration = Math.max(Math.floor((Date.now() - new Date(started).getTime()) / 1000), 1);
-      const endedAt = new Date().toISOString();
-      // Use sendBeacon-style: fire and forget
-      await supabase
-        .from("study_sessions")
-        .update({ is_active: false, ended_at: endedAt, duration_seconds: duration } as any)
-        .eq("id", sessionId);
-    };
-
-    const handleBeforeUnload = () => {
-      stopActiveSession();
-    };
-
-    const handleVisibilityChange = () => {
-      // Don't stop on visibility change — screen lock shouldn't stop timer
-      // The started_at is already saved, so duration is always recoverable
+      // Use navigator.sendBeacon for reliability during unload
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/study_sessions?id=eq.${sessionId}`;
+      const body = JSON.stringify({ is_active: false, ended_at: new Date().toISOString(), duration_seconds: duration });
+      navigator.sendBeacon?.(url, new Blob([body], { type: "application/json" }));
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
   // ── Click outside to exit edit mode ──
@@ -500,22 +478,6 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     if (!session) return;
     await resumeSession(session);
   };
-
-  // Stop on unmount (navigating away from Study page)
-  useEffect(() => {
-    return () => {
-      const sessionId = activeSessionIdRef.current;
-      const started = startedAtRef.current;
-      if (sessionId && started) {
-        const duration = Math.max(Math.floor((Date.now() - new Date(started).getTime()) / 1000), 1);
-        supabase
-          .from("study_sessions")
-          .update({ is_active: false, ended_at: new Date().toISOString(), duration_seconds: duration } as any)
-          .eq("id", sessionId)
-          .then(() => {});
-      }
-    };
-  }, []);
 
   const removeSubject = (sub: string) => {
     const updated = subjects.filter(s => s !== sub);
