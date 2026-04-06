@@ -30,7 +30,7 @@ export function saveNavPages(_pages: Tab[]) {}
 const NAV_ITEMS: { id: Tab; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
   { id: "shared-interests", label: "Explore", icon: Compass },
-  { id: "ai", label: "AI", icon: Sparkles },
+  { id: "ai", label: "AI", icon: Home },
   { id: "chat", label: "Chat", icon: MessageCircle },
   { id: "profile", label: "Profile", icon: User },
 ];
@@ -64,7 +64,7 @@ const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
                     ? "bg-gradient-to-br from-violet-500 to-indigo-600 scale-105"
                     : "bg-gradient-to-br from-violet-500/90 to-indigo-600/90 hover:scale-105"
                 }`}>
-                  <Sparkles size={24} className="text-white" />
+                  <VennIcon size={24} className="text-white" />
                 </div>
                 <span className={`text-[9px] font-semibold mt-0.5 ${active ? "text-violet-500" : "text-muted-foreground"}`}>AI</span>
               </button>
