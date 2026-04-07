@@ -1111,24 +1111,70 @@ const WorkoutsPage = ({
         </div>
       </header>
 
-      <PageGroupSelector page="workout" personalLabel="Mine" hideAllPill showAvatars />
+      {/* ── Mode Toggle ── */}
+      <ModeToggleBar mode={workoutMode} onModeChange={setWorkoutMode} />
 
-      {/* User filter pills */}
-      {!isPersonalView && (
-        <WorkoutUserFilter
-          selectedUserIds={userFilterIds}
-          onSelectionChange={setUserFilterIds}
-        />
+      {/* ── Group Mode layers ── */}
+      {workoutMode === "group" && (
+        <>
+          <GroupPillsRow selectedGroupId={selectedGroupId} onSelectGroup={handleGroupSelect} />
+          {selectedGroupId && (
+            <MemberSelectorPill
+              groupId={selectedGroupId}
+              selectedUserIds={memberFilter}
+              onSelectionChange={setMemberFilter}
+            />
+          )}
+          {/* Per-member summary cards */}
+          {selectedGroupId && (() => {
+            const group = groups.find((g) => g.id === selectedGroupId);
+            if (!group) return null;
+            const memberOptions: MemberOption[] = [];
+            if (user) {
+              memberOptions.push({
+                userId: user.id,
+                label: profile?.display_name?.split(" ")[0] || "Me",
+                initial: (profile?.display_name || "U")[0].toUpperCase(),
+                avatarUrl: profile?.avatar_url || null,
+              });
+            }
+            group.members
+              .filter((m: GroupMember) => m.user_id !== user?.id && m.status === "active")
+              .forEach((m) => {
+                const name = m.display_name || "Member";
+                memberOptions.push({
+                  userId: m.user_id,
+                  label: name.split(" ")[0],
+                  initial: name[0].toUpperCase(),
+                  avatarUrl: m.avatar_url,
+                });
+              });
+            // Filter to selected members
+            const isEveryone = memberFilter.has("__everyone__");
+            const visibleMembers = isEveryone ? memberOptions : memberOptions.filter((m) => memberFilter.has(m.userId));
+            if (visibleMembers.length <= 1) return null;
+            const weekStart = loadWeekStart();
+            const startStr = getWeekStartDate(new Date(), weekStart);
+            const today = todayStr();
+            const memberData = visibleMembers.map((m) => {
+              const mWorkouts = allContextWorkouts.filter((w) => (w.ownerUserId || user?.id) === m.userId);
+              const weekWorkouts = mWorkouts.filter((w) => w.done && (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today);
+              return {
+                userId: m.userId,
+                done: new Set(weekWorkouts.map((w) => w.completedDate || w.scheduledDate!)).size,
+                kcal: weekWorkouts.reduce((s, w) => s + (w.cal || 0), 0),
+                distance: weekWorkouts.reduce((s, w) => s + (w.distance || 0), 0),
+              };
+            });
+            return <MemberSummaryCards members={visibleMembers} weeklyGoal={weeklyGoal} memberWorkouts={memberData} />;
+          })()}
+        </>
       )}
 
-      {/* Main workout view */}
-      <>
-        {/* Hero Stats Card */}
-        {isMultiUserView ? (
-          <MultiUserHeroCard userData={userWorkoutData} weeklyGoal={weeklyGoal} />
-        ) : (
-          <HeroCard workouts={displayWorkouts} weeklyGoal={weeklyGoal} onGoalChange={saveGoal} />
-        )}
+      {/* ── Mine Mode: Hero Stats Card ── */}
+      {workoutMode === "mine" && (
+        <HeroCard workouts={displayWorkouts} weeklyGoal={weeklyGoal} onGoalChange={saveGoal} />
+      )}
 
         {/* Missed Workouts Banner */}
         {missedWorkouts.length > 0 && (
