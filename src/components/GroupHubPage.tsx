@@ -83,6 +83,9 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   const [uploadingCover, setUploadingCover] = useState(false);
   const [localCoverUrl, setLocalCoverUrl] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const [showChallengePage, setShowChallengePage] = useState(false);
+  const [activeChallenge, setActiveChallenge] = useState<any>(null);
+  const [challengeDetailOpen, setChallengeDetailOpen] = useState(false);
 
   const currentGroup = groups.find((g) => g.id === group.id) || group;
   const currentActiveMembers = currentGroup.members.filter((m) => m.status === "active");
