@@ -552,8 +552,64 @@ const WorkoutsPage = ({
     rescheduleWorkoutCascade,
     appleFitnessSyncEnabled,
   } = useAppContext();
-  const { user, profile, activeGroup, groups } = useAuth();
+  const { user, profile, activeGroup, groups, setActiveGroup } = useAuth();
   const [showCongrats, setShowCongrats] = useState(false);
+
+  // ── Mode toggle state ──
+  const [workoutMode, setWorkoutMode] = useState<WorkoutMode>(() => {
+    if (navigatedGroupId) return "group";
+    return (localStorage.getItem("workout_mode") as WorkoutMode) || "mine";
+  });
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(() => {
+    if (navigatedGroupId) return navigatedGroupId;
+    return localStorage.getItem("workout_selected_group") || null;
+  });
+  const [memberFilterMap, setMemberFilterMap] = useState<Record<string, Set<string>>>({});
+
+  // Auto-select first workout group if none selected
+  const workoutGroups = useMemo(() => groups.filter((g) => g.shared_pages?.includes("workout")), [groups]);
+  useEffect(() => {
+    if (workoutMode === "group" && (!selectedGroupId || !workoutGroups.find((g) => g.id === selectedGroupId))) {
+      if (workoutGroups.length > 0) setSelectedGroupId(workoutGroups[0].id);
+    }
+  }, [workoutMode, selectedGroupId, workoutGroups]);
+
+  // Persist mode and group
+  useEffect(() => { localStorage.setItem("workout_mode", workoutMode); }, [workoutMode]);
+  useEffect(() => { if (selectedGroupId) localStorage.setItem("workout_selected_group", selectedGroupId); }, [selectedGroupId]);
+
+  // Handle navigatedGroupId changes
+  useEffect(() => {
+    if (navigatedGroupId) {
+      setWorkoutMode("group");
+      setSelectedGroupId(navigatedGroupId);
+    }
+  }, [navigatedGroupId]);
+
+  const handleGroupSelect = (gid: string) => {
+    setSelectedGroupId(gid);
+    // Reset member filter when switching groups
+    setMemberFilterMap((prev) => ({ ...prev, [gid]: new Set(["__everyone__"]) }));
+  };
+
+  const memberFilter = useMemo(
+    () => selectedGroupId ? (memberFilterMap[selectedGroupId] ?? new Set(["__everyone__"])) : new Set(["__everyone__"]),
+    [selectedGroupId, memberFilterMap]
+  );
+  const setMemberFilter = useCallback((ids: Set<string>) => {
+    if (selectedGroupId) setMemberFilterMap((prev) => ({ ...prev, [selectedGroupId]: ids }));
+  }, [selectedGroupId]);
+
+  // Sync activeGroup based on mode
+  useEffect(() => {
+    if (workoutMode === "mine") {
+      // In mine mode, don't set active group (aggregate view)
+      setActiveGroup(null);
+    } else if (workoutMode === "group" && selectedGroupId) {
+      const g = groups.find((g) => g.id === selectedGroupId);
+      if (g) setActiveGroup(g);
+    }
+  }, [workoutMode, selectedGroupId, groups]);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [showCustomBuilder, setShowCustomBuilder] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ filter: "all" | "week" | "month" | "date" | "tomorrow"; message: string } | null>(null);
