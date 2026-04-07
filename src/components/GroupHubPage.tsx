@@ -362,8 +362,61 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
                 <span className="text-[11px] text-muted-foreground font-medium">{PAGE_LABELS[page]}</span>
               </button>
             ))}
+            {/* Challenge tile — always shown */}
+            <button onClick={() => setShowChallengePage(true)} className="flex flex-col items-center gap-1.5 shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-[hsl(260,60%,95%)] flex items-center justify-center">
+                <Trophy size={20} className="text-[#6C47FF]" />
+              </div>
+              <span className="text-[11px] text-muted-foreground font-medium">Challenge</span>
+            </button>
           </div>
         </div>
+
+        {/* Active Challenge Card */}
+        {activeChallenge && (
+          <div className="px-4 pb-3">
+            <button
+              onClick={() => setChallengeDetailOpen(true)}
+              className="w-full text-left rounded-[14px] p-4"
+              style={{ background: "#1a1a2e", border: "0.5px solid rgba(255,255,255,0.08)" }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-[#6C47FF]/20 text-[#6C47FF]">Active challenge</span>
+                <span className="text-[10px] text-white/50">{Math.max(0, Math.ceil((new Date(activeChallenge.ends_at).getTime() - Date.now()) / 86400000))} days left</span>
+              </div>
+              <p className="text-[15px] font-medium text-white mb-1">{activeChallenge.title}</p>
+              {activeChallenge.partner_reward && (
+                <p className="text-[11px] text-white/50 mb-3">🏆 Win: {activeChallenge.partner_reward}</p>
+              )}
+              {(() => {
+                const totalDays = activeChallenge.duration_weeks * 7;
+                const daysLeft = Math.max(0, Math.ceil((new Date(activeChallenge.ends_at).getTime() - Date.now()) / 86400000));
+                const currentWeek = Math.min(activeChallenge.duration_weeks, Math.ceil((totalDays - daysLeft) / 7) || 1);
+                return (
+                  <>
+                    <div className="flex items-center justify-between text-[10px] text-white/50 mb-1">
+                      <span>Group progress</span>
+                      <span>Week {currentWeek} of {activeChallenge.duration_weeks}</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-white/10 mb-2">
+                      <div className="h-full rounded-full bg-[#6C47FF]" style={{ width: `${Math.round(((totalDays - daysLeft) / totalDays) * 100)}%` }} />
+                    </div>
+                  </>
+                );
+              })()}
+              <div className="flex items-center justify-between">
+                <div className="flex -space-x-1.5">
+                  {currentActiveMembers.slice(0, 4).map((m) => (
+                    <div key={m.user_id} className="w-5 h-5 rounded-full bg-white/20 border border-[#1a1a2e] flex items-center justify-center text-[8px] font-bold text-white">
+                      {(m.display_name || "?")[0]}
+                    </div>
+                  ))}
+                </div>
+                <span className="text-[10px] text-white/40">Tap to see details</span>
+              </div>
+            </button>
+          </div>
+        )}
 
         {/* Divider line */}
         <div className="mx-4" style={{ height: "0.5px", background: "rgba(0,0,0,0.08)" }} />
