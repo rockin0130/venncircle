@@ -260,6 +260,9 @@ interface AppContextType {
   setAppleCalendarEvents: Dispatch<SetStateAction<AppleCalendarEvent[]>>;
   appleFitnessSyncEnabled: boolean;
   setAppleFitnessSyncEnabled: (enabled: boolean) => void;
+  healthKitWorkouts: Workout[];
+  healthKitWorkoutsLoading: boolean;
+  refreshHealthKitWorkouts: () => Promise<void>;
   hideGcalEvent: (eventId: string) => Promise<void>;
   toggleGcalCompletion: (eventId: string) => Promise<void>;
   toggleEventVisibility: (eventId: string) => Promise<void>;
@@ -338,6 +341,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [googleCalendarEvents, setGoogleCalendarEvents] = useState<GoogleCalendarEvent[]>([]);
   const [appleCalendarEvents, setAppleCalendarEvents] = useState<AppleCalendarEvent[]>([]);
   const [appleFitnessSyncEnabled, setAppleFitnessSyncEnabledState] = useState(readAppleFitnessSyncFromStorage);
+  const [healthKitWorkouts, setHealthKitWorkouts] = useState<Workout[]>([]);
+  const [healthKitWorkoutsLoading, setHealthKitWorkoutsLoading] = useState(false);
   const [habitSectionsState, setHabitSectionsState] = useState<HabitSectionMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshCounter, setRefreshCounter] = useState(0);
@@ -351,6 +356,79 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       /* ignore */
     }
   }, []);
+
+  const refreshHealthKitWorkouts = useCallback(async () => {
+    if (!user?.id || !appleFitnessSyncEnabled) {
+      setHealthKitWorkouts([]);
+      return;
+    }
+    try {
+      const { Capacitor } = await import("@capacitor/core");
+      if (!Capacitor.isNativePlatform()) {
+        setHealthKitWorkouts([]);
+        return;
+      }
+    } catch {
+      setHealthKitWorkouts([]);
+      return;
+    }
+    setHealthKitWorkoutsLoading(true);
+    try {
+      const { fetchHealthKitWorkoutHistory90Days } = await import("@/integrations/appleHealth");
+      const list = await fetchHealthKitWorkoutHistory90Days(user.id);
+      setHealthKitWorkouts(list);
+    } catch (e) {
+      console.warn("HealthKit workout history:", e);
+      setHealthKitWorkouts([]);
+    } finally {
+      setHealthKitWorkoutsLoading(false);
+    }
+  }, [user?.id, appleFitnessSyncEnabled]);
+
+  useEffect(() => {
+    void refreshHealthKitWorkouts();
+  }, [refreshHealthKitWorkouts]);
+
+  useEffect(() => {
+    let remove: (() => void) | undefined;
+    let cancelled = false;
+    import("@capacitor/app").then(({ App }) => {
+      if (cancelled) return;
+      App.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) void refreshHealthKitWorkouts();
+      }).then((h) => {
+        remove = () => h.remove();
+      });
+    });
+    return () => {
+      cancelled = true;
+      remove?.();
+    };
+  }, [refreshHealthKitWorkouts]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { Capacitor } = await import("@capacitor/core");
+        if (!Capacitor.isNativePlatform()) return;
+        const { hasCalendarReadPermission, getCalendarEvents } = await import("@/integrations/appleCalendar");
+        const ok = await hasCalendarReadPermission();
+        if (!ok || cancelled) return;
+        const now = new Date();
+        const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endDate = new Date(now.getFullYear(), now.getMonth() + 3, 0, 23, 59, 59, 999);
+        const events = await getCalendarEvents(startDate, endDate);
+        if (!cancelled) setAppleCalendarEvents(events);
+      } catch {
+        /* web / plugin */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   // Get ALL other user IDs in the active context (supports 3+ member groups)
   const contextOtherUserIds = useMemo(() => {
@@ -1917,7 +1995,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       partnerWaterIntake, partnerWaterGoal, partnerWaterMap,
       workouts, filteredWorkouts, toggleWorkout, removeWorkout, removeWorkoutsByFilter, updateWorkout, setWorkouts, addWorkouts, rescheduleWorkout, rescheduleWorkoutCascade,
       getHabitStreak, getHabitsForDate, getWorkoutsForDate,
-      googleCalendarEvents, appleCalendarEvents, setAppleCalendarEvents, appleFitnessSyncEnabled, setAppleFitnessSyncEnabled, hideGcalEvent, toggleGcalCompletion, toggleEventVisibility, designateGcalEvent,
+      googleCalendarEvents, appleCalendarEvents, setAppleCalendarEvents, appleFitnessSyncEnabled, setAppleFitnessSyncEnabled, healthKitWorkouts, healthKitWorkoutsLoading, refreshHealthKitWorkouts, hideGcalEvent, toggleGcalCompletion, toggleEventVisibility, designateGcalEvent,
       partnerHabits, partnerEvents, partnerTasks, partnerWorkouts,
       filteredPartnerHabits, filteredPartnerEvents, filteredPartnerTasks, filteredPartnerWorkouts,
       getPartnerWorkoutsForDate, getPartnerHabitsForDate, getPartnerHabitStreak,

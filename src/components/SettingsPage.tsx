@@ -88,20 +88,15 @@ const SettingsPage = () => {
     (async () => {
       try {
         const ok = await hasCalendarReadPermission();
-        if (cancelled || !ok) return;
-        const { startDate, endDate } = appleCalendarRange();
-        const events = await getCalendarEvents(startDate, endDate);
-        if (cancelled) return;
-        setAppleCalendarEvents(events);
-        setAppleCalendarConnected(true);
+        if (!cancelled) setAppleCalendarConnected(ok);
       } catch {
-        /* Web or unavailable plugin */
+        if (!cancelled) setAppleCalendarConnected(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [setAppleCalendarEvents]);
+  }, []);
 
   const handleConnectAppleCalendar = async () => {
     setAppleCalendarLoading(true);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { X, Plus, Check, RefreshCw, ChevronDown } from "lucide-react";
+import { X, Plus, Check, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -9,11 +9,13 @@ import { Switch } from "@/components/ui/switch";
 import { Capacitor } from "@capacitor/core";
 import { listDeviceCalendars, normalizeAppleCalendarColor } from "@/integrations/appleCalendar";
 import type { Calendar } from "@ebarooni/capacitor-calendar";
+import { APPLE_CALENDAR_VISIBILITY_CHANGED } from "@/lib/appleCalendarVisibility";
 import {
-  getHiddenAppleCalendarIds,
-  setAppleCalendarVisibleInApp,
-  APPLE_CALENDAR_VISIBILITY_CHANGED,
-} from "@/lib/appleCalendarVisibility";
+  getAppleCalendarDisplayColor,
+  setAppleCalendarDisplayColor,
+  isAppleVisibleInContext,
+  setAppleContextVisibility,
+} from "@/lib/appleCalendarPrefs";
 
 // ── Types ──
 
@@ -66,7 +68,9 @@ const CalendarsManager = ({ open, onClose }: Props) => {
   const [contextVisRows, setContextVisRows] = useState<ContextVisRow[]>([]);
   const [appleDeviceCalendars, setAppleDeviceCalendars] = useState<Calendar[]>([]);
   const [appleCalendarsLoading, setAppleCalendarsLoading] = useState(false);
-  const [appleHiddenIds, setAppleHiddenIds] = useState(() => getHiddenAppleCalendarIds());
+  const [appleUiRev, setAppleUiRev] = useState(0);
+  const [settingsAppleDeviceCal, setSettingsAppleDeviceCal] = useState<Calendar | null>(null);
+  const [appleSheetColor, setAppleSheetColor] = useState("");
 
   // New calendar form
   const [showNewForm, setShowNewForm] = useState(false);
@@ -175,14 +179,13 @@ const CalendarsManager = ({ open, onClose }: Props) => {
   }, [open, fetchCalendars, syncGoogleCalendars, fetchContextVisibility]);
 
   useEffect(() => {
-    const sync = () => setAppleHiddenIds(getHiddenAppleCalendarIds());
+    const sync = () => setAppleUiRev((n) => n + 1);
     window.addEventListener(APPLE_CALENDAR_VISIBILITY_CHANGED, sync);
     return () => window.removeEventListener(APPLE_CALENDAR_VISIBILITY_CHANGED, sync);
   }, []);
 
   useEffect(() => {
     if (!open) return;
-    setAppleHiddenIds(getHiddenAppleCalendarIds());
     if (!Capacitor.isNativePlatform()) {
       setAppleDeviceCalendars([]);
       return;
@@ -354,9 +357,22 @@ const CalendarsManager = ({ open, onClose }: Props) => {
   // ── Settings popup helpers ──
 
   const openSettings = (cal: CalendarEntry) => {
+    setSettingsAppleDeviceCal(null);
     setSettingsCalId(cal.id);
     setSettingsName(cal.name);
     setSettingsColor(cal.color);
+  };
+
+  const openAppleDeviceCalendarSettings = (cal: Calendar) => {
+    setSettingsCalId(null);
+    setSettingsAppleDeviceCal(cal);
+    setAppleSheetColor(getAppleCalendarDisplayColor(cal.id, normalizeAppleCalendarColor(cal.color)));
+  };
+
+  const saveAppleDeviceCalendarSettings = () => {
+    if (!settingsAppleDeviceCal) return;
+    setAppleCalendarDisplayColor(settingsAppleDeviceCal.id, appleSheetColor);
+    setSettingsAppleDeviceCal(null);
   };
 
   const saveSettings = async () => {
@@ -565,6 +581,7 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                               </p>
                             )}
                           </div>
+                          <ChevronRight size={18} className="text-muted-foreground flex-shrink-0" />
                         </button>
                       );
                     })}
@@ -574,7 +591,7 @@ const CalendarsManager = ({ open, onClose }: Props) => {
 
               {/* ── APPLE (device) ── */}
               {Capacitor.isNativePlatform() && (appleCalendarsLoading || appleDeviceCalendars.length > 0) && (
-                <div>
+                <div key={appleUiRev}>
                   <div className="flex items-center gap-2 py-2">
                     <span className="text-base">🍎</span>
                     <span className="text-[14px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -588,28 +605,41 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                     </div>
                   ) : (
                     <div className="bg-card rounded-xl border border-border divide-y divide-border">
-                      {appleDeviceCalendars.map((cal) => (
-                        <div
-                          key={cal.id}
-                          className="flex items-center gap-3 px-4 py-3"
-                        >
-                          <div
-                            className="w-7 h-7 rounded-full flex-shrink-0 border border-border/40"
-                            style={{ backgroundColor: normalizeAppleCalendarColor(cal.color) }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[14px] font-medium text-foreground truncate">{cal.title}</p>
-                            <p className="text-[11px] text-muted-foreground">On this device</p>
-                          </div>
-                          <Switch
-                            checked={!appleHiddenIds.has(cal.id)}
-                            onCheckedChange={(v) => {
-                              setAppleCalendarVisibleInApp(cal.id, v);
-                              setAppleHiddenIds(getHiddenAppleCalendarIds());
-                            }}
-                          />
-                        </div>
-                      ))}
+                      {appleDeviceCalendars.map((cal) => {
+                        const visibleCount = contextOptions.filter((ctx) =>
+                          isAppleVisibleInContext(cal.id, ctx.id)
+                        ).length;
+                        const dotColor = getAppleCalendarDisplayColor(cal.id, normalizeAppleCalendarColor(cal.color));
+                        return (
+                          <button
+                            key={cal.id}
+                            type="button"
+                            onClick={() => openAppleDeviceCalendarSettings(cal)}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-secondary/30 transition-colors"
+                          >
+                            <div
+                              className="relative w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                              style={{
+                                backgroundColor: visibleCount > 0 ? dotColor : "transparent",
+                                border: visibleCount > 0 ? "none" : `2px solid ${dotColor}`,
+                              }}
+                            >
+                              {visibleCount > 0 && (
+                                <Check size={14} className="text-white drop-shadow-sm" strokeWidth={3} />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[14px] font-medium text-foreground truncate">{cal.title}</p>
+                              {visibleCount > 0 && (
+                                <p className="text-[11px] text-muted-foreground">
+                                  Showing in {visibleCount} {visibleCount === 1 ? "view" : "views"}
+                                </p>
+                              )}
+                            </div>
+                            <ChevronRight size={18} className="text-muted-foreground flex-shrink-0" />
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -815,6 +845,117 @@ const CalendarsManager = ({ open, onClose }: Props) => {
                 <div className="px-5 pb-5 pt-2 border-t border-border flex-shrink-0">
                   <button
                     onClick={saveSettings}
+                    className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-[14px] font-semibold"
+                  >
+                    Done
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Apple device calendar settings (matches Google sheet) ── */}
+        <AnimatePresence>
+          {settingsAppleDeviceCal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-[65] bg-black/40 flex items-end justify-center"
+              onClick={() => saveAppleDeviceCalendarSettings()}
+            >
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 28, stiffness: 300 }}
+                className="w-full max-w-md bg-card rounded-t-2xl border-t border-border shadow-xl overflow-hidden max-h-[85vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-5 pt-5 pb-3 border-b border-border flex-shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="w-5 h-5 rounded-full flex-shrink-0 border border-border/40"
+                      style={{ backgroundColor: appleSheetColor }}
+                    />
+                    <h3 className="text-[15px] font-semibold text-foreground truncate">
+                      {settingsAppleDeviceCal.title}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+                  <div>
+                    <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 block">
+                      Color
+                    </label>
+                    <div className="grid grid-cols-6 gap-3">
+                      {CALENDAR_COLORS.map((c) => (
+                        <button
+                          key={c.value}
+                          type="button"
+                          onClick={() => setAppleSheetColor(c.value)}
+                          className="w-9 h-9 rounded-full flex items-center justify-center mx-auto transition-all"
+                          style={{
+                            backgroundColor: c.value,
+                            ...(appleSheetColor === c.value
+                              ? { boxShadow: `0 0 0 2px var(--background), 0 0 0 4px ${c.value}` }
+                              : {}),
+                          }}
+                        >
+                          {appleSheetColor === c.value && (
+                            <Check size={14} className="text-white drop-shadow-sm" strokeWidth={3} />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
+                      Show in…
+                    </label>
+                    <div className="bg-secondary/50 rounded-xl divide-y divide-border">
+                      {contextOptions.map((ctx) => {
+                        const isMineCtx = ctx.id === "__personal__";
+                        const visible = isAppleVisibleInContext(settingsAppleDeviceCal.id, ctx.id);
+                        return (
+                          <div key={ctx.id} className="px-4">
+                            <div className="flex items-center justify-between py-3">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className="text-sm">{ctx.emoji}</span>
+                                <div className="min-w-0">
+                                  <span className="text-[14px] text-foreground truncate block">
+                                    {ctx.label}
+                                  </span>
+                                  {isMineCtx && (
+                                    <span className="text-[11px] text-muted-foreground">Always visible</span>
+                                  )}
+                                </div>
+                              </div>
+                              {isMineCtx ? (
+                                <Switch checked={visible} disabled className="opacity-50" />
+                              ) : (
+                                <Switch
+                                  checked={visible}
+                                  onCheckedChange={(checked) =>
+                                    setAppleContextVisibility(settingsAppleDeviceCal.id, ctx.id, checked)
+                                  }
+                                />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-5 pb-5 pt-2 border-t border-border flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={saveAppleDeviceCalendarSettings}
                     className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-[14px] font-semibold"
                   >
                     Done

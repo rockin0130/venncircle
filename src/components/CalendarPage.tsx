@@ -24,10 +24,8 @@ import CalendarItemDetailModal from "@/components/CalendarItemDetailModal";
 import CalendarCreateEditModal from "@/components/CalendarCreateEditModal";
 import CalendarsManager from "@/components/CalendarsManager";
 import CalendarUserFilter from "@/components/CalendarUserFilter";
-import {
-  getHiddenAppleCalendarIds,
-  APPLE_CALENDAR_VISIBILITY_CHANGED,
-} from "@/lib/appleCalendarVisibility";
+import { APPLE_CALENDAR_VISIBILITY_CHANGED } from "@/lib/appleCalendarVisibility";
+import { isAppleDeviceCalendarVisible, getAppleCalendarDisplayColor } from "@/lib/appleCalendarPrefs";
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -167,6 +165,49 @@ interface CalItem {
 }
 
 const TODO_COLOR = "hsl(280 70% 55%)";
+
+/** Stable source key + color for month-grid dots (per calendar / source, not per user pill). */
+function monthDotKeyAndColor(
+  item: CalItem,
+  groups: Group[],
+  colorMap: { byId: Map<string, string>; byProvider: Map<string, string>; defaultColor?: string | null }
+): { key: string; color: string } {
+  if (item.isDueDateTask) {
+    return { key: "due", color: TODO_COLOR };
+  }
+  if (item.type === "gcal") {
+    const raw = item.raw as GoogleCalendarEvent;
+    const cid = raw.calendarId || raw.id;
+    const key = raw.isApple ? `apple:${cid}` : `gcal:${cid}`;
+    let color: string | null = item.calendarColor || null;
+    if (!color && raw.calendarId && colorMap.byProvider.has(raw.calendarId)) {
+      color = colorMap.byProvider.get(raw.calendarId)!;
+    }
+    if (!color) color = raw.isApple ? "hsl(0 0% 28%)" : "#4285F4";
+    return { key, color };
+  }
+  if (item.type === "event") {
+    const raw = item.raw as ScheduledEvent;
+    const cid = raw.calendarId || "local";
+    const gid = raw.groupId || "mine";
+    let color: string | null = null;
+    if (raw.calendarId && colorMap.byId.has(raw.calendarId)) {
+      color = colorMap.byId.get(raw.calendarId)!;
+    }
+    if (!color && colorMap.defaultColor) color = colorMap.defaultColor;
+    if (!color) {
+      const idx = getGroupColorIndex(raw.groupId, groups);
+      color = GROUP_COLORS[idx % GROUP_COLORS.length];
+    }
+    return { key: `evt:${cid}:${gid}`, color };
+  }
+  const t = item.raw as Task;
+  const gk = t.groupId || "mine";
+  const idx = getGroupColorIndex(t.groupId, groups);
+  const color = GROUP_COLORS[idx % GROUP_COLORS.length];
+  return { key: `task:${gk}:${item.assignee}`, color };
+}
+
 const TODO_COLOR_CLASSES = { bg: "bg-violet-500", text: "text-violet-500", bgLight: "bg-violet-500/15", border: "border-violet-500/30" };
 
 // ── Calendar color map type ──
@@ -234,7 +275,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   const [selectedItem, setSelectedItem] = useState<CalItem | null>(null);
   const [editingItem, setEditingItem] = useState<{ id: string; type: "event" | "task"; raw: ScheduledEvent | Task; isDueDateTask?: boolean; done?: boolean } | null>(null);
   const [showCalendarsManager, setShowCalendarsManager] = useState(false);
-  const [appleHiddenCalendarIds, setAppleHiddenCalendarIds] = useState(() => getHiddenAppleCalendarIds());
+  const [applePrefsTick, setApplePrefsTick] = useState(0);
   const [userFilterIds, setUserFilterIds] = useState<Set<string>>(() => new Set(["__everyone__"]));
   const timeGridRef = useRef<HTMLDivElement>(null);
   const calFilterUsers = useCalendarFilterUsers();
@@ -251,7 +292,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   }, [activeGroup?.id, activeGroup === null]);
 
   useEffect(() => {
-    const sync = () => setAppleHiddenCalendarIds(getHiddenAppleCalendarIds());
+    const sync = () => setApplePrefsTick((t) => t + 1);
     window.addEventListener(APPLE_CALENDAR_VISIBILITY_CHANGED, sync);
     return () => window.removeEventListener(APPLE_CALENDAR_VISIBILITY_CHANGED, sync);
   }, []);
@@ -536,7 +577,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
         ) {
           return;
         }
-        if (ge.isApple && ge.calendarId && appleHiddenCalendarIds.has(ge.calendarId)) return;
+        if (ge.isApple && !isAppleDeviceCalendarVisible(ge.calendarId, activeContextId)) return;
 
         const gcalStart = parseGoogleDateValue(ge.start);
         const gcalEnd = parseGoogleDateValue(ge.end) ?? gcalStart;
@@ -600,6 +641,11 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
           endDateTime = dateWithMinutes(activeDate, endMinutes);
         }
 
+        const displayCalColor =
+          ge.isApple && ge.calendarId
+            ? getAppleCalendarDisplayColor(ge.calendarId, ge.calendarColor || "hsl(210 100% 50%)")
+            : ge.calendarColor || null;
+
         items.push({
           id: `gcal-${ge.id}`,
           title: ge.title,
@@ -617,16 +663,18 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
           isEnd: isEndDay,
           startDateTime,
           endDateTime,
-          calendarColor: ge.calendarColor || null,
+          calendarColor: displayCalColor,
         });
       });
     }
 
     // ── User filter ──
     const currentUserId = user?.id || "";
-    const applyUserFilter = !userFilterIds.has("__everyone__") && userFilterIds.size > 0;
+    const applyUserFilter = !userFilterIds.has("__everyone__");
     const filtered = applyUserFilter
-      ? items.filter((item) => {
+      ? userFilterIds.size === 0
+        ? []
+        : items.filter((item) => {
           // Google cal events always belong to the logged-in user
           if (item.type === "gcal") {
             return userFilterIds.has(currentUserId);
@@ -676,68 +724,35 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
     });
 
     return filtered;
-  }, [calFilteredEvents, calFilteredTasks, googleCalendarEvents, showGoogleCalendar, visibleCalendarIds, visibleProviderCalendarIds, calendarColorMap.defaultVisible, calendarRecords.length, userFilterIds, user?.id, groups, appleHiddenCalendarIds]);
+  }, [calFilteredEvents, calFilteredTasks, googleCalendarEvents, showGoogleCalendar, visibleCalendarIds, visibleProviderCalendarIds, calendarColorMap.defaultVisible, calendarRecords.length, userFilterIds, user?.id, groups, activeContextId, applePrefsTick]);
 
   const selectedDayItems = useMemo(
     () => getItemsForDate(selDay, selMonth, selYear),
     [selDay, selMonth, selYear, getItemsForDate]
   );
 
-  // ── Month grid: dots per day ──────────────────────────
-
-  // ── Month grid: per-person dots ──────────────────────
+  // ── Month grid: up to 3 dots per day (distinct calendar / source), calendar colors
   const monthDots = useMemo(() => {
-    const dots = new Map<number, { id: string; color: string }[]>();
-    const currentUserId = user?.id || "";
-    const isEveryone = userFilterIds.has(EVERYONE_SENTINEL);
+    const dotsByDay = new Map<number, { key: string; color: string }[]>();
 
     for (let d = 1; d <= daysInMonth; d++) {
       const items = getItemsForDate(d, month, year);
       if (items.length === 0) continue;
 
-      const seenUsers = new Set<string>();
-      const dotColors: { id: string; color: string }[] = [];
+      const seenKeys = new Set<string>();
+      const row: { key: string; color: string }[] = [];
 
-      items.forEach((it) => {
-        const raw = it.raw as any;
-        const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
-        const ownerIds = new Set<string>();
+      for (const it of items) {
+        const { key, color } = monthDotKeyAndColor(it, groups, calendarColorMap);
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        row.push({ key, color });
+      }
 
-        if (it.assignee === "me") ownerIds.add(ownerId);
-        else if (it.assignee === "partner") {
-          if (it.groupId) {
-            const grp = groups.find(g => g.id === it.groupId);
-            grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
-              .forEach((m: any) => ownerIds.add(m.user_id));
-          }
-        } else if (it.assignee === "both") {
-          ownerIds.add(ownerId);
-          if (it.groupId) {
-            const grp = groups.find(g => g.id === it.groupId);
-            grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
-              .forEach((m: any) => ownerIds.add(m.user_id));
-          }
-        } else {
-          ownerIds.add(ownerId);
-        }
-        if (it.type === "gcal") ownerIds.add(currentUserId);
-
-        ownerIds.forEach(uid => {
-          if (seenUsers.has(uid)) return;
-          // Only show dot if this user's pill is selected
-          if (!isEveryone && !userFilterIds.has(uid)) return;
-          const fu = calFilterUsers.find(u => u.id === uid);
-          if (!fu) return;
-          seenUsers.add(uid);
-          const memberColor = MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length];
-          dotColors.push({ id: uid, color: memberColor.dot });
-        });
-      });
-
-      if (dotColors.length > 0) dots.set(d, dotColors.slice(0, 3));
+      if (row.length > 0) dotsByDay.set(d, row.slice(0, 3));
     }
-    return dots;
-  }, [daysInMonth, month, year, getItemsForDate, groups, user?.id, userFilterIds, calFilterUsers]);
+    return dotsByDay;
+  }, [daysInMonth, month, year, getItemsForDate, groups, calendarColorMap]);
 
   // ── Navigation ────────────────────────────────────────
 
@@ -1161,7 +1176,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
               className="grid grid-cols-7"
             >
               {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-                <div key={`e-${i}`} className="h-11" />
+                <div key={`e-${i}`} className="min-h-[48px]" />
               ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
@@ -1170,23 +1185,38 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
                 const dots = monthDots.get(day);
 
                 return (
-                  <button key={day} onClick={() => {
-                    selectDay(day);
-                    // Tapping today's date = go to today
-                    if (isTodayDay) goToday();
-                  }} className="h-11 flex flex-col items-center justify-center relative">
-                    <span className={`w-8 h-8 flex items-center justify-center rounded-full text-[13px] transition-all ${
-                      isSelected ? "bg-primary text-primary-foreground font-semibold"
-                        : isTodayDay ? "ring-2 ring-primary text-primary font-semibold"
-                        : "text-foreground hover:bg-secondary"
-                    }`}>
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => {
+                      selectDay(day);
+                      if (isTodayDay) goToday();
+                    }}
+                    className="min-h-[48px] flex flex-col items-center justify-start pt-0.5"
+                  >
+                    <span
+                      className={cn(
+                        "w-8 h-8 flex items-center justify-center rounded-full text-[13px] shrink-0 transition-all",
+                        isSelected
+                          ? "bg-primary text-primary-foreground font-semibold"
+                          : isTodayDay
+                            ? "ring-2 ring-primary text-primary font-semibold"
+                            : "text-foreground hover:bg-secondary"
+                      )}
+                    >
                       {day}
                     </span>
-                    {dots && (
-                      <div className="flex gap-[2px] absolute bottom-0">
-                        {dots.slice(0, 3).map((dot, idx) => (
-                            <span key={idx} className="w-[4px] h-[4px] rounded-full"
-                              style={{ backgroundColor: dot.color }} />
+                    {dots && dots.length > 0 && !isSelected && (
+                      <div
+                        className="flex gap-[3px] justify-center items-center shrink-0 mt-0.5"
+                        aria-hidden
+                      >
+                        {dots.map((dot) => (
+                          <span
+                            key={dot.key}
+                            className="w-[6px] h-[6px] rounded-full shrink-0"
+                            style={{ backgroundColor: dot.color }}
+                          />
                         ))}
                       </div>
                     )}

@@ -100,14 +100,12 @@ const CalendarUserFilter = ({ selectedUserIds, onSelectionChange }: CalendarUser
     if (isEveryone) {
       const next = new Set(allUserIds);
       next.delete(userId);
-      if (next.size === 0) return;
       onSelectionChange(next);
       return;
     }
     const next = new Set(selectedUserIds);
     if (next.has(userId)) {
       next.delete(userId);
-      if (next.size === 0) return;
     } else {
       next.add(userId);
       if ([...allUserIds].every((id) => next.has(id))) {
