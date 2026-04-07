@@ -17,7 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import CongratsPopup from "@/components/CongratsPopup";
-import PageGroupSelector from "@/components/PageGroupSelector";
+import { ModeToggleBar, GroupPillsRow, MemberSelectorPill, MemberSummaryCards, type WorkoutMode, type MemberOption } from "@/components/WorkoutModeToggle";
 
 import WorkoutPhotoPrompt, { isWorkoutPhotoPromptSuppressed } from "@/components/WorkoutPhotoPrompt";
 import ShareToFeedSheet from "@/components/ShareToFeedSheet";
