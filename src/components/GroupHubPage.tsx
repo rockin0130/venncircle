@@ -135,8 +135,20 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
     setLoadingPosts(false);
   };
 
+  const fetchActiveChallenge = async () => {
+    const { data } = await supabase
+      .from("group_challenges")
+      .select("*")
+      .eq("group_id", currentGroup.id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    setActiveChallenge(data?.[0] || null);
+  };
+
   useEffect(() => {
     fetchPosts();
+    fetchActiveChallenge();
     const channel = supabase
       .channel(`feed-${currentGroup.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "group_feed_posts", filter: `group_id=eq.${currentGroup.id}` }, () => { fetchPosts(); })
