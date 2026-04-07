@@ -659,6 +659,17 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Challenge Detail Modal */}
+      {activeChallenge && (
+        <ChallengeDetailModal
+          open={challengeDetailOpen}
+          onOpenChange={setChallengeDetailOpen}
+          challenge={activeChallenge}
+          members={currentActiveMembers}
+          userId={user?.id || ""}
+        />
+      )}
     </div>
   );
 };
