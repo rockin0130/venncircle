@@ -772,11 +772,19 @@ const WorkoutsPage = ({
   }, [filteredWorkouts, filteredPartnerWorkouts, isPersonalView]);
 
   const userFilteredWorkouts = useMemo(() => {
+    // Mine mode: only show logged-in user's workouts (aggregate personal view)
+    if (workoutMode === "mine") {
+      return allContextWorkouts.filter((w) => {
+        const ownerId = w.ownerUserId || user?.id;
+        return ownerId === user?.id;
+      });
+    }
     if (isPersonalView) return filteredWorkouts;
     if (userFilterIds.has(EVERYONE_SENTINEL)) return allContextWorkouts;
     return allContextWorkouts.filter((w) => {
       const ownerId = w.ownerUserId || user?.id;
       return ownerId && userFilterIds.has(ownerId);
+    });
     });
   }, [allContextWorkouts, filteredWorkouts, userFilterIds, isPersonalView, user?.id]);
 
