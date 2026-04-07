@@ -536,7 +536,8 @@ const WorkoutsPage = ({
   onOpenSettings,
   onOpenMore,
   isActive = true,
-}: { onOpenSettings?: () => void; onOpenMore?: () => void; isActive?: boolean } = {}) => {
+  navigatedGroupId,
+}: { onOpenSettings?: () => void; onOpenMore?: () => void; isActive?: boolean; navigatedGroupId?: string | null } = {}) => {
   const {
     workouts,
     filteredWorkouts,
