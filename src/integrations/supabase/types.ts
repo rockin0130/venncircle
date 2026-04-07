@@ -635,6 +635,109 @@ export type Database = {
           },
         ]
       }
+      group_challenge_progress: {
+        Row: {
+          challenge_id: string
+          completed_count: number
+          created_at: string
+          id: string
+          target_count: number
+          updated_at: string
+          user_id: string
+          week_number: number
+        }
+        Insert: {
+          challenge_id: string
+          completed_count?: number
+          created_at?: string
+          id?: string
+          target_count?: number
+          updated_at?: string
+          user_id: string
+          week_number?: number
+        }
+        Update: {
+          challenge_id?: string
+          completed_count?: number
+          created_at?: string
+          id?: string
+          target_count?: number
+          updated_at?: string
+          user_id?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_challenge_progress_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "group_challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_challenges: {
+        Row: {
+          challenge_type: string
+          created_at: string
+          created_by: string
+          description: string
+          difficulty: string
+          duration_weeks: number
+          ends_at: string
+          goal_description: string
+          group_id: string
+          id: string
+          partner_reward: string | null
+          started_at: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          challenge_type?: string
+          created_at?: string
+          created_by: string
+          description?: string
+          difficulty?: string
+          duration_weeks?: number
+          ends_at: string
+          goal_description?: string
+          group_id: string
+          id?: string
+          partner_reward?: string | null
+          started_at?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          challenge_type?: string
+          created_at?: string
+          created_by?: string
+          description?: string
+          difficulty?: string
+          duration_weeks?: number
+          ends_at?: string
+          goal_description?: string
+          group_id?: string
+          id?: string
+          partner_reward?: string | null
+          started_at?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_challenges_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_feed_comments: {
         Row: {
           content: string
