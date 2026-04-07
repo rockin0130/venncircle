@@ -251,6 +251,19 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
     e.target.value = "";
   };
 
+  if (showChallengePage) {
+    return (
+      <GroupChallengePage
+        groupId={currentGroup.id}
+        groupName={currentGroup.name}
+        enabledPages={currentEnabledPages}
+        members={currentActiveMembers}
+        userId={user?.id || ""}
+        onBack={() => { setShowChallengePage(false); fetchActiveChallenge(); }}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Hidden file input for cover */}
