@@ -1,9 +1,22 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Clock, History, MoreHorizontal } from "lucide-react";
+import { Clock, MoreHorizontal, ChevronDown, X, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import PageGroupSelector from "@/components/PageGroupSelector";
+import StudyFullscreenTimer from "@/components/StudyFullscreenTimer";
+import StudyLogPage from "@/components/StudyLogPage";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
+// ═══ Types ═══
 interface StudySession {
   id: string;
   user_id: string;
@@ -20,28 +33,104 @@ interface StudyPageProps {
   onOpenMore?: () => void;
 }
 
-const SUBJECTS = ["Math", "Reading", "Work", "Other"];
-const SUBJECT_COLORS: Record<string, string> = {
-  Math: "#6C47FF",
-  Reading: "#F59E0B",
-  Work: "#10B981",
-  Other: "#8B5CF6",
+// ═══ Constants ═══
+const DEFAULT_SUBJECTS = ["Math", "Reading", "Work"];
+const DAILY_GOAL_HOURS = 4;
+const MEMBER_COLORS = ["#6C47FF", "#F59E0B", "#10B981", "#EF4444", "#3B82F6", "#EC4899", "#14B8A6", "#8B5CF6"];
+const RESUME_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
+
+// ═══ Subject similarity ═══
+const ABBREVIATION_MAP: Record<string, string> = {
+  math: "math", mathematics: "math", maths: "math",
+  sci: "science", science: "science",
+  eng: "english", english: "english",
+  hist: "history", history: "history",
+  bio: "biology", biology: "biology",
+  chem: "chemistry", chemistry: "chemistry",
+  phys: "physics", physics: "physics",
+  geo: "geography", geography: "geography",
+  lit: "literature", literature: "literature",
+  econ: "economics", economics: "economics",
+  cs: "computer science", "computer science": "computer science", "comp sci": "computer science",
+  pe: "physical education", "physical education": "physical education",
+  psych: "psychology", psychology: "psychology",
 };
 
-const DAILY_GOAL_HOURS = 4;
+function normalizeSubject(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
 
+function getCanonicalKey(name: string): string | null {
+  const norm = normalizeSubject(name);
+  return ABBREVIATION_MAP[norm] || null;
+}
+
+type MatchResult = { type: "exact"; existing: string } | { type: "similar"; existing: string } | { type: "none" };
+
+function findSubjectMatch(newName: string, existingSubjects: string[], allSessionSubjects: string[]): MatchResult {
+  const norm = normalizeSubject(newName);
+  const allKnown = [...new Set([...existingSubjects, ...allSessionSubjects])];
+
+  for (const ex of allKnown) {
+    if (normalizeSubject(ex) === norm) return { type: "exact", existing: ex };
+  }
+
+  const newKey = getCanonicalKey(newName);
+  if (newKey) {
+    for (const ex of allKnown) {
+      const exKey = getCanonicalKey(ex);
+      if (exKey && exKey === newKey) return { type: "exact", existing: ex };
+    }
+  }
+
+  const withoutS = norm.endsWith("s") ? norm.slice(0, -1) : norm + "s";
+  for (const ex of allKnown) {
+    const exNorm = normalizeSubject(ex);
+    if (exNorm === withoutS) return { type: "similar", existing: ex };
+  }
+
+  for (const ex of allKnown) {
+    const exNorm = normalizeSubject(ex);
+    if (norm.length >= 3 && exNorm.startsWith(norm)) return { type: "similar", existing: ex };
+    if (exNorm.length >= 3 && norm.startsWith(exNorm)) return { type: "similar", existing: ex };
+  }
+
+  return { type: "none" };
+}
+
+function getSubjects(): string[] {
+  try {
+    const raw = localStorage.getItem("study_subjects");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return DEFAULT_SUBJECTS;
+}
+
+function saveSubjects(subs: string[]) {
+  localStorage.setItem("study_subjects", JSON.stringify(subs));
+}
+
+// ═══ Helpers ═══
 function fmtDuration(seconds: number) {
+  if (seconds <= 0) return "0s";
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
+  if (seconds < 60) return `${s}s`;
   if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
+  return `${m}m ${s}s`;
+}
+
+function fmtTimer(seconds: number) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
 function fmtTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function fmtHours(seconds: number) {
@@ -63,7 +152,7 @@ function getWeekDays() {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     days.push({
-      label: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i],
+      label: ["M", "T", "W", "T", "F", "S", "S"][i],
       date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
       isFuture: d > today && d.toDateString() !== today.toDateString(),
       isToday: d.toDateString() === today.toDateString(),
@@ -72,19 +161,128 @@ function getWeekDays() {
   return days;
 }
 
+function timeAgo(iso: string) {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return "Yesterday";
+}
+
+// ═══ LiveTimer ═══
+const LiveTimer = ({ startedAt }: { startedAt: string }) => {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const update = () => setElapsed(Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+  return (
+    <span className="tabular-nums" style={{ fontSize: 13, fontWeight: 500, color: "#6C47FF" }}>
+      {fmtTimer(elapsed)}
+    </span>
+  );
+};
+
+// ═══ Main Component ═══
 const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const { user, activeGroup, groups } = useAuth();
   const [sessions, setSessions] = useState<StudySession[]>([]);
-  const [selectedSubject, setSelectedSubject] = useState("Other");
-  const [activeTick, setActiveTick] = useState(0);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [groupSessions, setGroupSessions] = useState<StudySession[]>([]);
   const [memberProfiles, setMemberProfiles] = useState<Record<string, { display_name: string; avatar_url: string | null }>>({});
+  const [subjects, setSubjects] = useState<string[]>(getSubjects);
+  const [selectedSubject, setSelectedSubject] = useState(() => getSubjects()[0] || "Other");
+  const [addingSubject, setAddingSubject] = useState(false);
+  const [newSubjectText, setNewSubjectText] = useState("");
+  const [activeTick, setActiveTick] = useState(0);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [chartFilter, setChartFilter] = useState("mine");
+  const [chartDropdownOpen, setChartDropdownOpen] = useState(false);
+  const [sessionsFilter, setSessionsFilter] = useState<string[]>(["mine"]);
+  const [editMode, setEditMode] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+  const [similarityPrompt, setSimilarityPrompt] = useState<{ newName: string; existing: string } | null>(null);
+  const [swipedSessionId, setSwipedSessionId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [fadingSessionId, setFadingSessionId] = useState<string | null>(null);
+  const swipeStartX = useRef<number | null>(null);
+  const swipeCurrentX = useRef<number>(0);
+  const swipeRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const addInputRef = useRef<HTMLInputElement>(null);
+  const pillsRef = useRef<HTMLDivElement>(null);
 
   const isPersonal = !activeGroup || (activeGroup as any)?._personal;
   const groupId = isPersonal ? null : activeGroup?.id || null;
 
-  // Fetch sessions
+  // Ref to hold the active session ID to prevent re-render issues
+  const activeSessionIdRef = useRef<string | null>(null);
+  const startedAtRef = useRef<string | null>(null);
+
+  // ── Per-context timer state (keyed by context ID) ──
+  interface ContextTimerState {
+    lastStoppedSession: StudySession | null;
+    lastStoppedAt: number | null;
+    accumulatedSeconds: number;
+    baseDuration: number;
+  }
+  const contextTimerMapRef = useRef<Map<string, ContextTimerState>>(new Map());
+  const resumeWindowTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Derive context key from current view
+  const contextKey = isPersonal ? "__personal__" : (groupId || "__personal__");
+  const contextKeyRef = useRef(contextKey);
+  contextKeyRef.current = contextKey;
+
+  // Helper to get/init a context's timer state
+  const getCtxState = useCallback((key: string): ContextTimerState => {
+    if (!contextTimerMapRef.current.has(key)) {
+      contextTimerMapRef.current.set(key, { lastStoppedSession: null, lastStoppedAt: null, accumulatedSeconds: 0, baseDuration: 0 });
+    }
+    return contextTimerMapRef.current.get(key)!;
+  }, []);
+
+  // Reactive state derived from the current context's ref (triggers re-renders on context switch / pause / expiry)
+  const [ctxResumeVersion, setCtxResumeVersion] = useState(0);
+  const bumpResume = useCallback(() => setCtxResumeVersion(v => v + 1), []);
+
+  // Read current context state (reactive via ctxResumeVersion + contextKey)
+  const currentCtxState = useMemo(() => getCtxState(contextKey), [contextKey, ctxResumeVersion, getCtxState]);
+
+  // Convenience aliases matching old API
+  const lastStoppedSession = currentCtxState.lastStoppedSession;
+  const lastStoppedAt = currentCtxState.lastStoppedAt;
+
+  // Convenience refs that point to current context for use in callbacks
+  const accumulatedSecondsRef = useRef(0);
+  const baseDurationRef = useRef(0);
+
+  // Sync convenience refs from context map when context changes
+  useEffect(() => {
+    const s = getCtxState(contextKey);
+    accumulatedSecondsRef.current = s.accumulatedSeconds;
+    baseDurationRef.current = s.baseDuration;
+  }, [contextKey, ctxResumeVersion, getCtxState]);
+
+  // Groups that have Study feature enabled
+  const studyEnabledGroupIds = useMemo(() => {
+    const set = new Set<string>();
+    (groups || []).forEach((g: any) => {
+      if (!(g as any)._personal && (g.shared_pages || []).includes("study")) {
+        set.add(g.id);
+      }
+    });
+    return set;
+  }, [groups]);
+
+  // All subjects ever used in sessions (for similarity matching)
+  const allSessionSubjects = useMemo(() => {
+    const set = new Set(sessions.map(s => s.subject));
+    return Array.from(set);
+  }, [sessions]);
+
+  // ── Fetch ──
   const fetchSessions = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
@@ -92,11 +290,10 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
       .select("*")
       .eq("user_id", user.id)
       .order("started_at", { ascending: false })
-      .limit(100);
+      .limit(200);
     if (data) setSessions(data as unknown as StudySession[]);
   }, [user]);
 
-  // Fetch group sessions
   const fetchGroupSessions = useCallback(async () => {
     if (!groupId) { setGroupSessions([]); return; }
     const { data } = await supabase
@@ -104,28 +301,27 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
       .select("*")
       .eq("group_id", groupId)
       .order("started_at", { ascending: false })
-      .limit(200);
+      .limit(300);
     if (data) setGroupSessions(data as unknown as StudySession[]);
   }, [groupId]);
 
   useEffect(() => { fetchSessions(); }, [fetchSessions]);
   useEffect(() => { fetchGroupSessions(); }, [fetchGroupSessions]);
 
-  // Fetch member profiles for group view
+  // ── Profiles ──
   useEffect(() => {
     if (!activeGroup || isPersonal) return;
-    const userIds = activeGroup.members.map(m => m.user_id);
     const profiles: Record<string, { display_name: string; avatar_url: string | null }> = {};
-    activeGroup.members.forEach(m => {
+    activeGroup.members.forEach((m: any) => {
       profiles[m.user_id] = { display_name: m.display_name || "Member", avatar_url: m.avatar_url };
     });
     setMemberProfiles(profiles);
   }, [activeGroup, isPersonal]);
 
-  // Realtime subscription
+  // ── Realtime ──
   useEffect(() => {
     const channel = supabase
-      .channel("study-sessions-realtime")
+      .channel("study-sessions-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "study_sessions" }, () => {
         fetchSessions();
         fetchGroupSessions();
@@ -134,331 +330,1066 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     return () => { supabase.removeChannel(channel); };
   }, [fetchSessions, fetchGroupSessions]);
 
-  // Active session
+  // ── Active session ──
   const activeSession = useMemo(() => sessions.find(s => s.is_active), [sessions]);
 
-  // Tick timer for active session
-  useEffect(() => {
-    if (activeSession) {
-      const update = () => {
-        const elapsed = Math.floor((Date.now() - new Date(activeSession.started_at).getTime()) / 1000);
-        setActiveTick(elapsed);
-      };
-      update();
-      tickRef.current = setInterval(update, 1000);
-      return () => { if (tickRef.current) clearInterval(tickRef.current); };
-    } else {
-      setActiveTick(0);
-    }
-  }, [activeSession]);
+  // Stable active session ID to avoid tearing down intervals on every fetch
+  const activeSessionId = activeSession?.id ?? null;
+  const activeStartedAt = activeSession?.started_at ?? null;
 
-  // Today's sessions
+  // Keep refs in sync
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+    startedAtRef.current = activeStartedAt;
+  }, [activeSessionId, activeStartedAt]);
+
+  // No background timer — timer only runs on the fullscreen timer page
+  // activeTick stays at 0 when on the Study page
+
+  // ── Stop session on page unload only (NOT on component unmount) ──
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const sessionId = activeSessionIdRef.current;
+      if (!sessionId) return;
+      const duration = baseDurationRef.current + accumulatedSecondsRef.current;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/study_sessions?id=eq.${sessionId}`;
+      const body = JSON.stringify({ is_active: false, ended_at: new Date().toISOString(), duration_seconds: duration });
+      navigator.sendBeacon?.(url, new Blob([body], { type: "application/json" }));
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
+  // ── Click outside to exit edit mode ──
+  useEffect(() => {
+    if (!editMode) return;
+    const handler = (e: MouseEvent) => {
+      if (pillsRef.current && !pillsRef.current.contains(e.target as Node)) {
+        setEditMode(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [editMode]);
+
+  // ── Derived ──
   const today = todayStr();
-  const todaySessions = useMemo(() =>
-    sessions.filter(s => s.started_at.startsWith(today)),
-    [sessions, today]
-  );
+  const weekDays = useMemo(() => getWeekDays(), []);
+
+  const todaySessions = useMemo(() => sessions.filter(s => s.started_at.startsWith(today)), [sessions, today]);
 
   const todayTotal = useMemo(() => {
-    return todaySessions.reduce((sum, s) => {
-      if (s.is_active) return sum + activeTick;
-      return sum + s.duration_seconds;
-    }, 0);
-  }, [todaySessions, activeTick]);
+    return todaySessions.reduce((sum, s) => sum + s.duration_seconds, 0);
+  }, [todaySessions]);
 
   // Streak
-  const streak = useMemo(() => {
+  const { streak, bestStreak } = useMemo(() => {
     const dates = new Set(sessions.filter(s => s.duration_seconds > 0 || s.is_active).map(s => s.started_at.slice(0, 10)));
-    let count = 0;
-    const d = new Date();
+    let current = 0;
+    let best = 0;
+    const d2 = new Date();
     while (true) {
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      if (dates.has(key)) { count++; d.setDate(d.getDate() - 1); }
-      else if (count === 0 && key === today) { d.setDate(d.getDate() - 1); }
+      const key = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
+      if (dates.has(key)) { current++; d2.setDate(d2.getDate() - 1); }
+      else if (current === 0 && key === today) { d2.setDate(d2.getDate() - 1); }
       else break;
     }
-    return count;
+    const sortedDates = Array.from(dates).sort();
+    let run = 0;
+    for (let i = 0; i < sortedDates.length; i++) {
+      if (i === 0) { run = 1; }
+      else {
+        const prev = new Date(sortedDates[i - 1]);
+        const curr = new Date(sortedDates[i]);
+        prev.setDate(prev.getDate() + 1);
+        run = prev.toISOString().slice(0, 10) === curr.toISOString().slice(0, 10) ? run + 1 : 1;
+      }
+      best = Math.max(best, run);
+    }
+    return { streak: current, bestStreak: best };
   }, [sessions, today]);
 
   // Weekly data
-  const weekDays = useMemo(() => getWeekDays(), []);
   const weeklyData = useMemo(() => {
     return weekDays.map(day => {
       const daySessions = sessions.filter(s => s.started_at.startsWith(day.date));
-      const total = daySessions.reduce((sum, s) => {
-        if (s.is_active && day.isToday) return sum + activeTick;
-        return sum + s.duration_seconds;
-      }, 0);
+      const total = daySessions.reduce((sum, s) => sum + s.duration_seconds, 0);
       return { ...day, seconds: total };
     });
-  }, [weekDays, sessions, activeTick]);
+  }, [weekDays, sessions]);
 
   const weekTotal = useMemo(() => weeklyData.reduce((s, d) => s + d.seconds, 0), [weeklyData]);
-  const maxBar = useMemo(() => Math.max(...weeklyData.map(d => d.seconds), 1), [weeklyData]);
+  const maxBar = useMemo(() => Math.max(...weeklyData.map(d => d.seconds), 3600), [weeklyData]);
 
-  // Start/stop session
-  const toggleSession = async () => {
-    if (!user) return;
-    if (activeSession) {
-      const duration = Math.floor((Date.now() - new Date(activeSession.started_at).getTime()) / 1000);
-      await supabase
-        .from("study_sessions")
-        .update({ is_active: false, ended_at: new Date().toISOString(), duration_seconds: duration } as any)
-        .eq("id", activeSession.id);
-      fetchSessions();
-      fetchGroupSessions();
-    } else {
-      await supabase
-        .from("study_sessions")
-        .insert({ user_id: user.id, subject: selectedSubject, group_id: groupId, is_active: true, started_at: new Date().toISOString() } as any);
-      fetchSessions();
-      fetchGroupSessions();
-    }
-  };
-
-  // Ring progress
-  const progress = Math.min(todayTotal / (DAILY_GOAL_HOURS * 3600), 1);
-  const ringR = 70;
-  const circumference = 2 * Math.PI * ringR;
-  const strokeDash = circumference * progress;
-
-  // Group live data
-  const groupLiveMembers = useMemo(() => {
+  // Group members enriched
+  const groupMembers = useMemo(() => {
     if (!groupId || !activeGroup) return [];
-    return activeGroup.members.map(m => {
+    return activeGroup.members.map((m: any, idx: number) => {
       const memberSessions = groupSessions.filter(s => s.user_id === m.user_id);
       const active = memberSessions.find(s => s.is_active);
       const todayMember = memberSessions.filter(s => s.started_at.startsWith(today));
-      const todayTotalMember = todayMember.reduce((sum, s) => sum + (s.is_active ? Math.floor((Date.now() - new Date(s.started_at).getTime()) / 1000) : s.duration_seconds), 0);
+      const todayTotalMember = todayMember.reduce((sum, s) =>
+        sum + (s.is_active ? Math.floor((Date.now() - new Date(s.started_at).getTime()) / 1000) : s.duration_seconds), 0);
       const lastSession = memberSessions.find(s => !s.is_active);
       return {
         ...m,
         profile: memberProfiles[m.user_id],
+        color: MEMBER_COLORS[idx % MEMBER_COLORS.length],
         active,
         todayTotal: todayTotalMember,
+        todaySessions: todayMember,
         lastSession,
+        isMe: m.user_id === user?.id,
       };
     });
-  }, [groupId, activeGroup, groupSessions, today, memberProfiles]);
+  }, [groupId, activeGroup, groupSessions, today, memberProfiles, user]);
 
+  // ── Resume logic ──
+  // Ring resume: within 2-min window (timeout clears lastStoppedSession after 2 min)
+  const ringResumeSession = useMemo(() => {
+    if (activeSession) return null;
+    if (!lastStoppedSession || !lastStoppedAt) return null;
+    if (lastStoppedSession.subject !== selectedSubject) return null;
+    return lastStoppedSession;
+  }, [activeSession, lastStoppedSession, lastStoppedAt, selectedSubject]);
+
+  // List resume: show on most recent session when ring resume is not active
+  const listResumeSessionId = useMemo(() => {
+    if (activeSession || ringResumeSession) return null;
+    const completed = todaySessions.filter(s => !s.is_active && s.duration_seconds > 0);
+    if (completed.length === 0) return null;
+    return completed[0].id;
+  }, [activeSession, ringResumeSession, todaySessions]);
+
+  // ── Actions ──
+  const pauseSession = useCallback(async (totalElapsed: number) => {
+    const sessionId = activeSessionIdRef.current;
+    if (!sessionId) return;
+    const key = contextKeyRef.current;
+    const ctx = getCtxState(key);
+    ctx.accumulatedSeconds = totalElapsed;
+    accumulatedSecondsRef.current = totalElapsed;
+    const finalDuration = ctx.baseDuration + totalElapsed;
+    const endedAt = new Date().toISOString();
+    await supabase
+      .from("study_sessions")
+      .update({ is_active: false, ended_at: endedAt, duration_seconds: finalDuration } as any)
+      .eq("id", sessionId);
+    const session = sessions.find(s => s.id === sessionId);
+    if (session) {
+      ctx.lastStoppedSession = { ...session, ended_at: endedAt, duration_seconds: finalDuration, is_active: false };
+    }
+    ctx.lastStoppedAt = Date.now();
+    setFullscreen(false);
+    setActiveTick(0);
+    // Clear any existing resume window timer for this context
+    const existingTimer = resumeWindowTimersRef.current.get(key);
+    if (existingTimer) clearTimeout(existingTimer);
+    // Start 2-min window for THIS context only
+    const timer = setTimeout(() => {
+      const s = getCtxState(key);
+      s.accumulatedSeconds = 0;
+      s.baseDuration = 0;
+      s.lastStoppedSession = null;
+      s.lastStoppedAt = null;
+      resumeWindowTimersRef.current.delete(key);
+      // If user is currently viewing this context, update display
+      if (contextKeyRef.current === key) {
+        accumulatedSecondsRef.current = 0;
+        baseDurationRef.current = 0;
+        bumpResume();
+      }
+    }, RESUME_WINDOW_MS);
+    resumeWindowTimersRef.current.set(key, timer);
+    bumpResume();
+    fetchSessions();
+    fetchGroupSessions();
+  }, [sessions, fetchSessions, fetchGroupSessions, getCtxState, bumpResume]);
+
+  const startNewSession = useCallback(async () => {
+    if (!user) return;
+    const key = contextKeyRef.current;
+    const effectiveGroupId = groupId && studyEnabledGroupIds.has(groupId) ? groupId : null;
+    const ctx = getCtxState(key);
+    ctx.accumulatedSeconds = 0;
+    ctx.baseDuration = 0;
+    accumulatedSecondsRef.current = 0;
+    baseDurationRef.current = 0;
+    // Clear resume window timer for this context
+    const existingTimer = resumeWindowTimersRef.current.get(key);
+    if (existingTimer) { clearTimeout(existingTimer); resumeWindowTimersRef.current.delete(key); }
+    await supabase
+      .from("study_sessions")
+      .insert({ user_id: user.id, subject: selectedSubject, group_id: effectiveGroupId, is_active: true, started_at: new Date().toISOString() } as any);
+    ctx.lastStoppedSession = null;
+    ctx.lastStoppedAt = null;
+    setActiveTick(0);
+    setFullscreen(true);
+    bumpResume();
+    fetchSessions();
+    fetchGroupSessions();
+  }, [user, selectedSubject, groupId, studyEnabledGroupIds, fetchSessions, fetchGroupSessions, getCtxState, bumpResume]);
+
+  const resumeSession = useCallback(async (sessionToResume: StudySession, fromList = false) => {
+    const key = contextKeyRef.current;
+    const ctx = getCtxState(key);
+    if (fromList) {
+      ctx.baseDuration = sessionToResume.duration_seconds;
+      ctx.accumulatedSeconds = 0;
+      baseDurationRef.current = sessionToResume.duration_seconds;
+      accumulatedSecondsRef.current = 0;
+    }
+    // Clear resume window timer for this context
+    const existingTimer = resumeWindowTimersRef.current.get(key);
+    if (existingTimer) { clearTimeout(existingTimer); resumeWindowTimersRef.current.delete(key); }
+    await supabase
+      .from("study_sessions")
+      .update({ is_active: true, ended_at: null } as any)
+      .eq("id", sessionToResume.id);
+    ctx.lastStoppedSession = null;
+    ctx.lastStoppedAt = null;
+    setFullscreen(true);
+    bumpResume();
+    fetchSessions();
+    fetchGroupSessions();
+  }, [fetchSessions, fetchGroupSessions, getCtxState, bumpResume]);
+
+  // Cleanup all resume window timers on unmount
+  useEffect(() => {
+    return () => {
+      resumeWindowTimersRef.current.forEach(t => clearTimeout(t));
+      resumeWindowTimersRef.current.clear();
+    };
+  }, []);
+
+  const toggleSession = async () => {
+    if (!user) return;
+    if (ringResumeSession) {
+      await resumeSession(ringResumeSession, false);
+    } else {
+      await startNewSession();
+    }
+  };
+
+  const handleResumeFromList = async (sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return;
+    await resumeSession(session, true);
+  };
+
+  const removeSubject = (sub: string) => {
+    const updated = subjects.filter(s => s !== sub);
+    setSubjects(updated);
+    saveSubjects(updated);
+    if (selectedSubject === sub) {
+      setSelectedSubject(updated[0] || "Other");
+    }
+    if (updated.length === 0) setEditMode(false);
+  };
+
+  const addSubject = () => {
+    const trimmed = newSubjectText.trim();
+    if (!trimmed) {
+      setNewSubjectText("");
+      setAddingSubject(false);
+      return;
+    }
+
+    const match = findSubjectMatch(trimmed, subjects, allSessionSubjects);
+
+    if (match.type === "exact") {
+      if (!subjects.includes(match.existing)) {
+        const updated = [...subjects, match.existing];
+        setSubjects(updated);
+        saveSubjects(updated);
+      }
+      setSelectedSubject(match.existing);
+      setNewSubjectText("");
+      setAddingSubject(false);
+    } else if (match.type === "similar") {
+      setSimilarityPrompt({ newName: trimmed, existing: match.existing });
+      setNewSubjectText("");
+      setAddingSubject(false);
+    } else {
+      if (!subjects.includes(trimmed)) {
+        const updated = [...subjects, trimmed];
+        setSubjects(updated);
+        saveSubjects(updated);
+      }
+      setSelectedSubject(trimmed);
+      setNewSubjectText("");
+      setAddingSubject(false);
+    }
+  };
+
+  const handleSimilarityResponse = (isSame: boolean) => {
+    if (!similarityPrompt) return;
+    if (isSame) {
+      if (!subjects.includes(similarityPrompt.existing)) {
+        const updated = [...subjects, similarityPrompt.existing];
+        setSubjects(updated);
+        saveSubjects(updated);
+      }
+      setSelectedSubject(similarityPrompt.existing);
+    } else {
+      if (!subjects.includes(similarityPrompt.newName)) {
+        const updated = [...subjects, similarityPrompt.newName];
+        setSubjects(updated);
+        saveSubjects(updated);
+      }
+      setSelectedSubject(similarityPrompt.newName);
+    }
+    setSimilarityPrompt(null);
+  };
+
+  // Long press handler
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handlePillPointerDown = () => {
+    if (activeSession) return;
+    longPressTimer.current = setTimeout(() => setEditMode(true), 500);
+  };
+  const handlePillPointerUp = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
+
+  // ── Swipe-to-delete handlers ──
+  const canSwipeDelete = useMemo(() => {
+    if (isPersonal) return true;
+    return sessionsFilter.length === 1 && sessionsFilter[0] === "mine";
+  }, [isPersonal, sessionsFilter]);
+
+  const handleSwipeStart = useCallback((e: React.TouchEvent, sessionId: string) => {
+    if (!canSwipeDelete) return;
+    swipeStartX.current = e.touches[0].clientX;
+    swipeCurrentX.current = 0;
+  }, [canSwipeDelete]);
+
+  const handleSwipeMove = useCallback((e: React.TouchEvent, sessionId: string) => {
+    if (!canSwipeDelete || swipeStartX.current === null) return;
+    const diff = swipeStartX.current - e.touches[0].clientX;
+    const clamped = Math.max(0, Math.min(diff, 80));
+    swipeCurrentX.current = clamped;
+    const el = swipeRowRefs.current.get(sessionId);
+    if (el) el.style.transform = `translateX(-${clamped}px)`;
+    if (clamped > 10 && swipedSessionId !== sessionId) {
+      setSwipedSessionId(sessionId);
+    }
+  }, [canSwipeDelete, swipedSessionId]);
+
+  const handleSwipeEnd = useCallback((e: React.TouchEvent, sessionId: string) => {
+    if (!canSwipeDelete) return;
+    const el = swipeRowRefs.current.get(sessionId);
+    if (swipeCurrentX.current > 40) {
+      if (el) el.style.transform = `translateX(-72px)`;
+      setSwipedSessionId(sessionId);
+    } else {
+      if (el) el.style.transform = `translateX(0px)`;
+      if (swipedSessionId === sessionId) setSwipedSessionId(null);
+    }
+    swipeStartX.current = null;
+    swipeCurrentX.current = 0;
+  }, [canSwipeDelete, swipedSessionId]);
+
+  const resetSwipe = useCallback(() => {
+    if (swipedSessionId) {
+      const el = swipeRowRefs.current.get(swipedSessionId);
+      if (el) el.style.transform = `translateX(0px)`;
+      setSwipedSessionId(null);
+    }
+  }, [swipedSessionId]);
+
+  const handleDeleteSession = useCallback(async () => {
+    if (!deleteConfirmId) return;
+    setFadingSessionId(deleteConfirmId);
+    setDeleteConfirmId(null);
+    // Reset swipe on the row
+    const el = swipeRowRefs.current.get(deleteConfirmId);
+    if (el) el.style.transform = `translateX(0px)`;
+    setSwipedSessionId(null);
+
+    await supabase.from("study_sessions").delete().eq("id", deleteConfirmId);
+    // Small delay for fade animation
+    setTimeout(() => {
+      setFadingSessionId(null);
+      fetchSessions();
+      fetchGroupSessions();
+    }, 300);
+  }, [deleteConfirmId, fetchSessions, fetchGroupSessions]);
+
+  // Reset swipe on any interaction outside
+  useEffect(() => {
+    if (!swipedSessionId) return;
+    const handler = () => resetSwipe();
+    window.addEventListener("scroll", handler, true);
+    return () => window.removeEventListener("scroll", handler, true);
+  }, [swipedSessionId, resetSwipe]);
+
+
+  const progress = Math.min(todayTotal / (DAILY_GOAL_HOURS * 3600), 1);
+  const SIZE = 130;
+  const STROKE = 9;
+  const R = (SIZE - STROKE) / 2;
+  const C = 2 * Math.PI * R;
+  const offset = C - C * progress;
+  const angle = 2 * Math.PI * progress - Math.PI / 2;
+  const dotCx = SIZE / 2 + R * Math.cos(angle);
+  const dotCy = SIZE / 2 + R * Math.sin(angle);
+
+  // ── Chart filter options ──
+  const chartOptions = useMemo(() => {
+    if (isPersonal) {
+      const opts: { key: string; label: string }[] = [{ key: "mine", label: "Mine" }];
+      (groups || []).forEach((g: any) => {
+        if (!(g as any)._personal && studyEnabledGroupIds.has(g.id)) opts.push({ key: g.id, label: g.name });
+      });
+      opts.push({ key: "together", label: "Together" });
+      return opts;
+    } else {
+      const opts: { key: string; label: string }[] = [{ key: "mine", label: "Mine" }];
+      (activeGroup?.members || []).forEach((m: any) => {
+        if (m.user_id !== user?.id) opts.push({ key: m.user_id, label: memberProfiles[m.user_id]?.display_name || "Member" });
+      });
+      opts.push({ key: "together", label: "Together" });
+      return opts;
+    }
+  }, [isPersonal, groups, activeGroup, user, memberProfiles]);
+
+  // Group info lookup (name, cover photo, color)
+  const groupInfoMap = useMemo(() => {
+    const m: Record<string, { name: string; coverUrl: string | null; color: string }> = {};
+    const GROUP_COLORS = ["#93C5FD", "#86EFAC", "#C4B5FD", "#FCD34D", "#FCA5A5", "#67E8F9", "#A7F3D0", "#FDBA74"];
+    (groups || []).forEach((g: any, i: number) => {
+      if (!(g as any)._personal) {
+        m[g.id] = { name: g.name, coverUrl: g.cover_image_url || null, color: GROUP_COLORS[i % GROUP_COLORS.length] };
+      }
+    });
+    return m;
+  }, [groups]);
+
+  const groupNameMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    Object.entries(groupInfoMap).forEach(([id, info]) => { m[id] = info.name; });
+    return m;
+  }, [groupInfoMap]);
+
+  // Sessions filter options (group view)
+  const sessionsFilterOptions = useMemo(() => {
+    if (isPersonal) return [];
+    const opts: { key: string; label: string }[] = [{ key: "mine", label: "Mine" }];
+    (activeGroup?.members || []).forEach((m: any) => {
+      if (m.user_id !== user?.id)
+        opts.push({ key: m.user_id, label: memberProfiles[m.user_id]?.display_name || "Member" });
+    });
+    opts.push({ key: "together", label: "Together" });
+    return opts;
+  }, [isPersonal, activeGroup, user, memberProfiles]);
+
+  // Filtered today sessions for group view
+  const filteredGroupTodaySessions = useMemo(() => {
+    if (isPersonal) return todaySessions;
+    if (sessionsFilter.includes("together")) return [];
+    const selectedUserIds = sessionsFilter.map(k => k === "mine" ? user?.id : k).filter(Boolean) as string[];
+    return groupSessions.filter(s => selectedUserIds.includes(s.user_id) && s.started_at.startsWith(today));
+  }, [isPersonal, sessionsFilter, groupSessions, todaySessions, user, today]);
+
+  // Whether to show column view (together or multi-select)
+  const showColumnView = useMemo(() => {
+    if (isPersonal) return false;
+    if (sessionsFilter.includes("together")) return true;
+    return sessionsFilter.length > 1;
+  }, [isPersonal, sessionsFilter]);
+
+  // Members to show in column view
+  const columnMembers = useMemo(() => {
+    if (isPersonal) return [];
+    if (sessionsFilter.includes("together")) return groupMembers;
+    const selectedUserIds = sessionsFilter.map(k => k === "mine" ? user?.id : k).filter(Boolean) as string[];
+    return groupMembers.filter(m => selectedUserIds.includes(m.user_id));
+  }, [isPersonal, sessionsFilter, groupMembers, user]);
+
+  // Total time for header
+  const sessionsTotalSeconds = useMemo(() => {
+    if (isPersonal) return todaySessions.reduce((sum, s) => sum + s.duration_seconds, 0);
+    if (showColumnView) {
+      return columnMembers.reduce((sum, m) => sum + m.todayTotal, 0);
+    }
+    return filteredGroupTodaySessions.reduce((sum, s) => sum + s.duration_seconds, 0);
+  }, [isPersonal, todaySessions, showColumnView, columnMembers, filteredGroupTodaySessions]);
+
+  // Weekly sessions count
+  const weekSessionsCount = useMemo(() => sessions.filter(s => weekDays.some(d => s.started_at.startsWith(d.date))).length, [sessions, weekDays]);
+
+  // ── Ring display values ──
+  const ringDisplayTime = useMemo(() => {
+    if (activeSession) return fmtTimer(activeTick);
+    if (ringResumeSession) return fmtTimer(ringResumeSession.duration_seconds);
+    return fmtTimer(todayTotal);
+  }, [activeSession, activeTick, ringResumeSession, todayTotal]);
+
+  const ringLabel = useMemo(() => {
+    if (activeSession) return "Session";
+    if (ringResumeSession) return "Paused";
+    return "Today";
+  }, [activeSession, ringResumeSession]);
+
+  const ringAction = useMemo(() => {
+    if (activeSession) return "tap to expand";
+    if (ringResumeSession) return "Resume session";
+    return "tap to start";
+  }, [activeSession, ringResumeSession]);
+
+  // ── Show Log page ──
+  if (showLog) {
+    return <StudyLogPage onBack={() => setShowLog(false)} onOpenMore={onOpenMore} />;
+  }
+
+  // ── Fullscreen ──
+  if (fullscreen && activeSession) {
+    const groupName = activeSession.group_id ? groupNameMap[activeSession.group_id] || activeGroup?.name : undefined;
+    return (
+      <StudyFullscreenTimer
+        subject={activeSession.subject}
+        groupName={groupName}
+        initialElapsed={accumulatedSecondsRef.current}
+        todayTotal={todayTotal}
+        goalHours={DAILY_GOAL_HOURS}
+        onStop={(elapsed) => pauseSession(elapsed)}
+        onDismiss={(elapsed) => pauseSession(elapsed)}
+      />
+    );
+  }
+
+  // ═══ RENDER ═══
   return (
     <div className="flex flex-col min-h-full pb-4" style={{ background: "#F4F3F0" }}>
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="px-4 pt-6 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#FAF5FF" }}>
             <Clock size={18} color="#6C47FF" />
           </div>
-          <h1 className="text-xl font-bold text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>Study</h1>
+          <h1 className="text-xl font-bold text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>
+            Study
+          </h1>
         </div>
         <div className="flex items-center gap-2">
-          <button className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.07)" }}>
-            <History size={15} color="#888" />
+          <button
+            onClick={() => setShowLog(true)}
+            className="w-[30px] h-[30px] rounded-full flex items-center justify-center"
+            style={{ background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.07)" }}
+          >
+            <Clock size={14} color="#888" />
           </button>
           {onOpenMore && (
-            <button onClick={onOpenMore} className="w-[30px] h-[30px] rounded-full flex items-center justify-center" style={{ background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.07)" }}>
+            <button
+              onClick={onOpenMore}
+              className="w-[30px] h-[30px] rounded-full flex items-center justify-center"
+              style={{ background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.07)" }}
+            >
               <MoreHorizontal size={15} color="#888" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Group selector */}
+      {/* ── Context toggle ── */}
       <div className="px-4 pb-2">
-        <PageGroupSelector page="study" hideAllPill />
+        <PageGroupSelector page="study" personalLabel="Mine" hideAllPill showAvatars />
       </div>
 
       <div className="px-4 space-y-3">
-        {/* Group Live Card */}
-        {groupId && groupLiveMembers.some(m => m.active) && (
-          <div className="rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
-            <h3 className="text-sm font-semibold text-foreground mb-3">🟢 Live now</h3>
-            <div className="space-y-2">
-              {groupLiveMembers.filter(m => m.active).map(m => (
-                <div key={m.user_id} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-xs font-bold" style={{ color: "#6C47FF" }}>
-                    {m.profile?.avatar_url ? <img src={m.profile.avatar_url} className="w-8 h-8 rounded-full object-cover" /> : (m.profile?.display_name || "?")[0]}
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium">{m.profile?.display_name}</div>
-                    <div className="text-xs text-muted-foreground">{m.active?.subject}</div>
-                  </div>
-                  <LiveTimer startedAt={m.active!.started_at} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Timer Card */}
-        <div className="rounded-2xl p-6 flex flex-col items-center" style={{ background: activeSession ? "#FAF5FF" : "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
+        {/* ═══ Timer Card ═══ */}
+        <div
+          className="rounded-2xl p-6 flex flex-col items-center"
+          style={{
+            background: activeSession ? "#FAF5FF" : "#fff",
+            border: "0.5px solid rgba(0,0,0,0.07)",
+          }}
+        >
           {/* Ring */}
-          <div className="relative w-[180px] h-[180px] flex items-center justify-center mb-4">
-            <svg width="180" height="180" viewBox="0 0 180 180" className="absolute inset-0">
-              {/* Background track */}
-              <circle cx="90" cy="90" r={ringR} fill="none" stroke={activeSession ? "#EDE9FE" : "#F0EFF8"} strokeWidth="10" />
-              {/* Dashed inner ring */}
-              <circle cx="90" cy="90" r={ringR - 14} fill="none" stroke="#EEEDE8" strokeWidth="1" strokeDasharray="4 4" />
-              {/* Progress arc */}
+          <div className="relative flex items-center justify-center mb-4" style={{ width: SIZE, height: SIZE }}>
+            <svg width={SIZE} height={SIZE} className="absolute inset-0">
+              <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="#F0EFF8" strokeWidth={STROKE} />
               <circle
-                cx="90" cy="90" r={ringR} fill="none"
-                stroke="#6C47FF" strokeWidth="10" strokeLinecap="round"
-                strokeDasharray={`${strokeDash} ${circumference}`}
-                transform="rotate(-90 90 90)"
+                cx={SIZE / 2}
+                cy={SIZE / 2}
+                r={R}
+                fill="none"
+                stroke="#6C47FF"
+                strokeWidth={STROKE}
+                strokeLinecap="round"
+                strokeDasharray={`${C - offset} ${offset}`}
+                transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
                 style={{ transition: "stroke-dasharray 0.5s ease" }}
               />
-              {/* Dot marker when active */}
-              {activeSession && progress > 0.01 && (
-                <circle
-                  cx={90 + ringR * Math.cos(2 * Math.PI * progress - Math.PI / 2)}
-                  cy={90 + ringR * Math.sin(2 * Math.PI * progress - Math.PI / 2)}
-                  r="6" fill="#6C47FF" stroke="#fff" strokeWidth="2"
-                />
+              {progress > 0.01 && (
+                <circle cx={dotCx} cy={dotCy} r={5} fill="#6C47FF" stroke="#fff" strokeWidth={2} />
               )}
             </svg>
-            {/* Center tap target */}
             <button
-              onClick={toggleSession}
-              className="relative z-10 w-[100px] h-[100px] rounded-full flex flex-col items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-transform"
-              style={{ minWidth: 80, minHeight: 80 }}
+              onClick={activeSession ? () => { baseDurationRef.current = activeSession.duration_seconds; accumulatedSecondsRef.current = 0; setFullscreen(true); } : toggleSession}
+              className="relative z-10 flex flex-col items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+              style={{ width: SIZE - 30, height: SIZE - 30 }}
             >
               {activeSession ? (
                 <>
-                  <span className="text-[11px] font-medium" style={{ color: "#6C47FF" }}>Session</span>
-                  <span className="text-2xl font-semibold tabular-nums" style={{ color: "#6C47FF" }}>
-                    {fmtDuration(activeTick)}
+                  <span className="text-[10px]" style={{ color: "rgba(108,71,255,0.5)" }}>Session</span>
+                  <span className="tabular-nums" style={{ fontSize: 24, fontWeight: 500, color: "#6C47FF", fontFamily: "DM Sans, sans-serif" }}>
+                    {fmtTimer(activeTick)}
                   </span>
-                  <span className="text-[11px] font-medium" style={{ color: "#6C47FF" }}>
+                  <span className="text-[11px]" style={{ color: "rgba(108,71,255,0.6)" }}>
                     {fmtHours(todayTotal)} / {DAILY_GOAL_HOURS}h
                   </span>
+                  <span className="text-[10px] mt-0.5" style={{ color: "#6C47FF" }}>tap to expand</span>
+                </>
+              ) : ringResumeSession ? (
+                <>
+                  <span className="text-[10px]" style={{ color: "rgba(108,71,255,0.5)" }}>Paused</span>
+                    <span className="tabular-nums" style={{ fontSize: 24, fontWeight: 500, color: "#6C47FF", fontFamily: "DM Sans, sans-serif" }}>
+                     {fmtTimer(Math.max(ringResumeSession.duration_seconds - baseDurationRef.current, 0))}
+                  </span>
+                  <span className="text-[11px]" style={{ color: "rgba(108,71,255,0.6)" }}>
+                    {fmtHours(todayTotal)} / {DAILY_GOAL_HOURS}h
+                  </span>
+                  <span className="text-[10px] mt-0.5 font-medium" style={{ color: "#6C47FF" }}>Resume session</span>
                 </>
               ) : (
                 <>
-                  <span className="text-[11px] font-medium text-muted-foreground">Today</span>
-                  <span className="text-[28px] font-medium text-foreground tabular-nums">
-                    {fmtDuration(todayTotal)}
+                  <span className="text-[10px] text-muted-foreground">Today</span>
+                  <span className="tabular-nums" style={{ fontSize: 24, fontWeight: 500, color: "#1a1a1a", fontFamily: "DM Sans, sans-serif" }}>
+                    {fmtTimer(0)}
                   </span>
-                  <span className="text-[11px] font-medium" style={{ color: "#6C47FF" }}>
+                  <span className="text-[11px]" style={{ color: "rgba(108,71,255,0.6)" }}>
                     {fmtHours(todayTotal)} / {DAILY_GOAL_HOURS}h
                   </span>
+                  <span className="text-[10px] mt-0.5" style={{ color: "#6C47FF" }}>tap to start</span>
                 </>
               )}
             </button>
           </div>
 
-          {/* Studying now badge */}
+          {/* Studying badge */}
           {activeSession && (
             <div className="flex items-center gap-1.5 mb-3 px-3 py-1 rounded-full text-xs font-medium" style={{ background: "#ECFDF5", color: "#059669" }}>
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              Studying now · {activeSession.subject}
+              Studying · {activeSession.subject}
             </div>
           )}
 
-          {/* Subject tags */}
-          <div className="flex gap-2 flex-wrap justify-center">
-            {SUBJECTS.map(sub => (
-              <button
-                key={sub}
-                onClick={() => !activeSession && setSelectedSubject(sub)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                  selectedSubject === sub
-                    ? "text-white shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                style={{
-                  background: selectedSubject === sub ? "#6C47FF" : "#F4F3F0",
-                  border: "0.5px solid rgba(0,0,0,0.07)",
-                  opacity: activeSession ? 0.6 : 1,
-                }}
-              >
-                {sub}
-              </button>
+          {/* Subject pills */}
+          <div ref={pillsRef} className="flex gap-2 flex-wrap justify-center">
+            {subjects.map(sub => (
+              <div key={sub} className="relative">
+                <button
+                  onClick={() => !activeSession && !editMode && setSelectedSubject(sub)}
+                  onPointerDown={handlePillPointerDown}
+                  onPointerUp={handlePillPointerUp}
+                  onPointerLeave={handlePillPointerUp}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                  style={{
+                    background: selectedSubject === sub ? "#6C47FF" : "#F4F3F0",
+                    color: selectedSubject === sub ? "#fff" : "#888",
+                    border: "0.5px solid rgba(0,0,0,0.07)",
+                    opacity: activeSession ? 0.6 : 1,
+                  }}
+                >
+                  {sub}
+                </button>
+                {editMode && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeSubject(sub); }}
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center"
+                    style={{ background: "#EF4444", border: "1.5px solid #fff" }}
+                  >
+                    <X size={8} color="#fff" />
+                  </button>
+                )}
+              </div>
             ))}
+            {addingSubject ? (
+              <input
+                ref={addInputRef}
+                value={newSubjectText}
+                onChange={e => setNewSubjectText(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") addSubject(); if (e.key === "Escape") { setAddingSubject(false); setNewSubjectText(""); } }}
+                onBlur={addSubject}
+                className="px-3 py-1 rounded-full text-xs border outline-none w-20"
+                style={{ borderColor: "#6C47FF", background: "#fff" }}
+                autoFocus
+                placeholder="Name"
+              />
+            ) : (
+              <button
+                onClick={() => !activeSession && setAddingSubject(true)}
+                className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+                style={{ background: "transparent", border: "1px dashed rgba(0,0,0,0.15)", color: "#999", opacity: activeSession ? 0.5 : 1 }}
+              >
+                + Add
+              </button>
+            )}
           </div>
-        </div>
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
-            <div className="text-xs text-muted-foreground mb-1">🔥 Day streak</div>
-            <div className="text-2xl font-bold text-foreground">{streak}</div>
-            {streak > 0 && <div className="text-[10px] font-medium px-1.5 py-0.5 rounded-full inline-block mt-1" style={{ background: "#FEF3C7", color: "#92400E" }}>Personal best</div>}
-          </div>
-          <div className="rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
-            <div className="text-xs text-muted-foreground mb-1">📚 Sessions today</div>
-            <div className="text-2xl font-bold text-foreground">{todaySessions.length}</div>
-            <div className="text-[10px] font-medium px-1.5 py-0.5 rounded-full inline-block mt-1" style={{ background: "#EDE9FE", color: "#6C47FF" }}>
-              {sessions.filter(s => weekDays.some(d => s.started_at.startsWith(d.date))).length} this week
+          {/* Similarity prompt */}
+          {similarityPrompt && (
+            <div className="mt-3 p-3 rounded-xl w-full" style={{ background: "#FAF5FF", border: "1px solid #EDE9FE" }}>
+              <p className="text-xs text-foreground mb-2">
+                This looks similar to <strong>{similarityPrompt.existing}</strong>. Are these the same?
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleSimilarityResponse(true)}
+                  className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
+                  style={{ background: "#6C47FF" }}
+                >
+                  Yes, same subject
+                </button>
+                <button
+                  onClick={() => handleSimilarityResponse(false)}
+                  className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ background: "#F4F3F0", color: "#555" }}
+                >
+                  No, keep separate
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Group Today Summary */}
-        {groupId && groupLiveMembers.length > 0 && (
+        {/* ═══ Group Today Card ═══ */}
+        {groupId && groupMembers.length > 0 && (
           <div className="rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
-            <h3 className="text-sm font-semibold text-foreground mb-3">Group today</h3>
-            <div className="space-y-2">
-              {groupLiveMembers.map(m => (
-                <div key={m.user_id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-[10px] font-bold" style={{ color: "#6C47FF" }}>
-                      {m.profile?.avatar_url ? <img src={m.profile.avatar_url} className="w-6 h-6 rounded-full object-cover" /> : (m.profile?.display_name || "?")[0]}
-                    </div>
-                    <span className="text-sm" style={{ color: m.active ? "#1a1a1a" : "#999" }}>{m.profile?.display_name}</span>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>Group today</h3>
+              {groupMembers.filter(m => m.active).length > 0 && (
+                <span className="text-xs font-medium" style={{ color: "#059669" }}>
+                  {groupMembers.filter(m => m.active).length} live
+                </span>
+              )}
+            </div>
+            <div className="space-y-2.5">
+              {[...groupMembers].sort((a, b) => (a.active ? -1 : 1) - (b.active ? -1 : 1)).map(m => (
+                <div key={m.user_id} className="flex items-center gap-3">
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                    style={{ background: m.color }}
+                  >
+                    {m.profile?.avatar_url
+                      ? <img src={m.profile.avatar_url} className="w-7 h-7 rounded-full object-cover" />
+                      : (m.profile?.display_name || "?")[0]}
                   </div>
-                  <span className="text-sm font-medium" style={{ color: "#6C47FF" }}>{fmtHours(m.todayTotal)}h</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium">{m.isMe ? "Me" : m.profile?.display_name}</span>
+                  </div>
+                  {m.active ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium px-1.5 py-0.5 rounded-full" style={{ background: "#ECFDF5", color: "#059669" }}>
+                        Live
+                      </span>
+                      <LiveTimer startedAt={m.active.started_at} />
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      {m.lastSession ? `${timeAgo(m.lastSession.ended_at || m.lastSession.started_at)} · ${fmtDuration(m.todayTotal)}` : "No sessions"}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Today's Sessions */}
+        {/* ═══ Stats Row (Personal view) ═══ */}
+        {isPersonal && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
+              <div className="text-xs text-muted-foreground mb-1">🔥 Streak</div>
+              <div className="text-2xl font-bold text-foreground">{streak}</div>
+              <div
+                className="text-[10px] font-medium px-1.5 py-0.5 rounded-full inline-block mt-1"
+                style={{ background: "#FEF3C7", color: "#92400E" }}
+              >
+                Best {bestStreak}d
+              </div>
+            </div>
+            <div className="rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
+              <div className="text-xs text-muted-foreground mb-1">📚 Sessions</div>
+              <div className="text-2xl font-bold text-foreground">{todaySessions.length}</div>
+              <div
+                className="text-[10px] font-medium px-1.5 py-0.5 rounded-full inline-block mt-1"
+                style={{ background: "#EDE9FE", color: "#6C47FF" }}
+              >
+                {weekSessionsCount} this week
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ Today's Sessions ═══ */}
         <div className="rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-foreground">Today's sessions</h3>
-            <span className="text-xs text-muted-foreground">{todaySessions.length} sessions</span>
+            <h3 className="text-sm font-semibold text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>
+              Today's sessions
+            </h3>
+            {!showColumnView && (
+              <span className="text-xs" style={{ color: "#6C47FF", fontWeight: 500 }}>
+                {fmtDuration(sessionsTotalSeconds)} total
+              </span>
+            )}
           </div>
-          {todaySessions.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">No sessions yet today. Tap the timer to start!</p>
+
+          {/* Filter pills (group view) — multi-select */}
+          {!isPersonal && sessionsFilterOptions.length > 0 && (
+            <div className="flex gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
+              {sessionsFilterOptions.map(opt => {
+                const individualKeys = sessionsFilterOptions.filter(o => o.key !== "together").map(o => o.key);
+                const allIndividualsSelected = individualKeys.every(k => sessionsFilter.includes(k));
+                const isTogetherActive = sessionsFilter.includes("together") || allIndividualsSelected;
+                const isActive = opt.key === "together" ? isTogetherActive : sessionsFilter.includes(opt.key) || isTogetherActive;
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => {
+                      if (opt.key === "together") {
+                        // If Together is already active (all highlighted), reset to Mine only
+                        if (isTogetherActive) {
+                          setSessionsFilter(["mine"]);
+                        } else {
+                          // Select all individual pills + together
+                          setSessionsFilter([...individualKeys, "together"]);
+                        }
+                      } else {
+                        setSessionsFilter(prev => {
+                          const withoutTogether = prev.filter(k => k !== "together");
+                          if (isTogetherActive && !prev.includes("together")) {
+                            // Was in "all individuals selected" state, deselect this one
+                            return individualKeys.filter(k => k !== opt.key);
+                          }
+                          if (prev.includes("together")) {
+                            // Together was explicitly active, deselect this member
+                            return individualKeys.filter(k => k !== opt.key);
+                          }
+                          if (withoutTogether.includes(opt.key)) {
+                            const next = withoutTogether.filter(k => k !== opt.key);
+                            return next.length === 0 ? [opt.key] : next;
+                          }
+                          const next = [...withoutTogether, opt.key];
+                          // Check if all individuals are now selected
+                          if (individualKeys.every(k => next.includes(k))) {
+                            return [...next, "together"];
+                          }
+                          return next;
+                        });
+                      }
+                      resetSwipe();
+                    }}
+                    className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
+                    style={{
+                      background: isActive ? "#1a1a1a" : "#F4F3F0",
+                      color: isActive ? "#fff" : "#888",
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           )}
-          <div className="space-y-2">
-            {todaySessions.map(s => (
-              <div
-                key={s.id}
-                className="flex items-center gap-3 p-2.5 rounded-xl"
-                style={{ background: s.is_active ? "#FAF5FF" : "transparent" }}
-              >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold" style={{ background: SUBJECT_COLORS[s.subject] || "#6C47FF" }}>
-                  {s.subject[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium flex items-center gap-1.5">
-                    {s.subject}
-                    {s.is_active && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "#EDE9FE", color: "#6C47FF" }}>· live</span>}
+
+          {/* Column view: Together or multi-select */}
+          {!isPersonal && showColumnView ? (
+            <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
+              {columnMembers.map(m => {
+                const mSessions = m.todaySessions.filter((s: StudySession) => !s.is_active);
+                return (
+                  <div key={m.user_id} className="flex-shrink-0" style={{ width: 150 }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white" style={{ background: m.color }}>
+                          {m.profile?.avatar_url
+                            ? <img src={m.profile.avatar_url} className="w-5 h-5 rounded-full object-cover" />
+                            : (m.profile?.display_name || "?")[0]}
+                        </div>
+                        <span className="text-xs font-medium" style={{ color: m.color }}>
+                          {m.isMe ? "Me" : m.profile?.display_name}
+                        </span>
+                      </div>
+                      {m.todayTotal > 0 && (
+                        <span className="text-[11px] font-medium" style={{ color: m.color }}>
+                          {fmtDuration(m.todayTotal)}
+                        </span>
+                      )}
+                    </div>
+                    {mSessions.length === 0 ? (
+                      <div
+                        className="flex items-center justify-center text-xs text-muted-foreground py-6"
+                        style={{ border: "1px dashed rgba(0,0,0,0.12)", borderRadius: "0 9px 9px 0" }}
+                      >
+                        No sessions
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {mSessions.map((s: StudySession) => (
+                          <div
+                            key={s.id}
+                            className="p-2 rounded-r-[9px]"
+                            style={{ borderLeft: `2.5px solid ${m.color}`, background: "#FAFAF8" }}
+                          >
+                            <div className="text-[11px] font-medium text-foreground">{s.subject}</div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {fmtTime(s.started_at)}{s.ended_at ? `–${fmtTime(s.ended_at)}` : ""}
+                            </div>
+                            <div className="text-[11px] font-medium mt-0.5" style={{ color: m.color }}>
+                              {fmtDuration(s.duration_seconds)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {fmtTime(s.started_at)}{s.ended_at ? ` – ${fmtTime(s.ended_at)}` : " – now"}
-                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              {(isPersonal ? todaySessions : filteredGroupTodaySessions).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No sessions yet today. Tap the timer to start!
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {(isPersonal ? todaySessions : filteredGroupTodaySessions).map(s => (
+                    <div
+                      key={s.id}
+                      className="relative overflow-hidden rounded-xl"
+                      style={{
+                        opacity: fadingSessionId === s.id ? 0 : 1,
+                        transition: "opacity 0.3s ease",
+                      }}
+                      onClick={() => { if (swipedSessionId && swipedSessionId !== s.id) resetSwipe(); }}
+                    >
+                      {/* Delete button behind */}
+                      {canSwipeDelete && !s.is_active && (
+                        <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center" style={{ width: 72 }}>
+                          <button
+                            onClick={() => { setDeleteConfirmId(s.id); }}
+                            className="flex items-center justify-center gap-1 h-full w-full"
+                            style={{ background: "#EF4444", color: "#fff", fontSize: 12, fontWeight: 600 }}
+                          >
+                            <Trash2 size={14} />
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                      {/* Swipeable row */}
+                      <div
+                        ref={el => { if (el) swipeRowRefs.current.set(s.id, el); }}
+                        className="flex items-center gap-3 p-2.5 rounded-xl relative"
+                        style={{
+                          background: s.is_active ? "#FAF5FF" : "#fff",
+                          transition: swipedSessionId === s.id ? "none" : "transform 0.2s ease",
+                          zIndex: 1,
+                        }}
+                        onTouchStart={e => handleSwipeStart(e, s.id)}
+                        onTouchMove={e => handleSwipeMove(e, s.id)}
+                        onTouchEnd={e => handleSwipeEnd(e, s.id)}
+                      >
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#6C47FF" }}>
+                          <Clock size={13} color="#fff" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium flex items-center gap-1.5">
+                            {s.subject}
+                            {s.is_active && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "#EDE9FE", color: "#6C47FF" }}>
+                                live
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                            <span>{fmtTime(s.started_at)}{s.ended_at ? ` – ${fmtTime(s.ended_at)}` : " – now"}</span>
+                            {isPersonal && s.group_id && studyEnabledGroupIds.has(s.group_id) && groupInfoMap[s.group_id] && (() => {
+                              const gi = groupInfoMap[s.group_id];
+                              return (
+                                <span
+                                  className="inline-flex items-center gap-1"
+                                  style={{ fontSize: 9, fontWeight: 500, padding: "1px 6px", borderRadius: 99, background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.08)" }}
+                                >
+                                  {gi.coverUrl ? (
+                                    <img src={gi.coverUrl} className="w-3 h-3 rounded-full object-cover flex-shrink-0" />
+                                  ) : (
+                                    <span className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white flex-shrink-0" style={{ background: gi.color }}>
+                                      {gi.name[0]}
+                                    </span>
+                                  )}
+                                  {gi.name}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {!s.is_active && !activeSession && listResumeSessionId === s.id && (
+                            <button
+                              onClick={() => handleResumeFromList(s.id)}
+                              className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                              style={{ background: "#EDE9FE", color: "#6C47FF" }}
+                            >
+                              Resume
+                            </button>
+                          )}
+                          <span className="text-sm font-medium" style={{ color: "#6C47FF" }}>
+                            {s.is_active ? fmtDuration(activeTick) : fmtDuration(s.duration_seconds)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <span className="text-sm font-semibold" style={{ color: "#6C47FF" }}>
-                  {s.is_active ? fmtDuration(activeTick) : fmtDuration(s.duration_seconds)}
-                </span>
-              </div>
-            ))}
-          </div>
+              )}
+            </>
+          )}
         </div>
 
-        {/* Weekly Chart */}
+        {/* ═══ Weekly Chart ═══ */}
         <div className="rounded-2xl p-4" style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.07)" }}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-foreground">This week</h3>
-            <span className="text-xs text-muted-foreground">{fmtHours(weekTotal)} hours</span>
+            <h3 className="text-sm font-semibold text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>
+              This week
+            </h3>
+            {/* Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setChartDropdownOpen(!chartDropdownOpen)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+                style={{ background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.07)" }}
+              >
+                {chartOptions.find(o => o.key === chartFilter)?.label || "Mine"}
+                <ChevronDown size={12} />
+              </button>
+              {chartDropdownOpen && (
+                <div
+                  className="absolute right-0 top-full mt-1 z-50 rounded-xl py-1 shadow-lg min-w-[120px]"
+                  style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.1)" }}
+                >
+                  {chartOptions.map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => { setChartFilter(opt.key); setChartDropdownOpen(false); }}
+                      className="block w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50"
+                      style={{ fontWeight: chartFilter === opt.key ? 600 : 400, color: chartFilter === opt.key ? "#6C47FF" : "#555" }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex items-end justify-between gap-1.5 h-[100px]">
             {weeklyData.map((day, i) => {
               const h = day.seconds > 0 ? Math.max((day.seconds / maxBar) * 80, 6) : 4;
-              const color = day.isFuture ? "#EEEDE8" : day.isToday ? "#1a1a1a" : "#6C47FF";
+              const color = day.isFuture ? "#EEEDE8" : "#6C47FF";
               return (
                 <div key={i} className="flex flex-col items-center flex-1 gap-1">
                   <div className="w-full flex items-end justify-center" style={{ height: 80 }}>
@@ -469,25 +1400,31 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
               );
             })}
           </div>
+          <div className="text-center mt-2">
+            <span className="text-xs text-muted-foreground">{fmtHours(weekTotal)} hours total</span>
+          </div>
         </div>
       </div>
-    </div>
-  );
-};
 
-// Small live timer component for group view
-const LiveTimer = ({ startedAt }: { startedAt: string }) => {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    const update = () => setElapsed(Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
-  }, [startedAt]);
-  return (
-    <span className="text-sm font-semibold tabular-nums" style={{ color: "#6C47FF" }}>
-      {fmtDuration(elapsed)}
-    </span>
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this session?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteConfirmId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSession}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 };
 

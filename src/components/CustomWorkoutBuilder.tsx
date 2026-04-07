@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { X, Plus, Trash2, Search, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, MapPin, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WorkoutType as HealthWorkoutType } from "@capgo/capacitor-health";
@@ -27,9 +27,10 @@ interface CustomWorkoutBuilderProps {
   onClose: () => void;
   onAdd: (workouts: Workout[]) => void;
   selectedDate: string;
+  recentWorkouts?: Workout[];
 }
 
-const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWorkoutBuilderProps) => {
+const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate, recentWorkouts = [] }: CustomWorkoutBuilderProps) => {
   const { user, activeGroup, groups } = useAuth();
   const [step, setStep] = useState<Step>("type");
   const [title, setTitle] = useState("");
@@ -87,6 +88,42 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWork
       setPriorWeights(weights);
     })();
   }, [open, user]);
+
+  // Recent workouts — last 5 unique done workouts
+  const recentUniqueWorkouts = useMemo(() => {
+    const seen = new Set<string>();
+    return recentWorkouts
+      .filter((w) => w.done && w.title)
+      .sort((a, b) => (b.completedDate || b.scheduledDate || "").localeCompare(a.completedDate || a.scheduledDate || ""))
+      .filter((w) => {
+        const key = w.title.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 5);
+  }, [recentWorkouts]);
+
+  const prefillFromRecent = useCallback((w: Workout) => {
+    setTitle(w.title);
+    if (w.exercises && w.exercises.length > 0) {
+      setWorkoutType("strength");
+      setExercises(w.exercises.map((ex: any) => ({
+        name: ex.name,
+        sets: ex.sets || 3,
+        reps: ex.reps || "10",
+        weight: ex.weight ? String(ex.weight) : "",
+        unit: (ex.unit as "lb" | "kg") || "lb",
+      })));
+      setStep("exercises");
+    } else {
+      setWorkoutType("activity");
+      setActivityEmoji(w.emoji || "🏃");
+      setActivityDuration(w.duration?.replace(/[^\d]/g, "") || "");
+      setActivityCal(w.cal ? String(w.cal) : "");
+      setStep("activity-details");
+    }
+  }, []);
 
   const filteredActivities = healthKitActivityOptions.filter((a) =>
     a.label.toLowerCase().includes(activitySearch.toLowerCase())
@@ -239,6 +276,30 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate }: CustomWork
                   selectedContexts={selectedContexts}
                   onChangeContexts={setSelectedContexts}
                 />
+
+                {/* Recent workouts */}
+                {recentUniqueWorkouts.length > 0 && (
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recent</label>
+                    <div className="mt-1.5 space-y-1">
+                      {recentUniqueWorkouts.map((w) => (
+                        <button
+                          key={w.id}
+                          onClick={() => prefillFromRecent(w)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-secondary/80 transition-colors text-left"
+                          style={{ background: "#F9F8F6" }}
+                        >
+                          <span className="text-base">{w.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{w.title}</p>
+                            <p className="text-[10px] text-muted-foreground">{w.duration} · {w.cal} kcal</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Name input */}
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name</label>

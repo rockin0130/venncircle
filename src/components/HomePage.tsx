@@ -13,7 +13,7 @@ import TaskActionMenu from "@/components/TaskActionMenu";
 import AddItemModal from "@/components/AddItemModal";
 import CongratsPopup from "@/components/CongratsPopup";
 import HomeSectionCustomizer, { loadSectionPrefs, saveSectionPrefs, buildAllSections } from "@/components/HomeSectionCustomizer";
-import { HomeWaterWidget, HomeWorkoutWidget, HomeSobrietyWidget, HomeHabitSectionWidget, HomeNutritionWidget, HomeShoppingWidget } from "@/components/HomeWidgets";
+import { HomeWaterWidget, HomeWorkoutWidget, HomeSobrietyWidget, HomeHabitSectionWidget, HomeNutritionWidget, HomeShoppingWidget, HomeStudyWidget } from "@/components/HomeWidgets";
 import HomeScheduledSection from "@/components/HomeScheduledSection";
 import type { HabitSectionMeta } from "@/lib/habitSections";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
@@ -36,6 +36,11 @@ interface ClarificationState {
 }
 
 const QUICK_ACCESS_FEATURES = [
+  { id: "todo", label: "To-Do", page: "todo", icon: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  )},
   { id: "workout", label: "Workout", page: "workout", icon: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M6.5 6.5a2 2 0 1 1 0 4" /><path d="M17.5 6.5a2 2 0 1 0 0 4" />
@@ -71,21 +76,53 @@ const QUICK_ACCESS_FEATURES = [
   )},
 ];
 
-const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress }: {
+const getStoredQuickAccessPos = (): "above-scheduled" | "below-todo" | null => {
+  try {
+    const saved = localStorage.getItem("home_qa_position");
+    return saved === "above-scheduled" || saved === "below-todo" ? saved : null;
+  } catch {
+    return null;
+  }
+};
+
+const persistQuickAccessPosLocally = (pos: "above-scheduled" | "below-todo") => {
+  try {
+    localStorage.setItem("home_qa_position", pos);
+  } catch {
+    // no-op
+  }
+};
+
+const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress, onDragReposition }: {
   enabledSections: Set<string>;
   onNavigate?: (page: string) => void;
   isWiggling?: boolean;
   onLongPress?: () => void;
+  onDragReposition?: (direction: "up" | "down") => void;
 }) => {
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragStartY = useRef<number | null>(null);
   const clearLp = () => { if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; } };
   const tiles = QUICK_ACCESS_FEATURES.filter(f => enabledSections.has(f.id));
   if (tiles.length === 0) return null;
 
   return (
-    <section
-      className="mb-6"
-      onPointerDown={() => {
+    <motion.section
+      className="mb-6 select-none"
+      drag={isWiggling ? "y" : false}
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={0.5}
+      onDragStart={(_e, info) => {
+        dragStartY.current = info.point.y;
+      }}
+      onDragEnd={(_e, info) => {
+        const dy = info.offset.y;
+        if (Math.abs(dy) > 50) {
+          onDragReposition?.(dy < 0 ? "up" : "down");
+        }
+        dragStartY.current = null;
+      }}
+      onPointerDown={(e) => {
         if (isWiggling) return;
         clearLp();
         longPressRef.current = setTimeout(() => {
@@ -96,10 +133,16 @@ const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress
       onPointerUp={clearLp}
       onPointerLeave={clearLp}
       onPointerCancel={clearLp}
-      onContextMenu={(e) => e.preventDefault()}
-      onClick={(e) => { if (isWiggling) e.stopPropagation(); }}
+      onContextMenu={(e: React.MouseEvent) => e.preventDefault()}
+      onClick={(e: React.MouseEvent) => { if (isWiggling) e.stopPropagation(); }}
+      style={isWiggling ? { cursor: "grab", zIndex: 50 } : undefined}
     >
-      <div className={`bg-card rounded-xl border p-3 shadow-card transition-all ${isWiggling ? 'border-primary/30 shadow-lg' : 'border-border'}`}>
+      <div className={`bg-card rounded-xl border p-3 shadow-card transition-all ${isWiggling ? 'border-primary/30 shadow-lg ring-2 ring-primary/20' : 'border-border'}`}>
+        {isWiggling && (
+          <div className="flex justify-center mb-1.5">
+            <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
+          </div>
+        )}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {tiles.map((tile, i) => (
             <button
@@ -116,7 +159,7 @@ const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress
           ))}
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 };
 
@@ -138,7 +181,9 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   const [selectedSobrietyIds, setSelectedSobrietyIds] = useState<string[]>([]);
   
   const [selectedHabitSubIds, setSelectedHabitSubIds] = useState<string[]>([]);
-  const [quickAccessPos, setQuickAccessPos] = useState<"above-scheduled" | "below-todo">("below-todo");
+  const [quickAccessPos, setQuickAccessPos] = useState<"above-scheduled" | "below-todo">(() => {
+    return getStoredQuickAccessPos() ?? "below-todo";
+  });
   const [wiggleMode, setWiggleMode] = useState(false);
   const {
     habits, toggleHabit, addHabit, removeHabit, events, tasks, toggleTask, toggleEventCompletion, addTask, addEvent, removeEvent, removeTask, updateTask, rescheduleEvent,
@@ -156,21 +201,29 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
     setSectionVisible(prefs.visible);
     setSelectedSobrietyIds(prefs.selectedSobrietyIds);
     setSelectedHabitSubIds(prefs.selectedHabitSubIds);
-    try {
-      const pos = localStorage.getItem("home_qa_position");
-      if (pos === "above-scheduled" || pos === "below-todo") setQuickAccessPos(pos);
-    } catch {}
+    const localPos = getStoredQuickAccessPos();
+    if (localPos) setQuickAccessPos(localPos);
   }, []);
 
-  // Sync quick access position from backend for cross-device persistence
+  // Keep device-local placement authoritative for tab/page navigation, while backfilling backend.
   useEffect(() => {
     if (!user) return;
+
+    const localPos = getStoredQuickAccessPos();
+    if (localPos) {
+      void supabase
+        .from("profiles")
+        .update({ home_quick_access_position: localPos } as any)
+        .eq("id", user.id);
+      return;
+    }
+
     supabase.from("profiles").select("home_quick_access_position").eq("id", user.id).single()
       .then(({ data }) => {
         const pos = (data as any)?.home_quick_access_position;
         if (pos === "above-scheduled" || pos === "below-todo") {
           setQuickAccessPos(pos);
-          localStorage.setItem("home_qa_position", pos);
+          persistQuickAccessPosLocally(pos);
         }
       });
   }, [user?.id]);
@@ -178,9 +231,9 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
   const saveQuickAccessPos = useCallback((pos: "above-scheduled" | "below-todo") => {
     setQuickAccessPos(pos);
     setWiggleMode(false);
-    localStorage.setItem("home_qa_position", pos);
+    persistQuickAccessPosLocally(pos);
     if (user) {
-      supabase.from("profiles").update({ home_quick_access_position: pos } as any).eq("id", user.id);
+      void supabase.from("profiles").update({ home_quick_access_position: pos } as any).eq("id", user.id);
     }
   }, [user]);
 
@@ -740,14 +793,8 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
 
       {/* Wiggle mode banner */}
       {wiggleMode && (
-        <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-xl px-4 py-2.5 mb-4" onClick={(e) => e.stopPropagation()}>
-          <span className="text-xs font-medium text-primary">Tap a zone to reposition Quick Access</span>
-          <button
-            onClick={() => setWiggleMode(false)}
-            className="px-3 py-1 rounded-lg bg-primary text-primary-foreground text-xs font-semibold"
-          >
-            Done
-          </button>
+        <div className="flex items-center justify-center bg-primary/5 border border-primary/20 rounded-xl px-4 py-2.5 mb-4" onClick={(e) => e.stopPropagation()}>
+          <span className="text-xs font-medium text-primary">Drag the strip up or down to reposition</span>
         </div>
       )}
 
@@ -869,16 +916,9 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                           onNavigate={onNavigate}
                           isWiggling={wiggleMode}
                           onLongPress={() => setWiggleMode(true)}
+                          onDragReposition={(dir) => { if (dir === "down") saveQuickAccessPos("below-todo"); }}
                         />
                       </div>
-                    )}
-                    {wiggleMode && quickAccessPos !== "above-scheduled" && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); saveQuickAccessPos("above-scheduled"); }}
-                        className="w-full border-2 border-dashed border-primary/25 rounded-xl py-3 mb-4 text-center text-xs text-primary/50 font-medium hover:border-primary/40 hover:bg-primary/5 transition-all"
-                      >
-                        Move Quick Access here
-                      </button>
                     )}
                     <HomeScheduledSection
                       allDayItems={allDayItems}
@@ -901,23 +941,6 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
               case "todo":
                 return (
                   <div key={sectionId}>
-                    <TodoListSection
-                      tasks={todoTasks}
-                      onToggle={isViewingPartner ? undefined : toggleTask}
-                      onCongrats={() => setCongratsType("task")}
-                      readOnly={isViewingPartner}
-                      addTask={addTask}
-                      selectedDate={selectedDate}
-                      memberFilters={[]}
-                    />
-                    {wiggleMode && quickAccessPos !== "below-todo" && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); saveQuickAccessPos("below-todo"); }}
-                        className="w-full border-2 border-dashed border-primary/25 rounded-xl py-3 mb-4 text-center text-xs text-primary/50 font-medium hover:border-primary/40 hover:bg-primary/5 transition-all"
-                      >
-                        Move Quick Access here
-                      </button>
-                    )}
                     {quickAccessPos === "below-todo" && (
                       <div onClick={(e) => e.stopPropagation()}>
                         <QuickAccessStrip
@@ -925,6 +948,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
                           onNavigate={onNavigate}
                           isWiggling={wiggleMode}
                           onLongPress={() => setWiggleMode(true)}
+                          onDragReposition={(dir) => { if (dir === "up") saveQuickAccessPos("above-scheduled"); }}
                         />
                       </div>
                     )}
@@ -939,6 +963,8 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
               case "sobriety":
               
               case "shopping":
+                return null;
+
               case "study":
                 return null;
 

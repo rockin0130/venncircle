@@ -635,6 +635,109 @@ export type Database = {
           },
         ]
       }
+      group_challenge_progress: {
+        Row: {
+          challenge_id: string
+          completed_count: number
+          created_at: string
+          id: string
+          target_count: number
+          updated_at: string
+          user_id: string
+          week_number: number
+        }
+        Insert: {
+          challenge_id: string
+          completed_count?: number
+          created_at?: string
+          id?: string
+          target_count?: number
+          updated_at?: string
+          user_id: string
+          week_number?: number
+        }
+        Update: {
+          challenge_id?: string
+          completed_count?: number
+          created_at?: string
+          id?: string
+          target_count?: number
+          updated_at?: string
+          user_id?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_challenge_progress_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "group_challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_challenges: {
+        Row: {
+          challenge_type: string
+          created_at: string
+          created_by: string
+          description: string
+          difficulty: string
+          duration_weeks: number
+          ends_at: string
+          goal_description: string
+          group_id: string
+          id: string
+          partner_reward: string | null
+          started_at: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          challenge_type?: string
+          created_at?: string
+          created_by: string
+          description?: string
+          difficulty?: string
+          duration_weeks?: number
+          ends_at: string
+          goal_description?: string
+          group_id: string
+          id?: string
+          partner_reward?: string | null
+          started_at?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          challenge_type?: string
+          created_at?: string
+          created_by?: string
+          description?: string
+          difficulty?: string
+          duration_weeks?: number
+          ends_at?: string
+          goal_description?: string
+          group_id?: string
+          id?: string
+          partner_reward?: string | null
+          started_at?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_challenges_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_feed_comments: {
         Row: {
           content: string
@@ -1172,6 +1275,33 @@ export type Database = {
           },
         ]
       }
+      onboarding_preferences: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          preferences: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          preferences?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          preferences?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1182,7 +1312,12 @@ export type Database = {
           home_quick_access_position: string | null
           id: string
           invite_code: string | null
+          join_type: string | null
+          onboarding_completed: boolean | null
           partner_id: string | null
+          referral_code: string | null
+          referred_by: string | null
+          selected_interests: string[] | null
           timezone: string | null
           updated_at: string
           username: string | null
@@ -1196,7 +1331,12 @@ export type Database = {
           home_quick_access_position?: string | null
           id: string
           invite_code?: string | null
+          join_type?: string | null
+          onboarding_completed?: boolean | null
           partner_id?: string | null
+          referral_code?: string | null
+          referred_by?: string | null
+          selected_interests?: string[] | null
           timezone?: string | null
           updated_at?: string
           username?: string | null
@@ -1210,7 +1350,12 @@ export type Database = {
           home_quick_access_position?: string | null
           id?: string
           invite_code?: string | null
+          join_type?: string | null
+          onboarding_completed?: boolean | null
           partner_id?: string | null
+          referral_code?: string | null
+          referred_by?: string | null
+          selected_interests?: string[] | null
           timezone?: string | null
           updated_at?: string
           username?: string | null
@@ -1224,6 +1369,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      referrals: {
+        Row: {
+          created_at: string | null
+          id: string
+          premium_granted: boolean | null
+          referred_id: string
+          referrer_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          premium_granted?: boolean | null
+          referred_id: string
+          referrer_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          premium_granted?: boolean | null
+          referred_id?: string
+          referrer_id?: string
+        }
+        Relationships: []
       }
       shopping_list_items: {
         Row: {
@@ -1523,6 +1692,7 @@ export type Database = {
           hidden_from_partner: boolean
           id: string
           prior_notice_days: number
+          priority: string
           scheduled_day: number | null
           scheduled_month: number | null
           scheduled_year: number | null
@@ -1545,6 +1715,7 @@ export type Database = {
           hidden_from_partner?: boolean
           id?: string
           prior_notice_days?: number
+          priority?: string
           scheduled_day?: number | null
           scheduled_month?: number | null
           scheduled_year?: number | null
@@ -1567,6 +1738,7 @@ export type Database = {
           hidden_from_partner?: boolean
           id?: string
           prior_notice_days?: number
+          priority?: string
           scheduled_day?: number | null
           scheduled_month?: number | null
           scheduled_year?: number | null
@@ -1838,6 +2010,10 @@ export type Database = {
           invite_code: string
         }[]
       }
+      set_member_role: {
+        Args: { _group_id: string; _new_role: string; _target_user_id: string }
+        Returns: Json
+      }
       toggle_event_completion: {
         Args: { _completed: boolean; _event_id: string }
         Returns: {
@@ -1890,6 +2066,7 @@ export type Database = {
           hidden_from_partner: boolean
           id: string
           prior_notice_days: number
+          priority: string
           scheduled_day: number | null
           scheduled_month: number | null
           scheduled_year: number | null

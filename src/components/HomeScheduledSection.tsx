@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight, Droplets } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight, Droplets, Dumbbell } from "lucide-react";
+import { useAuth, GroupMember } from "@/context/AuthContext";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
 import { formatTime } from "@/lib/formatTime";
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { normalizeCalendarAssignees, getAssignedAvatarMembers, getAvatarPalette } from "@/lib/calendarAssignees";
+import { MEMBER_COLORS, type FilterUser } from "@/components/CalendarUserFilter";
 
 type UnifiedScheduledItem = {
   id: string;
@@ -215,8 +217,39 @@ const HomeScheduledSection = ({
   isViewingMemberName,
   showWater = false,
 }: Props) => {
-  const { groups, activeGroup, user } = useAuth();
-  const { filteredHabits, toggleHabit, getHabitStreak } = useAppContext();
+  const { groups, activeGroup, user, profile } = useAuth();
+  const { filteredHabits, toggleHabit, getHabitStreak, getWorkoutsForDate } = useAppContext();
+
+  // Build a unified FilterUser list from all groups (same approach as Calendar's useCalendarFilterUsers in "All" mode)
+  const allFilterUsers = useMemo<FilterUser[]>(() => {
+    const users: FilterUser[] = [];
+    users.push({
+      id: user?.id || "me",
+      label: "Me",
+      avatarUrl: profile?.avatar_url || null,
+      initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?",
+      colorIndex: 0,
+    });
+    let colorIdx = 1;
+    const seen = new Set<string>();
+    seen.add(user?.id || "");
+    groups.forEach((g) => {
+      g.members
+        .filter((m: GroupMember) => m.status === "active" && !seen.has(m.user_id))
+        .forEach((m) => {
+          seen.add(m.user_id);
+          const name = m.display_name || "Member";
+          users.push({
+            id: m.user_id,
+            label: name.split(" ")[0],
+            avatarUrl: m.avatar_url,
+            initial: name.charAt(0).toUpperCase(),
+            colorIndex: colorIdx++ % MEMBER_COLORS.length,
+          });
+        });
+    });
+    return users;
+  }, [user, profile, groups]);
   const dateStr = selectedDate ? fmtDateStr(selectedDate) : fmtDateStr(new Date());
   const isTodayForHabits = dateStr === fmtDateStr(new Date());
   const [nowMinutes, setNowMinutes] = useState(() => {
@@ -300,17 +333,23 @@ const HomeScheduledSection = ({
     return map;
   }, [filteredHabits, enabledHabitCategories]);
 
-  // Ensure flexible always appears if water is enabled
+  // Workouts scheduled for the viewed date (owned by logged-in user)
+  const scheduledWorkouts = useMemo(() => {
+    if (!user) return [];
+    return getWorkoutsForDate(dateStr).filter(w => w.ownerUserId === user.id || (!w.ownerUserId));
+  }, [getWorkoutsForDate, dateStr, user]);
+
+  // Ensure flexible always appears if water is enabled or workouts exist
   const activePeriods = (["morning", "afternoon", "evening", "flexible"] as Period[]).filter(
-    p => periodMap[p].length > 0 || habitsByPeriod[p].length > 0 || (p === "flexible" && showWater)
+    p => periodMap[p].length > 0 || habitsByPeriod[p].length > 0 || (p === "flexible" && (showWater || scheduledWorkouts.length > 0))
   );
 
   // Progress (include habits in count)
   const allPeriodHabits = useMemo(() => {
     return Object.values(habitsByPeriod).flat();
   }, [habitsByPeriod]);
-  const totalItems = unifiedItems.length + allPeriodHabits.length;
-  const doneItems = unifiedItems.filter(i => i.done).length + allPeriodHabits.filter(h => h.completionDates.includes(dateStr)).length;
+  const totalItems = unifiedItems.length + allPeriodHabits.length + scheduledWorkouts.length;
+  const doneItems = unifiedItems.filter(i => i.done).length + allPeriodHabits.filter(h => h.completionDates.includes(dateStr)).length + scheduledWorkouts.filter(w => w.done).length;
   const progressPercent = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
 
   // NOW item: the item whose time window contains current time
@@ -328,14 +367,31 @@ const HomeScheduledSection = ({
   const getContextTag = useCallback((item: UnifiedScheduledItem) => {
     if (item.groupId) {
       const group = groups.find(g => g.id === item.groupId);
-      if (group) {
-        // Family groups use green
-        const isFamily = group.name.toLowerCase() === "family" || group.category === "home";
-        if (isFamily) return { label: group.name, bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-300" };
-        return { label: group.name, bg: "bg-violet-100 dark:bg-violet-900/30", text: "text-violet-700 dark:text-violet-300" };
-      }
+      if (group) return { label: group.name, coverUrl: (group as any).cover_image_url || null, group };
     }
-    return { label: "Mine", bg: "bg-sky-100 dark:bg-sky-900/30", text: "text-sky-700 dark:text-sky-300" };
+    return null;
+  }, [groups]);
+
+  const GROUP_PILL_COLORS = ["#93C5FD", "#86EFAC", "#C4B5FD", "#FCD34D", "#FCA5A5", "#67E8F9", "#A7F3D0", "#FDBA74"];
+
+  const renderGroupPill = useCallback((tag: { label: string; coverUrl: string | null; group: any }) => {
+    const groupIndex = groups.findIndex(g => g.id === tag.group.id);
+    const color = GROUP_PILL_COLORS[groupIndex >= 0 ? groupIndex % GROUP_PILL_COLORS.length : 0];
+    return (
+      <span
+        className="inline-flex items-center gap-1"
+        style={{ fontSize: 10, fontWeight: 500, padding: "2px 8px 2px 3px", borderRadius: 99, background: "#fff", border: "0.5px solid rgba(0,0,0,0.08)" }}
+      >
+        {tag.coverUrl ? (
+          <img src={tag.coverUrl} className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
+        ) : (
+          <span className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-bold text-white flex-shrink-0" style={{ background: color }}>
+            {tag.label[0]}
+          </span>
+        )}
+        <span className="truncate max-w-[60px]">{tag.label}</span>
+      </span>
+    );
   }, [groups]);
 
   // Toggle handler
@@ -347,14 +403,28 @@ const HomeScheduledSection = ({
     else onToggleGcal(item.id);
   };
 
-  // Avatar initials for shared items
-  const getAvatarInitials = (item: UnifiedScheduledItem): string[] => {
-    if (item.assignee === "both") {
-      const myInit = user?.email?.charAt(0)?.toUpperCase() || "M";
-      return [myInit, "P"];
-    }
-    return [];
-  };
+  // Get avatar members for shared items using the same logic as Calendar
+  const getItemAvatarMembers = useCallback((item: UnifiedScheduledItem) => {
+    const assigneeValue = (item.assignee || "me") as "me" | "partner" | "both";
+    const assignedIds = normalizeCalendarAssignees({
+      item: {
+        assignee: assigneeValue,
+        groupId: item.groupId,
+        type: item.kind === "gcal" ? "gcal" : "event",
+        raw: { ...item.raw, ownerUserId: item.ownerUserId, user_id: item.ownerUserId },
+      },
+      currentUserId: user?.id || "",
+      groups,
+    });
+    if (assignedIds.length <= 1) return [];
+    return getAssignedAvatarMembers({
+      assignedUserIds: assignedIds,
+      filterUsers: allFilterUsers,
+      currentUserId: user?.id || "",
+      currentUserInitial: profile?.display_name?.charAt(0)?.toUpperCase() || "?",
+      currentUserAvatarUrl: profile?.avatar_url,
+    });
+  }, [user, groups, allFilterUsers, profile]);
 
   // Empty state
   if (totalItems === 0) {
@@ -412,11 +482,7 @@ const HomeScheduledSection = ({
                   className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-border bg-card text-xs font-medium"
                 >
                   <span className="truncate max-w-[140px]">{item.title}</span>
-                  {tag.label !== "Mine" && (
-                    <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full", tag.bg, tag.text)}>
-                      {tag.label}
-                    </span>
-                  )}
+                  {tag && renderGroupPill(tag)}
                 </div>
               );
             })}
@@ -430,7 +496,7 @@ const HomeScheduledSection = ({
           const items = periodMap[period];
           const periodHabits = habitsByPeriod[period];
           const config = PERIOD_CONFIG[period];
-          const totalCount = items.length + periodHabits.length + (period === "flexible" && showWater ? 1 : 0);
+          const totalCount = items.length + periodHabits.length + (period === "flexible" ? (showWater ? 1 : 0) + scheduledWorkouts.length : 0);
           return (
             <div key={period}>
               {/* Period separator */}
@@ -446,51 +512,120 @@ const HomeScheduledSection = ({
                 <InlineWaterWidget selectedDate={selectedDate} isToday={isToday} />
               )}
 
-              {/* Habits card at top of period */}
+              {/* Habits inline row */}
               {periodHabits.length > 0 && (
-                <div className="rounded-xl border border-border bg-card p-3 mb-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2 block">Habits</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(() => {
-                      const incomplete = periodHabits.filter((h) => !h.completionDates.includes(dateStr));
-                      const complete = periodHabits.filter((h) => h.completionDates.includes(dateStr));
-                      return [...incomplete, ...complete].map((habit) => {
-                        const doneForDate = habit.completionDates.includes(dateStr);
-                        return (
-                          <button
-                            key={habit.id}
-                            onClick={() => isTodayForHabits && !isViewingPartner && toggleHabit(habit.id)}
-                            disabled={!isTodayForHabits || isViewingPartner}
-                            className={cn(
-                              "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors active:scale-[0.97]",
-                              doneForDate
-                                ? "border-border bg-secondary/50 opacity-45"
-                                : "border-border bg-secondary/30 text-foreground",
-                              (!isTodayForHabits || isViewingPartner) && "opacity-80"
-                            )}
-                          >
-                            {doneForDate ? (
-                              <span className="w-3.5 h-3.5 rounded-full bg-habit-green flex items-center justify-center flex-shrink-0">
-                                <Check size={9} className="text-primary-foreground" />
-                              </span>
-                            ) : (
-                              <span className="w-3.5 h-3.5 rounded-full border-[1.5px] border-muted flex-shrink-0" />
-                            )}
-                            <span className={cn(doneForDate && "line-through")}>{habit.label}</span>
-                          </button>
-                        );
-                      });
-                    })()}
+                <div className="rounded-xl bg-card border border-border mb-2" style={{ padding: "8px 12px", borderRadius: 12, borderWidth: "0.5px", borderColor: "rgba(0,0,0,0.07)" }}>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-[10px] font-medium uppercase text-[#aaa] flex-shrink-0 tracking-wide">Habits</span>
+                    <div className="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
+                      <div className="flex gap-1.5 w-max">
+                        {(() => {
+                          const incomplete = periodHabits.filter((h) => !h.completionDates.includes(dateStr));
+                          const complete = periodHabits.filter((h) => h.completionDates.includes(dateStr));
+                          return [...incomplete, ...complete].map((habit) => {
+                            const doneForDate = habit.completionDates.includes(dateStr);
+                            return (
+                              <button
+                                key={habit.id}
+                                onClick={() => isTodayForHabits && !isViewingPartner && toggleHabit(habit.id)}
+                                disabled={!isTodayForHabits || isViewingPartner}
+                                className={cn(
+                                  "flex items-center gap-1.5 rounded-full border text-[12px] font-medium transition-colors active:scale-[0.97] flex-shrink-0",
+                                  doneForDate
+                                    ? "border-border bg-secondary/50 opacity-45"
+                                    : "border-border bg-secondary/30 text-foreground",
+                                  (!isTodayForHabits || isViewingPartner) && "opacity-80"
+                                )}
+                                style={{ padding: "5px 12px" }}
+                              >
+                                {doneForDate ? (
+                                  <span className="rounded-full bg-habit-green flex items-center justify-center flex-shrink-0" style={{ width: 18, height: 18 }}>
+                                    <Check size={11} className="text-primary-foreground" />
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full border-[1.5px] border-muted flex-shrink-0" style={{ width: 18, height: 18 }} />
+                                )}
+                                <span className={cn(doneForDate && "line-through")}>{habit.label}</span>
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
+              {/* Scheduled workouts in Flexible */}
+              {period === "flexible" && scheduledWorkouts.length > 0 && (
+                <div className="space-y-2 mb-2">
+                  {scheduledWorkouts.map(workout => {
+                    const workoutGroup = workout.groupId ? groups.find(g => g.id === workout.groupId) : null;
+                    const workoutContextTag = workoutGroup
+                      ? { label: workoutGroup.name, coverUrl: (workoutGroup as any).cover_image_url || null, group: workoutGroup }
+                      : null;
+                    return (
+                      <button
+                        key={workout.id}
+                        onClick={() => onNavigate?.("workout")}
+                        className={cn(
+                          "w-full text-left rounded-xl bg-card border active:scale-[0.99] transition-all",
+                          workout.done && "opacity-45"
+                        )}
+                        style={{ padding: "10px 12px", borderRadius: 12, borderWidth: "0.5px", borderColor: "rgba(0,0,0,0.07)" }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Dumbbell size={16} className={cn("flex-shrink-0", workout.done ? "text-muted-foreground" : "text-primary")} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              {workout.done && <Check size={14} className="text-habit-green flex-shrink-0" />}
+                              <p className={cn("text-[15px] font-medium leading-tight truncate", workout.done && "line-through text-muted-foreground")}>
+                                {workout.emoji} {workout.title}
+                              </p>
+                            </div>
+                            {workout.scheduledDate && !workout.done && (
+                              <span className="text-[11px] text-muted-foreground font-medium mt-0.5 block">Planned</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {workoutContextTag ? (
+                              renderGroupPill(workoutContextTag)
+                            ) : (
+                              <span
+                                className="inline-flex items-center gap-1"
+                                style={{ fontSize: 10, fontWeight: 500, padding: "2px 8px 2px 3px", borderRadius: 99, background: "#fff", border: "0.5px solid rgba(0,0,0,0.08)" }}
+                              >
+                                {profile?.avatar_url ? (
+                                  <img src={profile.avatar_url} className="w-3 h-3 rounded-full object-cover flex-shrink-0" />
+                                ) : (
+                                  <span
+                                    className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white flex-shrink-0"
+                                    style={{ background: MEMBER_COLORS[0].dot }}
+                                  >
+                                    {profile?.display_name?.[0]?.toUpperCase() || "?"}
+                                  </span>
+                                )}
+                                <span className="truncate max-w-[40px]">Mine</span>
+                              </span>
+                            )}
+                            {workout.tag && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                                {workout.tag}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               {/* Cards */}
               <div className="space-y-2">
                 {items.map(item => {
                   const isNow = nowItemId === item.id;
                   const tag = getContextTag(item);
-                  const avatars = getAvatarInitials(item);
+                  const avatarMembers = getItemAvatarMembers(item);
                   const timeDisplay = formatTimeRange(item);
 
                   return (
@@ -513,19 +648,6 @@ const HomeScheduledSection = ({
                       style={!item.done && !isNow && item.kind === "task" ? undefined : undefined}
                     >
                       <div className="flex items-center gap-3">
-                        {/* Completion circle */}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleToggle(item); }}
-                          disabled={isViewingPartner}
-                          className={cn(
-                            "w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors",
-                            item.done ? "bg-habit-green border-habit-green" : "border-muted hover:border-primary",
-                            isViewingPartner && "opacity-60"
-                          )}
-                        >
-                          {item.done && <Check size={14} className="text-primary-foreground" />}
-                        </button>
-
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <p className={cn(
@@ -547,9 +669,7 @@ const HomeScheduledSection = ({
                               </span>
                             )}
                             {/* Context tag */}
-                            <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full", tag.bg, tag.text)}>
-                              {tag.label}
-                            </span>
+                            {tag && renderGroupPill(tag)}
                             {item.kind === "gcal" && (
                               <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">Google</span>
                             )}
@@ -557,19 +677,38 @@ const HomeScheduledSection = ({
                         </div>
 
                         {/* Avatars for shared items */}
-                        {avatars.length > 0 && (
+                        {avatarMembers.length > 0 && (
                           <div className="flex -space-x-1.5 flex-shrink-0">
-                            {avatars.map((init, i) => (
-                              <div
-                                key={i}
-                                className={cn(
-                                  "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-primary-foreground ring-2 ring-card",
-                                  i === 0 ? "bg-user-a" : "bg-user-b"
-                                )}
-                              >
-                                {init}
-                              </div>
-                            ))}
+                            {avatarMembers.map((member) => {
+                              const palette = getAvatarPalette(member.colorIndex);
+                              return member.avatarUrl ? (
+                                <img
+                                  key={member.id}
+                                  src={member.avatarUrl}
+                                  alt={member.initial}
+                                  className="w-6 h-6 rounded-full object-cover ring-2 ring-card"
+                                  onError={(e) => {
+                                    const span = document.createElement("span");
+                                    span.className = "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold leading-none ring-2 ring-card";
+                                    span.style.backgroundColor = palette.avatarBackground;
+                                    span.style.color = palette.avatarText;
+                                    span.textContent = member.initial;
+                                    (e.target as HTMLElement).replaceWith(span);
+                                  }}
+                                />
+                              ) : (
+                                <span
+                                  key={member.id}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold leading-none ring-2 ring-card"
+                                  style={{
+                                    backgroundColor: palette.avatarBackground,
+                                    color: palette.avatarText,
+                                  }}
+                                >
+                                  {member.initial}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

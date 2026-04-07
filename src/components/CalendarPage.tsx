@@ -59,8 +59,9 @@ function getGroupColorIndex(groupId: string | null | undefined, groups: Group[])
   return idx >= 0 ? idx % GROUP_COLOR_CLASSES.length : 0;
 }
 
-type ViewMode = "month" | "list" | "day" | "3day" | "week";
-const VIEW_LABELS: Record<ViewMode, string> = { month: "M", list: "List", day: "D", "3day": "3D", week: "W" };
+type ViewMode = "month" | "list" | "week";
+const VIEW_LABELS: Record<ViewMode, string> = { month: "Month", list: "List", week: "Week" };
+const DAYS_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -233,7 +234,10 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   const { user, activeGroup, setActiveGroup, groups } = useAuth();
   const { showGoogleCalendar } = useGroupContext();
 
-  // "Mine" is now the default via AuthContext initial state
+  // Always default to "Mine" on Calendar page mount
+  useEffect(() => {
+    setActiveGroup({ _personal: true, id: "__personal__", name: "Mine", type: "personal", emoji: "👤", invite_code: "", created_by: "", shared_pages: [], members: [] } as any);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isPrivateMode = !!(activeGroup as any)?._personal;
 
@@ -733,7 +737,16 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
 
   // ── Month grid: up to 3 dots per day (distinct calendar / source), calendar colors
   const monthDots = useMemo(() => {
+<<<<<<< HEAD
     const dotsByDay = new Map<number, { key: string; color: string }[]>();
+=======
+    const dots = new Map<number, { id: string; color: string }[]>();
+    const currentUserId = user?.id || "";
+    const isEveryone = userFilterIds.has(EVERYONE_SENTINEL);
+    const hasFilterUsers = calFilterUsers.length > 0;
+    // Default dot color for current user when calFilterUsers is empty (Personal/All mode)
+    const defaultDotColor = MEMBER_COLORS[0].dot;
+>>>>>>> origin/main
 
     for (let d = 1; d <= daysInMonth; d++) {
       const items = getItemsForDate(d, month, year);
@@ -749,7 +762,52 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
         row.push({ key, color });
       }
 
+<<<<<<< HEAD
       if (row.length > 0) dotsByDay.set(d, row.slice(0, 3));
+=======
+        if (it.assignee === "me") ownerIds.add(ownerId);
+        else if (it.assignee === "partner") {
+          if (it.groupId) {
+            const grp = groups.find(g => g.id === it.groupId);
+            grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+              .forEach((m: any) => ownerIds.add(m.user_id));
+          }
+        } else if (it.assignee === "both") {
+          ownerIds.add(ownerId);
+          if (it.groupId) {
+            const grp = groups.find(g => g.id === it.groupId);
+            grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+              .forEach((m: any) => ownerIds.add(m.user_id));
+          }
+        } else {
+          ownerIds.add(ownerId);
+        }
+        if (it.type === "gcal") ownerIds.add(currentUserId);
+
+        ownerIds.forEach(uid => {
+          if (seenUsers.has(uid)) return;
+          if (!isEveryone && !userFilterIds.has(uid)) return;
+
+          if (hasFilterUsers) {
+            const fu = calFilterUsers.find(u => u.id === uid);
+            if (!fu) return;
+            seenUsers.add(uid);
+            const memberColor = MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length];
+            dotColors.push({ id: uid, color: memberColor.dot });
+          } else {
+            // Personal/All mode — no filter users available, show dot for current user
+            if (uid === currentUserId || ownerId === currentUserId) {
+              if (!seenUsers.has(currentUserId)) {
+                seenUsers.add(currentUserId);
+                dotColors.push({ id: currentUserId, color: defaultDotColor });
+              }
+            }
+          }
+        });
+      });
+
+      if (dotColors.length > 0) dots.set(d, dotColors.slice(0, 3));
+>>>>>>> origin/main
     }
     return dotsByDay;
   }, [daysInMonth, month, year, getItemsForDate, groups, calendarColorMap]);
@@ -820,31 +878,10 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
 
   // Scroll time grid to 8am
   useEffect(() => {
-    if ((viewMode === "day" || viewMode === "3day") && timeGridRef.current) {
+    if (viewMode === "week" && timeGridRef.current) {
       timeGridRef.current.scrollTop = 8 * 60;
     }
   }, [viewMode]);
-
-  // ── Day/3-Day swipe handlers ──────────────────────────
-
-  const handleDaySwipe = useCallback((_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (Math.abs(info.offset.x) > 50) {
-      setSelectedDate((prev) => addDays(prev, info.offset.x > 0 ? -1 : 1));
-    }
-  }, []);
-
-  const handleThreeDaySwipe = useCallback((_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (Math.abs(info.offset.x) > 50) {
-      setSelectedDate((prev) => addDays(prev, info.offset.x > 0 ? -3 : 3));
-    }
-  }, []);
-
-  // Sync currentDate when selectedDate changes (for day/3day views)
-  useEffect(() => {
-    if (viewMode === "day" || viewMode === "3day") {
-      setCurrentDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
-    }
-  }, [selectedDate, viewMode]);
 
   // ── Month swipe for month view ────────────────────────
 
@@ -952,24 +989,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   const getGroupName = (groupId: string | null | undefined) =>
     groupId ? groups.find((g) => g.id === groupId) : null;
 
-  // ── 3-day dates ───────────────────────────────────────
 
-  const threeDayDates = useMemo(() => {
-    const d = new Date(selYear, selMonth, selDay);
-    return [d, addDays(d, 1), addDays(d, 2)];
-  }, [selDay, selMonth, selYear]);
-
-  // ── Date strip for Day/3-Day views ────────────────────
-
-  const dateStripDates = useMemo(() => {
-    // Show a 7-day strip centered around selected date
-    const dates: Date[] = [];
-    const center = new Date(selYear, selMonth, selDay);
-    for (let i = -3; i <= 3; i++) {
-      dates.push(addDays(center, i));
-    }
-    return dates;
-  }, [selDay, selMonth, selYear]);
 
   // ── List view: generate dates for continuous scroll ───
 
@@ -1037,11 +1057,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
       <header className="pt-10 pb-2">
         <div className="flex items-center justify-between">
           {/* Left: Month Year */}
-          {viewMode === "list" ? (
-            <button onClick={goToday} className="flex items-center gap-2 hover:bg-secondary rounded-lg px-2 py-1 transition-colors">
-              <h1 className="text-xl font-bold text-foreground">{listVisibleMonth}</h1>
-            </button>
-          ) : viewMode === "day" || viewMode === "3day" ? (
+          {viewMode === "week" ? (
             <Popover>
               <PopoverTrigger asChild>
                 <button className="flex items-center gap-2 hover:bg-secondary rounded-lg px-2 py-1 transition-colors">
@@ -1097,18 +1113,18 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
           <div className="flex items-center gap-1.5">
             {/* D / W / M pill toggle */}
             <div className="flex bg-secondary rounded-full p-0.5">
-              {(["day", "3day", "month"] as ViewMode[]).map((mode) => (
+              {(["week", "month"] as ViewMode[]).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
                   className={cn(
-                    "px-2 py-0.5 text-[10px] font-semibold rounded-full transition-all",
+                    "px-3 py-0.5 text-[10px] font-semibold rounded-full transition-all",
                     viewMode === mode
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  {mode === "day" ? "D" : mode === "3day" ? "W" : "M"}
+                  {VIEW_LABELS[mode]}
                 </button>
               ))}
             </div>
@@ -1135,7 +1151,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
         </div>
       </header>
 
-      <PageGroupSelector page="calendar" personalLabel="Mine" personalEmoji="👤" hideAllPill />
+      <PageGroupSelector page="calendar" personalLabel="Mine" personalEmoji="👤" hideAllPill showAvatars />
       <CalendarUserFilter
         selectedUserIds={userFilterIds}
         onSelectionChange={setUserFilterIds}
@@ -1206,6 +1222,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
                     >
                       {day}
                     </span>
+<<<<<<< HEAD
                     {dots && dots.length > 0 && !isSelected && (
                       <div
                         className="flex gap-[3px] justify-center items-center shrink-0 mt-0.5"
@@ -1217,6 +1234,13 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
                             className="w-[6px] h-[6px] rounded-full shrink-0"
                             style={{ backgroundColor: dot.color }}
                           />
+=======
+                    {dots && (
+                      <div className="flex gap-[2px] absolute bottom-0">
+                        {dots.slice(0, 3).map((dot, idx) => (
+                            <span key={idx} className="rounded-full"
+                              style={{ width: 5, height: 5, backgroundColor: dot.color }} />
+>>>>>>> origin/main
                         ))}
                       </div>
                     )}
@@ -1312,66 +1336,20 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
         </div>
       )}
 
-      {/* ── DAY VIEW (with date strip + swipe) ──────────── */}
-      {viewMode === "day" && (
-        <div>
-          {/* Date strip */}
-          <DateStrip
-            dates={dateStripDates}
-            selectedDate={selectedDate}
-            onSelectDate={(d) => setSelectedDate(d)}
-          />
-          {/* Swipeable time grid */}
-          <motion.div
-            key={getLocalDateKey(selectedDate)}
-            onPanEnd={handleDaySwipe}
-            style={{ touchAction: "pan-y" }}
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <TimeGridView
-              dates={[selectedDate]}
-              getItemsForDate={getItemsForDate}
-              groups={groups}
-              timeGridRef={timeGridRef}
-              onItemTap={handleItemTap}
-              hideColumnHeaders
-              colorMap={calendarColorMap}
-            />
-          </motion.div>
-        </div>
-      )}
-
-      {/* ── 3-DAY VIEW (with date strip + swipe 3 days) ── */}
-      {viewMode === "3day" && (
-        <div>
-          {/* Date strip for 3-day */}
-          <DateStrip
-            dates={dateStripDates}
-            selectedDate={selectedDate}
-            onSelectDate={(d) => setSelectedDate(d)}
-            rangeLength={3}
-          />
-          {/* Swipeable time grid */}
-          <motion.div
-            key={getLocalDateKey(selectedDate)}
-            onPanEnd={handleThreeDaySwipe}
-            style={{ touchAction: "pan-y" }}
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <TimeGridView
-              dates={threeDayDates}
-              getItemsForDate={getItemsForDate}
-              groups={groups}
-              timeGridRef={timeGridRef}
-              onItemTap={handleItemTap}
-              colorMap={calendarColorMap}
-            />
-          </motion.div>
-        </div>
+      {/* ── WEEK VIEW (new 5-day layout) ──────────────── */}
+      {viewMode === "week" && (
+        <WeekView
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          getItemsForDate={getItemsForDate}
+          groups={groups}
+          timeGridRef={timeGridRef}
+          onItemTap={handleItemTap}
+          colorMap={calendarColorMap}
+          filterUsers={calFilterUsers}
+          userFilterIds={userFilterIds}
+          currentUserId={user?.id || ""}
+        />
       )}
 
       {/* ── Search Modal ────────────────────────────────── */}
@@ -1579,11 +1557,12 @@ function getAvatarColor(userId: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName }: {
+const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName, currentUserAvatarUrl }: {
   item: CalItem;
   groups: Group[];
   currentUserId: string;
   currentUserName: string;
+  currentUserAvatarUrl?: string | null;
 }) => {
   const assignee = item.assignee;
   const groupId = item.groupId;
@@ -1591,27 +1570,27 @@ const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName }: {
   const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
 
   // Build list of assigned members
-  const members: { id: string; initial: string }[] = [];
+  const members: { id: string; initial: string; avatarUrl?: string | null }[] = [];
+
+  const getMemberInfo = (userId: string) => {
+    if (userId === currentUserId) {
+      return { id: currentUserId, initial: currentUserName.charAt(0).toUpperCase() || "?", avatarUrl: currentUserAvatarUrl || null };
+    }
+    const grp = groupId ? groups.find(g => g.id === groupId) : null;
+    const member = grp?.members?.find((m: any) => m.user_id === userId);
+    return { id: userId, initial: (member?.display_name || "?").charAt(0).toUpperCase(), avatarUrl: member?.avatar_url || null };
+  };
 
   if (assignee === "me") {
-    // Only the owner
-    if (ownerId === currentUserId) {
-      members.push({ id: currentUserId, initial: currentUserName.charAt(0).toUpperCase() || "?" });
-    } else {
-      // Find owner name from group
-      const grp = groupId ? groups.find(g => g.id === groupId) : null;
-      const member = grp?.members?.find((m: any) => m.user_id === ownerId);
-      members.push({ id: ownerId, initial: (member?.display_name || "?").charAt(0).toUpperCase() });
-    }
+    members.push(getMemberInfo(ownerId));
   } else if (assignee === "partner") {
-    // Only the other members (not the owner)
     if (groupId) {
       const grp = groups.find(g => g.id === groupId);
       if (grp) {
         grp.members
           .filter((m: any) => m.user_id !== ownerId && m.status === "active")
           .forEach((m: any) => {
-            members.push({ id: m.user_id, initial: (m.display_name || "?").charAt(0).toUpperCase() });
+            members.push(getMemberInfo(m.user_id));
           });
       }
     }
@@ -1619,21 +1598,16 @@ const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName }: {
       members.push({ id: "partner", initial: "P" });
     }
   } else if (assignee === "both") {
-    // Owner + all other members
-    members.push({ id: currentUserId === ownerId ? currentUserId : ownerId, initial: (currentUserId === ownerId ? currentUserName : "?").charAt(0).toUpperCase() || "?" });
+    members.push(getMemberInfo(ownerId));
     if (groupId) {
       const grp = groups.find(g => g.id === groupId);
       if (grp) {
         grp.members
           .filter((m: any) => m.user_id !== ownerId && m.status === "active")
           .forEach((m: any) => {
-            members.push({ id: m.user_id, initial: (m.display_name || "?").charAt(0).toUpperCase() });
+            members.push(getMemberInfo(m.user_id));
           });
       }
-    }
-    // If owner is current user, fix initial
-    if (ownerId === currentUserId && members.length > 0) {
-      members[0].initial = currentUserName.charAt(0).toUpperCase() || "?";
     }
   }
 
@@ -1642,12 +1616,27 @@ const AssigneeAvatars = ({ item, groups, currentUserId, currentUserName }: {
   return (
     <div className="flex -space-x-1.5 flex-shrink-0">
       {members.map((m) => (
-        <div
-          key={m.id}
-          className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white ring-1 ring-card ${getAvatarColor(m.id)}`}
-        >
-          {m.initial}
-        </div>
+        m.avatarUrl ? (
+          <img
+            key={m.id}
+            src={m.avatarUrl}
+            alt={m.initial}
+            className="w-5 h-5 rounded-full object-cover ring-1 ring-card"
+            onError={(e) => {
+              const div = document.createElement("div");
+              div.className = `w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white ring-1 ring-card ${getAvatarColor(m.id)}`;
+              div.textContent = m.initial;
+              (e.target as HTMLElement).replaceWith(div);
+            }}
+          />
+        ) : (
+          <div
+            key={m.id}
+            className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white ring-1 ring-card ${getAvatarColor(m.id)}`}
+          >
+            {m.initial}
+          </div>
+        )
       ))}
     </div>
   );
@@ -1667,6 +1656,7 @@ const EventList = ({
   const { activeGroup, user, profile } = useAuth();
   const currentUserId = user?.id || "";
   const currentUserName = profile?.display_name || "";
+  const isPersonalOrAll = !activeGroup || (activeGroup as any)?._personal;
   const todoItems = items.filter((i) => i.isDueDateTask);
   const allDayItems = items.filter((i) => i.allDay && !i.isDueDateTask);
   const timedItems = items.filter((i) => !i.allDay);
@@ -1692,12 +1682,31 @@ const EventList = ({
     return resolveItemColor(item, groups, colorMap);
   };
 
+  // Group pill renderer for Mine/All views
+  const renderGroupPill = (group: any) => {
+    const coverUrl = group.cover_image_url;
+    const initial = (group.name || "G")[0].toUpperCase();
+    const color = GROUP_COLORS[groups.indexOf(group) % GROUP_COLORS.length] || GROUP_COLORS[0];
+    return (
+      <span className="inline-flex items-center gap-1 flex-shrink-0" style={{ fontSize: 10, fontWeight: 500, padding: "1px 6px", borderRadius: 99, background: "hsl(var(--secondary))", border: "0.5px solid hsl(var(--border))" }}>
+        {coverUrl ? (
+          <img src={coverUrl} className="w-3 h-3 rounded-full object-cover flex-shrink-0" alt="" />
+        ) : (
+          <span className="w-3 h-3 rounded-full flex items-center justify-center text-[6px] font-bold text-white flex-shrink-0" style={{ background: color }}>
+            {initial}
+          </span>
+        )}
+        <span className="truncate max-w-[60px]">{group.name}</span>
+      </span>
+    );
+  };
+
   return (
     <div className={compact ? "space-y-0.5" : "divide-y divide-border"}>
       {todoItems.length > 0 && (
         <div className="py-0.5">
           {todoItems.map((item) => {
-            const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
+            const group = isPersonalOrAll && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
             return (
               <button key={item.id} onClick={() => onItemTap?.(item)}
                 className="w-full flex items-center gap-2.5 py-1.5 px-1 text-left hover:bg-secondary/50 rounded-lg transition-colors active:bg-secondary">
@@ -1706,10 +1715,8 @@ const EventList = ({
                 <span className={`text-[13px] font-medium flex-1 truncate ${item.done ? "line-through opacity-40" : "text-foreground"}`}>
                   {item.title}
                 </span>
-                {group && (
-                  <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
-                )}
-                <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
+                {group && renderGroupPill(group)}
+                <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} currentUserAvatarUrl={profile?.avatar_url} />
               </button>
             );
           })}
@@ -1720,7 +1727,7 @@ const EventList = ({
         <div className="py-0.5">
           {allDayItems.map((item) => {
             const color = getPersonColor(item);
-            const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
+            const group = isPersonalOrAll && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
             return (
               <button key={item.id} onClick={() => onItemTap?.(item)}
                 className="w-full flex items-center gap-2.5 py-1.5 px-1 text-left hover:bg-secondary/50 rounded-lg transition-colors active:bg-secondary">
@@ -1733,10 +1740,8 @@ const EventList = ({
                 {item.isMultiDay && (
                   <span className="text-[10px] text-muted-foreground">multi-day</span>
                 )}
-                {group && (
-                  <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
-                )}
-                <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
+                {group && renderGroupPill(group)}
+                <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} currentUserAvatarUrl={profile?.avatar_url} />
               </button>
             );
           })}
@@ -1745,7 +1750,7 @@ const EventList = ({
 
       {timedItems.map((item) => {
         const color = getPersonColor(item);
-        const group = !activeGroup && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
+        const group = isPersonalOrAll && item.groupId ? groups.find((g) => g.id === item.groupId) : null;
         const displayTime = item.type === "gcal" && item.time
           ? new Date(item.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
           : formatTime(item.time);
@@ -1764,11 +1769,17 @@ const EventList = ({
                 {displayTime}{displayEndTime && displayEndTime !== displayTime ? ` – ${displayEndTime}` : ""}
               </span>
             </div>
+<<<<<<< HEAD
             {item.type === "gcal" && <GcalProviderBadge raw={item.raw as GoogleCalendarEvent} />}
             {group && (
               <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{group.emoji} {group.name}</span>
             )}
             <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} />
+=======
+            {item.type === "gcal" && <GoogleBadge />}
+            {group && renderGroupPill(group)}
+            <AssigneeAvatars item={item} groups={groups} currentUserId={currentUserId} currentUserName={currentUserName} currentUserAvatarUrl={profile?.avatar_url} />
+>>>>>>> origin/main
           </button>
         );
       })}
@@ -1942,6 +1953,447 @@ const TimeGridView = ({
                           </p>
                         )}
                       </div>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Week View (4-day sliding window) ─────────────────────
+const WEEK_TIME_COL = 38;
+const WEEK_VISIBLE_DAYS = 4;
+const WEEK_HOUR_HEIGHT = 60;
+
+// Specific light backgrounds and borders per member
+const MEMBER_CARD_STYLES: Record<string, { bg: string; border: string; text: string }> = {
+  "#3B82F6": { bg: "#EEF4FF", border: "#6C47FF", text: "#3730A3" },
+  "#6C47FF": { bg: "#EEF4FF", border: "#6C47FF", text: "#3730A3" },
+  "#10B981": { bg: "#F0FDF4", border: "#059669", text: "#065F46" },
+  "#059669": { bg: "#F0FDF4", border: "#059669", text: "#065F46" },
+  "#EC4899": { bg: "#FFF0F0", border: "#E05C5C", text: "#B91C1C" },
+  "#E05C5C": { bg: "#FFF0F0", border: "#E05C5C", text: "#B91C1C" },
+  "#F59E0B": { bg: "#FFF8E1", border: "#D97706", text: "#78350F" },
+  "#14B8A6": { bg: "#F0FDFA", border: "#0D9488", text: "#134E4A" },
+  "#F97316": { bg: "#FFF7ED", border: "#EA580C", text: "#7C2D12" },
+  "#8B5CF6": { bg: "#FAF5FF", border: "#6C47FF", text: "#3B0764" },
+};
+
+function getCardStyle(color: string): { bg: string; border: string; text: string } {
+  return MEMBER_CARD_STYLES[color] || { bg: color + "18", border: color, text: color };
+}
+
+const WeekView = ({
+  selectedDate, setSelectedDate, getItemsForDate, groups, timeGridRef, onItemTap, colorMap, filterUsers, userFilterIds, currentUserId,
+}: {
+  selectedDate: Date;
+  setSelectedDate: (d: Date | ((prev: Date) => Date)) => void;
+  getItemsForDate: (d: number, m: number, y: number) => CalItem[];
+  groups: Group[];
+  timeGridRef: React.RefObject<HTMLDivElement | null>;
+  onItemTap?: (item: CalItem) => void;
+  colorMap?: { byId: Map<string, string>; byProvider: Map<string, string>; defaultColor?: string | null };
+  filterUsers: FilterUser[];
+  userFilterIds: Set<string>;
+  currentUserId: string;
+}) => {
+  const { profile } = useAuth();
+  const todayRef = useRef(new Date());
+  const [windowStart, setWindowStart] = useState(0);
+  const [weekScrollbarWidth, setWeekScrollbarWidth] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const visibleDates = useMemo(() => {
+    const dates: Date[] = [];
+    for (let i = 0; i < WEEK_VISIBLE_DAYS; i++) {
+      dates.push(addDays(todayRef.current, windowStart + i));
+    }
+    return dates;
+  }, [windowStart]);
+
+  const dateItems = useMemo(() => {
+    return visibleDates.map((d) => ({
+      date: d,
+      items: getItemsForDate(d.getDate(), d.getMonth(), d.getFullYear()),
+      isToday: isSameDay(d, todayRef.current),
+    }));
+  }, [visibleDates, getItemsForDate]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      setWindowStart((prev) => deltaX < 0 ? prev + 1 : prev - 1);
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (timeGridRef.current) {
+      timeGridRef.current.scrollTop = 8 * WEEK_HOUR_HEIGHT;
+    }
+  }, []);
+
+  useEffect(() => {
+    const grid = timeGridRef.current;
+    if (!grid) return;
+
+    const updateScrollbarWidth = () => {
+      setWeekScrollbarWidth(Math.max(grid.offsetWidth - grid.clientWidth, 0));
+    };
+
+    updateScrollbarWidth();
+
+    const resizeObserver = new ResizeObserver(updateScrollbarWidth);
+    resizeObserver.observe(grid);
+    window.addEventListener("resize", updateScrollbarWidth);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateScrollbarWidth);
+    };
+  }, [timeGridRef, dateItems.length]);
+
+  const getMemberDots = useCallback((items: CalItem[]): string[] => {
+    const seen = new Set<string>();
+    const dots: string[] = [];
+    items.forEach((it) => {
+      const raw = it.raw as any;
+      const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+      const ownerIds = new Set<string>();
+      if (it.assignee === "me") ownerIds.add(ownerId);
+      else if (it.assignee === "partner") {
+        if (it.groupId) {
+          const grp = groups.find(g => g.id === it.groupId);
+          grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+            .forEach((m: any) => ownerIds.add(m.user_id));
+        }
+      } else if (it.assignee === "both") {
+        ownerIds.add(ownerId);
+        if (it.groupId) {
+          const grp = groups.find(g => g.id === it.groupId);
+          grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+            .forEach((m: any) => ownerIds.add(m.user_id));
+        }
+      } else ownerIds.add(ownerId);
+      if (it.type === "gcal") ownerIds.add(currentUserId);
+
+      ownerIds.forEach(uid => {
+        if (seen.has(uid)) return;
+        if (filterUsers.length > 0) {
+          const fu = filterUsers.find(u => u.id === uid);
+          if (fu) { seen.add(uid); dots.push(MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot); }
+        } else {
+          if (!seen.has(currentUserId)) { seen.add(currentUserId); dots.push(MEMBER_COLORS[0].dot); }
+        }
+      });
+    });
+    return dots.slice(0, 3);
+  }, [filterUsers, groups, currentUserId]);
+
+  const isWeekAllDayItem = useCallback((item: CalItem) => {
+    return Boolean(item.isDueDateTask || item.allDay || !item.time || item.time === "All day");
+  }, []);
+
+  const layoutEventsInCol = (items: CalItem[]) => {
+    const timed = items.filter((it) => !isWeekAllDayItem(it) && it.hour != null);
+    const sorted = [...timed].sort((a, b) => (a.hour ?? 0) - (b.hour ?? 0));
+    const positioned: { item: CalItem; col: number; totalCols: number }[] = [];
+    sorted.forEach((item) => {
+      const startH = item.hour!;
+      const endH = item.endHour ?? startH + 1;
+      const overlapping = positioned.filter((p) => {
+        const pStart = p.item.hour!;
+        const pEnd = p.item.endHour ?? pStart + 1;
+        return startH < pEnd && endH > pStart;
+      });
+      const usedCols = new Set(overlapping.map((o) => o.col));
+      let col = 0;
+      while (usedCols.has(col)) col++;
+      positioned.push({ item, col, totalCols: 1 });
+      const group = [...overlapping, { item, col, totalCols: 1 }];
+      const maxCol = Math.max(...group.map((g) => g.col)) + 1;
+      group.forEach((g) => { g.totalCols = maxCol; });
+      overlapping.forEach((o) => { o.totalCols = maxCol; });
+    });
+    return positioned;
+  };
+
+  const getPersonColor = (item: CalItem): string => {
+    if (filterUsers.length === 0) return resolveItemColor(item, groups, colorMap);
+    const raw = item.raw as any;
+    const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+    if (item.assignee === "both") return "#8B5CF6";
+    if (item.type === "gcal") {
+      const fu = filterUsers.find(u => u.id === currentUserId);
+      return fu ? MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot : resolveItemColor(item, groups, colorMap);
+    }
+    const targetId = item.assignee === "partner" ? undefined : ownerId;
+    if (targetId) {
+      const fu = filterUsers.find(u => u.id === targetId);
+      if (fu) return MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot;
+    }
+    return resolveItemColor(item, groups, colorMap);
+  };
+
+  const resolveMemberInfo = useCallback((uid: string): { initial: string; color: string; avatarUrl: string | null } => {
+    const fu = filterUsers.find(u => u.id === uid);
+    if (fu) {
+      return {
+        initial: fu.initial,
+        color: MEMBER_COLORS[fu.colorIndex % MEMBER_COLORS.length].dot,
+        avatarUrl: fu.avatarUrl || null,
+      };
+    }
+    if (uid === currentUserId) {
+      return {
+        initial: profile?.display_name?.charAt(0)?.toUpperCase() || "U",
+        color: MEMBER_COLORS[0].dot,
+        avatarUrl: profile?.avatar_url || null,
+      };
+    }
+    for (const grp of groups) {
+      const member = grp.members?.find((m: any) => m.user_id === uid);
+      if (member) {
+        return {
+          initial: (member.display_name || "M").charAt(0).toUpperCase(),
+          color: MEMBER_COLORS[1].dot,
+          avatarUrl: member.avatar_url || null,
+        };
+      }
+    }
+    return { initial: "M", color: MEMBER_COLORS[0].dot, avatarUrl: null };
+  }, [filterUsers, currentUserId, profile, groups]);
+
+  const getMemberIds = useCallback((item: CalItem) => {
+    const raw = item.raw as any;
+    const ownerId: string = raw.ownerUserId || raw.user_id || currentUserId;
+    const memberIds: string[] = [];
+
+    if (item.assignee === "me") memberIds.push(ownerId);
+    else if (item.assignee === "both") {
+      memberIds.push(ownerId);
+      if (item.groupId) {
+        const grp = groups.find(g => g.id === item.groupId);
+        grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+          .forEach((m: any) => memberIds.push(m.user_id));
+      }
+    } else if (item.assignee === "partner") {
+      if (item.groupId) {
+        const grp = groups.find(g => g.id === item.groupId);
+        grp?.members?.filter((m: any) => m.user_id !== ownerId && m.status === "active")
+          .forEach((m: any) => memberIds.push(m.user_id));
+      }
+    }
+
+    if (memberIds.length === 0) memberIds.push(ownerId);
+    return memberIds;
+  }, [groups, currentUserId]);
+
+  const MemberDot = ({ item, compact = false }: { item: CalItem; compact?: boolean }) => {
+    const memberIds = getMemberIds(item);
+
+    return (
+      <div className={cn("flex -space-x-1", compact ? "items-center shrink-0" : "mt-auto")}>
+        {memberIds.map((uid) => {
+          const info = resolveMemberInfo(uid);
+          const size = compact ? 16 : 12;
+          const fontSize = compact ? 8 : 6;
+
+          return info.avatarUrl ? (
+            <img
+              key={uid}
+              src={info.avatarUrl}
+              alt={info.initial}
+              className="rounded-full object-cover border"
+              style={{ width: size, height: size, borderColor: "white" }}
+              onError={(e) => {
+                const span = document.createElement("span");
+                span.className = "inline-flex items-center justify-center rounded-full font-bold leading-none";
+                span.style.cssText = `width:${size}px;height:${size}px;font-size:${fontSize}px;background:${info.color};color:white`;
+                span.textContent = info.initial;
+                (e.target as HTMLElement).replaceWith(span);
+              }}
+            />
+          ) : (
+            <span
+              key={uid}
+              className="inline-flex items-center justify-center rounded-full font-bold leading-none text-white"
+              style={{ width: size, height: size, fontSize, backgroundColor: info.color }}
+            >
+              {info.initial}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const weekHeaderCompensationStyle = weekScrollbarWidth > 0 ? { paddingRight: weekScrollbarWidth } : undefined;
+
+  return (
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      className="flex flex-col -mx-4"
+      style={{ background: "#fff", height: "calc(100vh - 200px)" }}
+    >
+      {/* ── Day Strip ── */}
+      <div className="flex" style={{ flexShrink: 0, ...weekHeaderCompensationStyle }}>
+        <div style={{ width: WEEK_TIME_COL, flexShrink: 0 }} />
+        {dateItems.map((col) => (
+          <div key={getLocalDateKey(col.date)} className="flex-1 flex flex-col items-center"
+            style={{ padding: "8px 6px 5px" }}>
+            <div className="flex items-center gap-1">
+              <span style={{ fontSize: 14, fontWeight: 500, color: "#1a1a1a" }}>
+                {DAYS_ABBR[col.date.getDay()]}
+              </span>
+              {col.isToday ? (
+                <span className="inline-flex items-center justify-center rounded-full text-white"
+                  style={{ width: 20, height: 20, fontSize: 10, fontWeight: 500, backgroundColor: "#1a1a1a" }}>
+                  {col.date.getDate()}
+                </span>
+              ) : (
+                <span style={{ fontSize: 11, fontWeight: 400, color: "#aaa" }}>
+                  {col.date.getDate()}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-[2px] mt-1 h-[5px]">
+              {getMemberDots(col.items).map((c, di) => (
+                <span key={di} className="rounded-full" style={{ width: 5, height: 5, backgroundColor: c }} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── All-day pill row (always visible, pinned between header and time grid) ── */}
+      <div
+        className="flex"
+        style={{
+          flexShrink: 0,
+          borderTop: "0.5px solid hsl(var(--border))",
+          borderBottom: "0.5px solid hsl(var(--border))",
+          ...weekHeaderCompensationStyle,
+        }}
+      >
+        <div className="flex items-center justify-end pr-1"
+          style={{ width: WEEK_TIME_COL, flexShrink: 0, fontSize: 8, color: "hsl(var(--muted-foreground))" }}>all<br/>day</div>
+        {dateItems.map((col, ci) => {
+          const allDayItems = col.items.filter((it) => isWeekAllDayItem(it));
+          return (
+            <div key={ci} className="flex-1 px-1.5 py-1.5 border-l border-border" style={{ minHeight: 40 }}>
+              {allDayItems.map((it) => {
+                const color = it.isDueDateTask ? TODO_COLOR : getPersonColor(it);
+                const style = getCardStyle(color);
+                return (
+                  <button
+                    key={it.id}
+                    onClick={() => onItemTap?.(it)}
+                    className="w-full flex items-center gap-1.5 text-left px-3 py-1.5 mb-1 hover:opacity-80 active:opacity-60 transition-opacity truncate"
+                    style={{
+                      backgroundColor: style.bg,
+                      color: style.text,
+                      border: `1px solid ${style.border}`,
+                      borderRadius: 999,
+                      minHeight: 30,
+                    }}
+                  >
+                    <MemberDot item={it} compact />
+                    <span className="text-[12px] font-semibold leading-none truncate">
+                      {it.title}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Time grid (fills remaining height) ── */}
+      <div ref={timeGridRef} className="overflow-y-auto relative flex-1 min-h-0">
+        <div className="flex" style={{ height: 24 * WEEK_HOUR_HEIGHT }}>
+          {/* Time labels */}
+          <div className="relative" style={{ width: WEEK_TIME_COL, flexShrink: 0 }}>
+            {HOURS.map((h) => (
+              <div key={h} className="absolute w-full text-right pr-1 text-muted-foreground"
+                style={{ top: h * WEEK_HOUR_HEIGHT - 5, fontSize: 9 }}>
+                {h === 0 ? "" : h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`}
+              </div>
+            ))}
+          </div>
+
+          {/* Day columns */}
+          {dateItems.map((col) => {
+            const positioned = layoutEventsInCol(col.items);
+            return (
+              <div key={getLocalDateKey(col.date)} className="relative border-l border-border flex-1"
+                style={col.isToday ? { backgroundColor: "rgba(108,71,255,0.015)" } : undefined}>
+                {/* Hour lines */}
+                {HOURS.map((h) => (
+                  <div key={h} className="absolute border-t border-border/60"
+                    style={{ top: h * WEEK_HOUR_HEIGHT, width: "100%" }} />
+                ))}
+
+                {/* Now line */}
+                {col.isToday && (() => {
+                  const now = new Date();
+                  const nowPos = (now.getHours() + now.getMinutes() / 60) * WEEK_HOUR_HEIGHT;
+                  return (
+                    <div className="absolute z-10" style={{ top: nowPos, width: "100%" }}>
+                      <div className="w-2 h-2 rounded-full absolute -left-1 -top-[3px]" style={{ backgroundColor: "hsl(var(--destructive))" }} />
+                      <div className="h-[2px] w-full" style={{ backgroundColor: "hsl(var(--destructive))" }} />
+                    </div>
+                  );
+                })()}
+
+                {/* Event cards */}
+                {positioned.map(({ item, col: colIdx, totalCols }) => {
+                  const color = getPersonColor(item);
+                  const cardStyle = getCardStyle(color);
+                  const top = item.hour! * WEEK_HOUR_HEIGHT;
+                  const endH = item.endHour ?? item.hour! + 1;
+                  const duration = Math.max(endH - item.hour!, 0.25);
+                  const height = Math.max(duration * WEEK_HOUR_HEIGHT, 20);
+                  const pct = 100 / totalCols;
+                  const leftPct = colIdx * pct;
+
+                  return (
+                    <button key={item.id} onClick={() => onItemTap?.(item)}
+                      className="absolute overflow-hidden cursor-pointer text-left hover:brightness-105 active:brightness-95 transition-all flex flex-col"
+                      style={{
+                        top, height,
+                        width: `calc(${pct}% - 2px)`,
+                        left: `calc(${leftPct}% + 1px)`,
+                        backgroundColor: cardStyle.bg,
+                        borderLeft: `3px solid ${cardStyle.border}`,
+                        borderRadius: "0 7px 7px 0",
+                      }}>
+                      <p className="text-[9px] font-medium leading-tight px-1 pt-0.5 truncate"
+                        style={{ color: cardStyle.text }}>
+                        {item.title}
+                      </p>
+                      {height > 24 && (
+                        <p className="text-[7px] px-1 truncate" style={{ color: cardStyle.text, opacity: 0.7 }}>
+                          {item.type === "gcal" ? new Date(item.time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : formatTime(item.time)}
+                        </p>
+                      )}
+                      {height > 36 && <div className="px-1 pb-0.5"><MemberDot item={item} /></div>}
                     </button>
                   );
                 })}

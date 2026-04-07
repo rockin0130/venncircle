@@ -66,6 +66,7 @@ export interface Task {
   hiddenFromPartner?: boolean;
   groupId?: string | null;
   ownerUserId?: string;
+  priority?: "high" | "medium" | "low" | "none";
 }
 
 export type WorkoutOriginType = "manual" | "ai" | "imported" | "merged";
@@ -233,7 +234,7 @@ interface AppContextType {
   toggleTask: (id: string) => void;
   addTask: (task: Omit<Task, "id" | "done">) => void;
   removeTask: (id: string) => void;
-  updateTask: (id: string, updates: Partial<Pick<Task, "title" | "tag" | "scheduledDay" | "scheduledMonth" | "scheduledYear" | "time" | "dueDate" | "priorNoticeDays">>) => void;
+  updateTask: (id: string, updates: Partial<Pick<Task, "title" | "tag" | "scheduledDay" | "scheduledMonth" | "scheduledYear" | "time" | "dueDate" | "priorNoticeDays" | "priority">>) => void;
   waterIntake: number;
   waterGoal: number;
   setWaterIntake: (amount: number) => void;
@@ -535,6 +536,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             priorNoticeDays: t.prior_notice_days ?? 0,
             hiddenFromPartner: t.hidden_from_partner || false,
             groupId: t.group_id || null,
+            priority: (t as any).priority || "none",
           })));
         }
 
@@ -1446,6 +1448,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
     if (task.dueDate !== undefined) insertData.due_date = task.dueDate;
     if (task.priorNoticeDays !== undefined) insertData.prior_notice_days = task.priorNoticeDays;
+    if (task.priority !== undefined) insertData.priority = task.priority;
 
     const { data, error } = await supabase
       .from("tasks")
@@ -1464,6 +1467,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         dueDate: (data as any).due_date ?? null,
         priorNoticeDays: (data as any).prior_notice_days ?? 0,
         groupId,
+        priority: (data as any).priority || "none",
       }]);
     }
   };
@@ -1473,7 +1477,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await supabase.from("tasks").delete().eq("id", id);
   };
 
-  const updateTask = async (id: string, updates: Partial<Pick<Task, "title" | "tag" | "scheduledDay" | "scheduledMonth" | "scheduledYear" | "time" | "dueDate" | "priorNoticeDays">>) => {
+  const updateTask = async (id: string, updates: Partial<Pick<Task, "title" | "tag" | "scheduledDay" | "scheduledMonth" | "scheduledYear" | "time" | "dueDate" | "priorNoticeDays" | "priority">>) => {
     setTasks((t) => t.map((item) => (item.id === id ? { ...item, ...updates } : item)));
     const dbUpdates: any = {};
     if (updates.title !== undefined) dbUpdates.title = updates.title;
@@ -1484,6 +1488,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (updates.time !== undefined) dbUpdates.time = updates.time;
     if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate;
     if (updates.priorNoticeDays !== undefined) dbUpdates.prior_notice_days = updates.priorNoticeDays;
+    if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
     await supabase.from("tasks").update(dbUpdates).eq("id", id);
   };
 
@@ -1577,8 +1582,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const removeWorkout = async (id: string) => {
-    setWorkoutsState((w) => w.filter((item) => item.id !== id));
-    await supabase.from("workouts").delete().eq("id", id);
+    const workout = workouts.find((w) => w.id === id);
+    if (!workout) return;
+
+    // If in a specific group view and the workout is linked, only remove that group's copy
+    // and keep the other linked copies (including personal).
+    // If in personal/all view, delete ALL linked copies.
+    const isInGroupView = activeGroup && !(activeGroup as any)?._personal;
+
+    if (isInGroupView && workout.linkedWorkoutId) {
+      // Remove only this group's copy
+      setWorkoutsState((w) => w.filter((item) => item.id !== id));
+      await supabase.from("workouts").delete().eq("id", id);
+    } else if (workout.linkedWorkoutId) {
+      // Delete all linked copies (Mine/All view deletion)
+      const linkedIds = workouts
+        .filter((w) => w.linkedWorkoutId === workout.linkedWorkoutId)
+        .map((w) => w.id);
+      setWorkoutsState((w) => w.filter((item) => !linkedIds.includes(item.id)));
+      for (const lid of linkedIds) {
+        await supabase.from("workouts").delete().eq("id", lid);
+      }
+    } else {
+      // No linked workouts — simple delete
+      setWorkoutsState((w) => w.filter((item) => item.id !== id));
+      await supabase.from("workouts").delete().eq("id", id);
+    }
   };
 
   const removeWorkoutsByFilter = async (filter: "all" | "week" | "month" | "date", date?: string): Promise<number> => {
@@ -1867,9 +1896,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const filteredEvents = useMemo(() => filterByGroup(events), [events, filterByGroup]);
   const filteredTasks = useMemo(() => filterByGroup(tasks), [tasks, filterByGroup]);
   const filteredWorkoutsRaw = useMemo(() => filterByGroup(workouts), [workouts, filterByGroup]);
-  // Deduplicate linked workouts in "All" view (activeGroup === null)
+  // Deduplicate linked workouts in ALL views — personal, group, and "All"
+  // When a workout is shared with multiple groups, multiple DB rows exist linked by linkedWorkoutId.
+  // We always show only one card per linked set so the user never sees duplicates.
   const filteredWorkouts = useMemo(() => {
-    if (activeGroup !== null) return filteredWorkoutsRaw;
     const seen = new Set<string>();
     return filteredWorkoutsRaw.filter((w) => {
       if (!w.linkedWorkoutId) return true;
@@ -1877,7 +1907,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       seen.add(w.linkedWorkoutId);
       return true;
     });
-  }, [filteredWorkoutsRaw, activeGroup]);
+  }, [filteredWorkoutsRaw]);
 
   // Group-filtered partner data — applies the same activeGroup filter so cross-user views are consistent
   const filteredPartnerHabits = useMemo(() => {

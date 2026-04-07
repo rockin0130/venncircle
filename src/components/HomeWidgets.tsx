@@ -3,7 +3,7 @@ import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext, Workout } from "@/context/AppContext";
-import { Droplets, Dumbbell, Trophy, Check, Flame, Heart, Apple, Sparkles, ShoppingCart } from "lucide-react";
+import { Droplets, Dumbbell, Trophy, Check, Flame, Heart, Apple, Sparkles, ShoppingCart, Clock } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 
@@ -599,6 +599,72 @@ export const HomeShoppingWidget = () => {
                 <span className="flex-1 text-xs font-medium truncate">{item.name}</span>
               </button>
             ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/** Compact study widget for Home page */
+export const HomeStudyWidget = ({ selectedDate }: { selectedDate: Date }) => {
+  const { user } = useAuth();
+  const [sessions, setSessions] = useState<{ id: string; subject: string; duration_seconds: number; is_active: boolean }[]>([]);
+
+  const dateStr = fmtDate(selectedDate);
+
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const dayStart = `${dateStr}T00:00:00`;
+      const dayEnd = `${dateStr}T23:59:59`;
+      const { data } = await supabase
+        .from("study_sessions")
+        .select("id, subject, duration_seconds, is_active")
+        .eq("user_id", user.id)
+        .gte("started_at", dayStart)
+        .lte("started_at", dayEnd)
+        .order("started_at", { ascending: false });
+      if (data) setSessions(data);
+    };
+    load();
+  }, [user, dateStr]);
+
+  const totalSeconds = sessions.reduce((sum, s) => sum + s.duration_seconds, 0);
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const hasActive = sessions.some((s) => s.is_active);
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold tracking-display mb-3 flex items-center gap-2">
+        <Clock size={18} className="text-primary" /> Study
+      </h2>
+      <div className="bg-card rounded-xl p-4 shadow-card border border-border">
+        {sessions.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No study sessions today</p>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold">
+                {hours > 0 ? `${hours}h ${mins}m` : `${mins}m`} studied
+              </span>
+              {hasActive && (
+                <span className="text-[10px] font-semibold text-primary animate-pulse">● Live</span>
+              )}
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              {sessions.slice(0, 5).map((s) => (
+                <span key={s.id} className="text-[10px] px-2 py-0.5 rounded-full bg-secondary font-medium text-muted-foreground">
+                  {s.subject} · {Math.floor(s.duration_seconds / 60)}m
+                </span>
+              ))}
+              {sessions.length > 5 && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary font-medium text-muted-foreground">
+                  +{sessions.length - 5} more
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>

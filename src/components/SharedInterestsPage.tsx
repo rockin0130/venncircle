@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Plus, ChevronRight, Maximize2, Minimize2, MoreHorizontal } from "lucide-react";
+import { Plus, Maximize2, Minimize2, MoreHorizontal, Camera } from "lucide-react";
 import { useAuth, Group, ShareablePage, PAGE_LABELS, SHAREABLE_PAGES } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import LeaveGroupFlow from "@/components/LeaveGroupFlow";
 
 interface FeedItem {
   id: string;
@@ -90,19 +92,254 @@ const MemberDots = ({ members }: { members: { display_name: string | null; user_
 
 type SplitMode = "equal" | "groups-expanded" | "feed-expanded";
 
+const SwipeableGroupCard = ({
+  group,
+  gi,
+  user,
+  onTap,
+  onLeft,
+  activeSwipeId,
+  onSwipeOpen,
+  scrollContainerRef,
+}: {
+  group: Group;
+  gi: number;
+  user: { id: string } | null;
+  onTap: () => void;
+  onLeft: () => void;
+  activeSwipeId: string | null;
+  onSwipeOpen: (id: string | null) => void;
+  scrollContainerRef: React.RefObject<HTMLElement | null>;
+}) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const startX = useRef(0);
+  const startOffset = useRef(0);
+  const movedDistance = useRef(0);
+  const blockTapRef = useRef(false);
+  const [offset, setOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [leaveFlowOpen, setLeaveFlowOpen] = useState(false);
+  const [removed, setRemoved] = useState(false);
+
+  const REVEAL_WIDTH = 100;
+  const TAP_SLOP = 6;
+  const isActive = activeSwipeId === group.id;
+
+  useEffect(() => {
+    if (!isActive && offset !== 0 && !isDragging) {
+      setOffset(0);
+    }
+  }, [isActive, offset, isDragging]);
+
+  useEffect(() => {
+    const container = scrollContainerRef?.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      if (offset !== 0 || isActive) {
+        setIsDragging(false);
+        setOffset(0);
+        onSwipeOpen(null);
+      }
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [offset, isActive, onSwipeOpen, scrollContainerRef]);
+
+  useEffect(() => {
+    if (!isActive && offset === 0) return;
+
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (cardRef.current && !cardRef.current.contains(target)) {
+        setIsDragging(false);
+        setOffset(0);
+        onSwipeOpen(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutside, true);
+    document.addEventListener("touchstart", handleOutside, true);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside, true);
+      document.removeEventListener("touchstart", handleOutside, true);
+    };
+  }, [offset, isActive, onSwipeOpen]);
+
+  const closeSwipe = () => {
+    setIsDragging(false);
+    setOffset(0);
+    onSwipeOpen(null);
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+    startX.current = e.clientX;
+    startOffset.current = offset;
+    movedDistance.current = 0;
+    blockTapRef.current = activeSwipeId !== null && activeSwipeId !== group.id;
+    setIsDragging(true);
+
+    if (activeSwipeId !== group.id) {
+      onSwipeOpen(group.id);
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+
+    const deltaX = e.clientX - startX.current;
+    movedDistance.current = Math.max(movedDistance.current, Math.abs(deltaX));
+    const nextOffset = Math.max(-REVEAL_WIDTH, Math.min(0, startOffset.current + deltaX));
+    setOffset(nextOffset);
+  };
+
+  const handlePointerEnd = (e?: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+
+    if (e && e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+
+    setIsDragging(false);
+
+    if (offset < -REVEAL_WIDTH / 2) {
+      setOffset(-REVEAL_WIDTH);
+      onSwipeOpen(group.id);
+      return;
+    }
+
+    setOffset(0);
+    onSwipeOpen(null);
+  };
+
+  if (removed) {
+    return <div className="h-0 overflow-hidden transition-all duration-300" />;
+  }
+
+  const activeMembers = group.members.filter((m) => m.status === "active");
+  const validPages = (group.shared_pages || [])
+    .filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p))
+    .slice(0, 4) as ShareablePage[];
+  const extraPages = Math.max(
+    (group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).length - 4,
+    0
+  );
+  const coverUrl = group.cover_image_url || null;
+
+  return (
+    <>
+      <div ref={cardRef} className="relative h-[76px] overflow-hidden rounded-[14px] bg-card">
+        <button
+          type="button"
+          className="absolute inset-y-[1px] right-[1px] z-0 flex w-[99px] items-center justify-center rounded-r-[13px] text-xs font-semibold text-white select-none"
+          style={{ backgroundColor: "#E05C5C" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setLeaveFlowOpen(true);
+          }}
+        >
+          Leave Group
+        </button>
+
+        <div
+          className="absolute inset-0 z-10 flex touch-pan-y overflow-hidden rounded-[14px] border border-border bg-card"
+          style={{
+            transform: `translateX(${offset}px)`,
+            transition: isDragging ? "none" : "transform 0.25s cubic-bezier(.4,0,.2,1)",
+            willChange: "transform",
+          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerEnd}
+          onPointerCancel={handlePointerEnd}
+          onClick={() => {
+            if (blockTapRef.current) {
+              blockTapRef.current = false;
+              return;
+            }
+
+            if (movedDistance.current > TAP_SLOP) return;
+
+            if (offset !== 0) {
+              closeSwipe();
+              return;
+            }
+
+            onTap();
+          }}
+        >
+          <div className="flex-1 min-w-0 px-3 py-2.5 flex flex-col justify-center bg-card">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="text-[13px] font-medium text-foreground truncate">{group.name}</p>
+              <div className="shrink-0">
+                <MemberDots members={activeMembers} />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {validPages.map((page) => (
+                <span
+                  key={page}
+                  className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
+                >
+                  {PAGE_LABELS[page] || page}
+                </span>
+              ))}
+              {extraPages > 0 && (
+                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  +{extraPages}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="w-[100px] shrink-0 overflow-hidden rounded-r-[14px]">
+            {coverUrl ? (
+              <img src={coverUrl} alt="" className="w-full h-full object-cover block" />
+            ) : (
+              <div className={`w-full h-full ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex flex-col items-center justify-center gap-0.5`}>
+                <Camera size={12} className="text-muted-foreground/50" />
+                <span className="text-[8px] font-medium text-muted-foreground/70">Add photo</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {user && (
+        <LeaveGroupFlow
+          group={group}
+          userId={user.id}
+          open={leaveFlowOpen}
+          onOpenChange={setLeaveFlowOpen}
+          onLeft={() => {
+            setRemoved(true);
+            setTimeout(() => onLeft(), 300);
+          }}
+        />
+      )}
+    </>
+  );
+};
+
 const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHub, onOpenMore }: SharedInterestsPageProps) => {
-  const { groups, user } = useAuth();
+  const { groups, user, refreshGroups } = useAuth();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
   const [splitMode, setSplitMode] = useState<SplitMode>("equal");
   const [splitRatio, setSplitRatio] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  const [activeSwipeId, setActiveSwipeId] = useState<string | null>(null);
+  const groupsScrollRef = useRef<HTMLDivElement>(null);
 
   const allGroups = useMemo(
     () => groups.filter((g: any) => !g._personal && g.id !== "__personal__"),
     [groups]
   );
+
 
   useEffect(() => {
     if (!user || allGroups.length === 0) {
@@ -267,41 +504,21 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
               </div>
             ) : (
               /* Full group cards */
-              <div className="space-y-2">
-                {allGroups.map((group, gi) => {
-                  const activeMembers = group.members.filter((m) => m.status === "active");
-                  return (
-                    <button
-                      key={group.id}
-                      onClick={() => handleGroupTap(group)}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary/20 transition-all active:scale-[0.99] text-left"
-                    >
-                      <div className={`w-9 h-9 rounded-lg ${GROUP_AVATAR_COLORS[gi % GROUP_AVATAR_COLORS.length]} flex items-center justify-center shrink-0`}>
-                        <span className="text-xs font-bold text-foreground/80">{getInitials(group.name)}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{group.name}</p>
-                        <MemberDots members={activeMembers} />
-                      </div>
-                      <div className="flex flex-wrap gap-1 max-w-[160px] justify-end shrink-0">
-                        {(group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).slice(0, 4).map((page) => (
-                          <span
-                            key={page}
-                            className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${INTEREST_PILL_COLORS[page] || INTEREST_PILL_COLORS.calendar}`}
-                          >
-                            {PAGE_LABELS[page as ShareablePage] || page}
-                          </span>
-                        ))}
-                        {(group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).length > 4 && (
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                            +{(group.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)).length - 4}
-                          </span>
-                        )}
-                      </div>
-                      <ChevronRight size={16} className="text-muted-foreground shrink-0" />
-                    </button>
-                  );
-                })}
+              <div className="space-y-2" ref={groupsScrollRef}>
+                {allGroups.map((group, gi) => (
+                  <SwipeableGroupCard
+                    key={group.id}
+                    group={group}
+                    gi={gi}
+                    user={user}
+                    onTap={() => handleGroupTap(group)}
+                    onLeft={() => refreshGroups()}
+                    activeSwipeId={activeSwipeId}
+                    onSwipeOpen={setActiveSwipeId}
+                    scrollContainerRef={groupsScrollRef}
+                  />
+                ))}
+                
               </div>
             )}
           </div>

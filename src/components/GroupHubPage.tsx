@@ -1,5 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { ArrowLeft, Settings, ChevronRight, Plus, Trash2, LogOut, Pencil, X, Check, Loader2, MoreHorizontal, Heart, MessageCircle, Share2, Image, Activity, Smile, Camera } from "lucide-react";
+import { ArrowLeft, Settings, ChevronRight, Plus, Trash2, LogOut, Pencil, X, Check, Loader2, MoreHorizontal, Heart, MessageCircle, Share2, Image, Activity, Smile, Camera, UserPlus, ShieldCheck, ShieldOff, Trophy } from "lucide-react";
+import { supabase as supabaseClient } from "@/integrations/supabase/client";
+import GroupChallengePage from "@/components/GroupChallengePage";
+import ChallengeDetailModal from "@/components/ChallengeDetailModal";
 import { useAuth, Group, ShareablePage, SHAREABLE_PAGES, PAGE_LABELS, PAGE_ICONS } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -8,6 +11,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import GroupFeedCompose from "@/components/GroupFeedCompose";
 import GroupFeedPost from "@/components/GroupFeedPost";
+import LeaveGroupFlow from "@/components/LeaveGroupFlow";
+import { useFriendships } from "@/hooks/useFriendships";
 
 interface GroupHubPageProps {
   group: Group;
@@ -60,6 +65,7 @@ interface FeedPost {
 
 const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps) => {
   const { user, leaveGroup, updateGroupSharedPages, inviteToGroup, refreshGroups, groups } = useAuth();
+  const { friendships, activeFriends } = useFriendships();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addInterestOpen, setAddInterestOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -69,16 +75,24 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   const [deleting, setDeleting] = useState(false);
   const [memberSheetOpen, setMemberSheetOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [leaveFlowOpen, setLeaveFlowOpen] = useState(false);
+  const [memberMenuOpen, setMemberMenuOpen] = useState<string | null>(null);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [localCoverUrl, setLocalCoverUrl] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const [showChallengePage, setShowChallengePage] = useState(false);
+  const [activeChallenge, setActiveChallenge] = useState<any>(null);
+  const [challengeDetailOpen, setChallengeDetailOpen] = useState(false);
 
-  const isOwner = user?.id === group.created_by;
   const currentGroup = groups.find((g) => g.id === group.id) || group;
-  const currentEnabledPages = (currentGroup.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)) as ShareablePage[];
   const currentActiveMembers = currentGroup.members.filter((m) => m.status === "active");
+  const myMember = currentActiveMembers.find((m) => m.user_id === user?.id);
+  const isAdmin = myMember?.role === "admin";
+  const isOwner = user?.id === group.created_by;
+  const currentEnabledPages = (currentGroup.shared_pages || []).filter((p) => (SHAREABLE_PAGES as readonly string[]).includes(p)) as ShareablePage[];
   const coverUrl = localCoverUrl || currentGroup.cover_image_url || null;
   const coverGradientIdx = currentGroup.name.charCodeAt(0) % COVER_GRADIENTS.length;
 
@@ -121,8 +135,20 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
     setLoadingPosts(false);
   };
 
+  const fetchActiveChallenge = async () => {
+    const { data } = await supabase
+      .from("group_challenges")
+      .select("*")
+      .eq("group_id", currentGroup.id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    setActiveChallenge(data?.[0] || null);
+  };
+
   useEffect(() => {
     fetchPosts();
+    fetchActiveChallenge();
     const channel = supabase
       .channel(`feed-${currentGroup.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "group_feed_posts", filter: `group_id=eq.${currentGroup.id}` }, () => { fetchPosts(); })
@@ -158,25 +184,31 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
     setEditingName(false);
   };
 
-  const handleLeave = async () => {
-    setLeaving(true);
-    const result = await leaveGroup(currentGroup.id);
-    if (result.error) { toast.error(result.error); setLeaving(false); }
-    else { toast.success("Left group"); await refreshGroups(); onBack(); }
+  const handleSetRole = async (targetUserId: string, newRole: string) => {
+    const { data, error } = await supabase.rpc("set_member_role" as any, {
+      _group_id: currentGroup.id,
+      _target_user_id: targetUserId,
+      _new_role: newRole,
+    });
+    if (error) { toast.error(error.message); return; }
+    const result = data as any;
+    if (result?.error) { toast.error(result.error); return; }
+    toast.success(newRole === "admin" ? "Promoted to admin" : "Removed admin role");
+    setMemberMenuOpen(null);
+    await refreshGroups();
   };
 
-  const handleDelete = async () => {
-    setDeleting(true);
-    try {
-      const { data, error } = await supabase.rpc("delete_group", { _group_id: currentGroup.id });
-      if (error) { toast.error(`Failed to delete group: ${error.message}`); setDeleting(false); return; }
-      const result = data as any;
-      if (result?.error) { toast.error(result.error); setDeleting(false); return; }
-      toast.success("Group deleted");
-      setSettingsOpen(false);
-      await refreshGroups();
-      onBack();
-    } catch { toast.error("Failed to delete group"); setDeleting(false); }
+  const handleAddMember = async (friendUserId: string) => {
+    const result = await inviteToGroup(currentGroup.id, friendUserId);
+    if (result.error) toast.error(result.error);
+    else { toast.success("Invite sent!"); setAddMemberOpen(false); await refreshGroups(); }
+  };
+
+  const handleLeaveFlowDone = async () => {
+    setLeaveFlowOpen(false);
+    setSettingsOpen(false);
+    await refreshGroups();
+    onBack();
   };
 
   const handleLike = async (postId: string, currentlyLiked: boolean) => {
@@ -219,13 +251,26 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
     e.target.value = "";
   };
 
+  if (showChallengePage) {
+    return (
+      <GroupChallengePage
+        groupId={currentGroup.id}
+        groupName={currentGroup.name}
+        enabledPages={currentEnabledPages}
+        members={currentActiveMembers}
+        userId={user?.id || ""}
+        onBack={() => { setShowChallengePage(false); fetchActiveChallenge(); }}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Hidden file input for cover */}
       <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFileChange} />
 
       {/* Cover Photo */}
-      <div className="relative w-full flex-shrink-0" style={{ height: 110 }}>
+      <div className="relative w-full flex-shrink-0" style={{ height: 150 }}>
         {coverUrl ? (
           <>
             <img src={coverUrl} alt="" className="w-full h-full object-cover" />
@@ -279,12 +324,6 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
           >
             <Settings size={13} className="text-white" />
           </button>
-          <button
-            className="w-7 h-7 rounded-full flex items-center justify-center"
-            style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(8px)" }}
-          >
-            <MoreHorizontal size={13} className="text-white" />
-          </button>
         </div>
       </div>
 
@@ -323,8 +362,61 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
                 <span className="text-[11px] text-muted-foreground font-medium">{PAGE_LABELS[page]}</span>
               </button>
             ))}
+            {/* Challenge tile — always shown */}
+            <button onClick={() => setShowChallengePage(true)} className="flex flex-col items-center gap-1.5 shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-[hsl(260,60%,95%)] flex items-center justify-center">
+                <Trophy size={20} className="text-[#6C47FF]" />
+              </div>
+              <span className="text-[11px] text-muted-foreground font-medium">Challenge</span>
+            </button>
           </div>
         </div>
+
+        {/* Active Challenge Card */}
+        {activeChallenge && (
+          <div className="px-4 pb-3">
+            <button
+              onClick={() => setChallengeDetailOpen(true)}
+              className="w-full text-left rounded-[14px] p-4"
+              style={{ background: "#1a1a2e", border: "0.5px solid rgba(255,255,255,0.08)" }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-[#6C47FF]/20 text-[#6C47FF]">Active challenge</span>
+                <span className="text-[10px] text-white/50">{Math.max(0, Math.ceil((new Date(activeChallenge.ends_at).getTime() - Date.now()) / 86400000))} days left</span>
+              </div>
+              <p className="text-[15px] font-medium text-white mb-1">{activeChallenge.title}</p>
+              {activeChallenge.partner_reward && (
+                <p className="text-[11px] text-white/50 mb-3">🏆 Win: {activeChallenge.partner_reward}</p>
+              )}
+              {(() => {
+                const totalDays = activeChallenge.duration_weeks * 7;
+                const daysLeft = Math.max(0, Math.ceil((new Date(activeChallenge.ends_at).getTime() - Date.now()) / 86400000));
+                const currentWeek = Math.min(activeChallenge.duration_weeks, Math.ceil((totalDays - daysLeft) / 7) || 1);
+                return (
+                  <>
+                    <div className="flex items-center justify-between text-[10px] text-white/50 mb-1">
+                      <span>Group progress</span>
+                      <span>Week {currentWeek} of {activeChallenge.duration_weeks}</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-white/10 mb-2">
+                      <div className="h-full rounded-full bg-[#6C47FF]" style={{ width: `${Math.round(((totalDays - daysLeft) / totalDays) * 100)}%` }} />
+                    </div>
+                  </>
+                );
+              })()}
+              <div className="flex items-center justify-between">
+                <div className="flex -space-x-1.5">
+                  {currentActiveMembers.slice(0, 4).map((m) => (
+                    <div key={m.user_id} className="w-5 h-5 rounded-full bg-white/20 border border-[#1a1a2e] flex items-center justify-center text-[8px] font-bold text-white">
+                      {(m.display_name || "?")[0]}
+                    </div>
+                  ))}
+                </div>
+                <span className="text-[10px] text-white/40">Tap to see details</span>
+              </div>
+            </button>
+          </div>
+        )}
 
         {/* Divider line */}
         <div className="mx-4" style={{ height: "0.5px", background: "rgba(0,0,0,0.08)" }} />
@@ -357,6 +449,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
                 onLike={() => handleLike(post.id, !!post.liked_by_me)}
                 memberColors={MEMBER_COLORS}
                 members={currentActiveMembers}
+                currentUserId={user?.id}
               />
             ))
           )}
@@ -428,17 +521,61 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Members ({currentActiveMembers.length})</label>
               <div className="space-y-2 mt-2">
-                {currentActiveMembers.map((m) => (
-                  <div key={m.user_id} className="flex items-center gap-2 p-2 rounded-lg bg-secondary/30">
-                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
-                      {(m.display_name || "?")[0].toUpperCase()}
+                {currentActiveMembers.map((m) => {
+                  const isMemberAdmin = m.role === "admin";
+                  const isMe = m.user_id === user?.id;
+                  return (
+                    <div key={m.user_id} className="flex items-center gap-2 p-2 rounded-lg bg-secondary/30 relative">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                        {(m.display_name || "?")[0].toUpperCase()}
+                      </div>
+                      <span className="text-sm text-foreground flex-1">{m.display_name || "Member"}</span>
+                      {isMemberAdmin && (
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">Admin</span>
+                      )}
+                      {isAdmin && !isMe && (
+                        <div className="relative">
+                          <button
+                            onClick={() => setMemberMenuOpen(memberMenuOpen === m.user_id ? null : m.user_id)}
+                            className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+                          >
+                            <MoreHorizontal size={14} className="text-muted-foreground" />
+                          </button>
+                          {memberMenuOpen === m.user_id && (
+                            <div className="absolute right-0 top-7 z-50 bg-card border border-border rounded-xl shadow-lg py-1 min-w-[160px]">
+                              {isMemberAdmin ? (
+                                <button
+                                  onClick={() => handleSetRole(m.user_id, "member")}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                                >
+                                  <ShieldOff size={14} className="text-muted-foreground" />
+                                  Remove admin role
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleSetRole(m.user_id, "admin")}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                                >
+                                  <ShieldCheck size={14} className="text-muted-foreground" />
+                                  Make admin
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <span className="text-sm text-foreground flex-1">{m.display_name || "Member"}</span>
-                    {m.user_id === currentGroup.created_by && (
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">Admin</span>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
+                {isAdmin && (
+                  <button
+                    onClick={() => setAddMemberOpen(true)}
+                    className="w-full flex items-center gap-2 p-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+                  >
+                    <UserPlus size={14} />
+                    Add member
+                  </button>
+                )}
               </div>
             </div>
 
@@ -469,34 +606,70 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
               </div>
             </div>
 
-            {/* Leave / Delete */}
-            <div className="border-t border-border pt-4 space-y-2">
-              {!isOwner && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button className="w-full flex items-center gap-2 p-3 rounded-xl text-destructive hover:bg-destructive/5 transition-colors text-sm font-medium"><LogOut size={16} />Leave Group</button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Leave group?</AlertDialogTitle><AlertDialogDescription>You'll lose access to shared data in this group. You can rejoin later with an invite.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleLeave} disabled={leaving}>{leaving ? "Leaving..." : "Leave"}</AlertDialogAction></AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-              {isOwner && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button className="w-full flex items-center gap-2 p-3 rounded-xl text-destructive hover:bg-destructive/5 transition-colors text-sm font-medium"><Trash2 size={16} />Delete Group</button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Delete group?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the group and remove all members. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive hover:bg-destructive/90">{deleting ? "Deleting..." : "Delete"}</AlertDialogAction></AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
+            {/* Leave Group */}
+            <div className="border-t border-border pt-4">
+              <button
+                onClick={() => setLeaveFlowOpen(true)}
+                className="w-full flex items-center gap-2 p-3 rounded-xl hover:bg-destructive/5 transition-colors text-sm font-medium"
+                style={{ color: "#E05C5C" }}
+              >
+                <LogOut size={16} />
+                Leave Group
+              </button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Leave Group Flow */}
+      {user && (
+        <LeaveGroupFlow
+          group={currentGroup}
+          userId={user.id}
+          open={leaveFlowOpen}
+          onOpenChange={setLeaveFlowOpen}
+          onLeft={handleLeaveFlowDone}
+        />
+      )}
+
+      {/* Add Member Dialog */}
+      <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+        <DialogContent className="max-w-sm max-h-[70vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Add Member</DialogTitle></DialogHeader>
+          <div className="space-y-2 py-2">
+            {activeFriends.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No friends to invite. Add friends first!</p>
+            ) : (
+              activeFriends
+                .filter((f) => f.friend && !currentActiveMembers.some((m) => m.user_id === f.friend!.id))
+                .map((f) => (
+                  <button
+                    key={f.friend!.id}
+                    onClick={() => handleAddMember(f.friend!.id)}
+                    className="w-full flex items-center gap-2.5 p-2.5 rounded-xl border border-border hover:border-primary/30 transition-all text-left"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                      {(f.friend!.display_name || "?")[0].toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium text-foreground flex-1">{f.friend!.display_name}</span>
+                    <Plus size={14} className="text-muted-foreground" />
+                  </button>
+                ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Challenge Detail Modal */}
+      {activeChallenge && (
+        <ChallengeDetailModal
+          open={challengeDetailOpen}
+          onOpenChange={setChallengeDetailOpen}
+          challenge={activeChallenge}
+          members={currentActiveMembers}
+          userId={user?.id || ""}
+        />
+      )}
     </div>
   );
 };

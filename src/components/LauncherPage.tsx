@@ -582,7 +582,7 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
 
           <div
             ref={listRef}
-            className="space-y-3 overflow-y-auto flex-1 scrollbar-none"
+            className="overflow-y-auto flex-1 scrollbar-none"
             onPointerMove={handleCardPointerMove}
             onPointerLeave={() => clearLP()}
             onPointerCancel={() => { clearLP(); setDragIdx(null); setDragOverIdx(null); }}
@@ -592,90 +592,117 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
                 <button onClick={() => setEditMode(false)} className="text-[10px] font-semibold text-primary px-3 py-0.5 rounded-full bg-primary/10">Done</button>
               </div>
             )}
-            {visualCalendarGroups.map((group, index) => {
-              const activeMembers = group.members.filter((m) => m.status === 'active' && m.user_id !== profile?.id);
-              const pendingMembers = group.members.filter((m) => m.status === 'pending_invited');
-              const memberNames = activeMembers.map((m) => m.display_name || "Member").join(", ");
-              const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
-              const currentCoverUrl = localCoverMap[group.id] || group.cover_image_url || null;
-              const hasCover = !!currentCoverUrl;
-              const isUploading = uploadingGroupId === group.id;
-              const isDragging = editMode && dragIdx !== null && orderedVisibleGroups[dragIdx]?.id === group.id;
-              const isAdmin = group.created_by === user?.id;
-              const validPages = (group.shared_pages || []).filter((p: string) => (SHAREABLE_PAGES as readonly string[]).includes(p as ShareablePage)) as ShareablePage[];
+            {/* Sticky stack container */}
+            <div className="relative">
+              {visualCalendarGroups.map((group, index) => {
+                const activeMembers = group.members.filter((m) => m.status === 'active' && m.user_id !== profile?.id);
+                const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
+                const currentCoverUrl = localCoverMap[group.id] || group.cover_image_url || null;
+                const hasCover = !!currentCoverUrl;
+                const isUploading = uploadingGroupId === group.id;
+                const isDragging = editMode && dragIdx !== null && orderedVisibleGroups[dragIdx]?.id === group.id;
+                const isAdmin = group.created_by === user?.id;
+                const validPages = (group.shared_pages || []).filter((p: string) => (SHAREABLE_PAGES as readonly string[]).includes(p as ShareablePage)) as ShareablePage[];
+                const CARD_HEIGHT = 76;
+                const PEEK_OFFSET = 52;
+                const shadowOpacity = Math.max(0.10 - index * 0.02, 0.02);
+                const isLast = index === visualCalendarGroups.length - 1;
 
-              return (
-                <div
-                  key={group.id}
-                  ref={(el) => { cardRefs.current[index] = el; }}
-                  onPointerDown={(e) => { e.preventDefault(); handleCardPointerDown(index); }}
-                  onPointerUp={() => handleCardPointerUp(group)}
-                  className={`relative overflow-hidden rounded-2xl shadow-sm border border-border/60 select-none touch-none ${editMode ? "animate-nav-wiggle" : ""} ${isDragging ? "opacity-60 scale-[1.02]" : ""}`}
-                  style={editMode ? { animationDelay: `${index * 0.05}s` } : undefined}
-                >
-                  {/* Photo Strip — 52px */}
-                  <div className="relative w-full" style={{ height: 52 }}>
-                    {hasCover ? (
-                      <>
-                        <img src={currentCoverUrl!} alt="" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.05), rgba(0,0,0,0.25))" }} />
-                      </>
-                    ) : (
-                      <div
-                        className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center gap-1.5`}
-                        onClick={(e) => { if (isAdmin && !editMode) { e.stopPropagation(); triggerFileInput(group.id, e); } }}
-                      >
-                        {isUploading ? (
-                          <Loader2 size={12} className="animate-spin text-muted-foreground/40" />
+                return (
+                  <div
+                    key={group.id}
+                    ref={(el) => { cardRefs.current[index] = el; }}
+                    className="sticky select-none touch-none"
+                    style={{
+                      top: index * PEEK_OFFSET,
+                      zIndex: visualCalendarGroups.length - index,
+                      height: CARD_HEIGHT,
+                      marginBottom: isLast ? 0 : -(CARD_HEIGHT - PEEK_OFFSET),
+                    }}
+                  >
+                    <div
+                      onPointerDown={(e) => { e.preventDefault(); handleCardPointerDown(index); }}
+                      onPointerUp={() => handleCardPointerUp(group)}
+                      className={`flex overflow-hidden ${editMode ? "animate-nav-wiggle" : ""} ${isDragging ? "opacity-60 scale-[1.02]" : ""}`}
+                      style={{
+                        height: CARD_HEIGHT,
+                        borderRadius: 14,
+                        border: "0.5px solid rgba(0,0,0,0.07)",
+                        background: "#fff",
+                        boxShadow: `0 4px 12px rgba(0,0,0,${shadowOpacity})`,
+                        ...(editMode ? { animationDelay: `${index * 0.05}s` } : {}),
+                      }}
+                    >
+                      {/* Left child */}
+                      <div style={{ flex: 1, padding: "10px 12px", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                        {/* Row 1: name + member dots */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} className="text-foreground">{group.name}</span>
+                          {activeMembers.length > 0 && (
+                            <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                              {activeMembers.slice(0, 4).map((m, mIdx) => {
+                                const dotColors = ["#7C5CCC", "#CC5C80", "#5CA88A", "#CC8A3D"];
+                                return (
+                                  <div
+                                    key={m.user_id}
+                                    style={{
+                                      width: 18, height: 18, borderRadius: "50%",
+                                      backgroundColor: dotColors[mIdx % dotColors.length],
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      fontSize: 8, fontWeight: 700, color: "#fff",
+                                      border: "1.5px solid #fff",
+                                      marginLeft: mIdx > 0 ? -4 : 0,
+                                    }}
+                                    title={m.display_name || "Member"}
+                                  >
+                                    {(m.display_name || "M")[0].toUpperCase()}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        {/* Row 2: interest pills */}
+                        {validPages.length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                            {validPages.slice(0, 4).map((page) => (
+                              <span key={page} className="text-primary" style={{ fontSize: 9, fontWeight: 500, padding: "2px 6px", borderRadius: 4, background: "rgba(var(--primary-rgb, 99,102,241), 0.08)" }}>
+                                {PAGE_LABELS[page]}
+                              </span>
+                            ))}
+                            {validPages.length > 4 && (
+                              <span style={{ fontSize: 9, fontWeight: 500, padding: "2px 6px", borderRadius: 4 }} className="bg-secondary text-muted-foreground">+{validPages.length - 4}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right child — photo area */}
+                      <div style={{ width: 100, flexShrink: 0, borderRadius: "0 14px 14px 0", overflow: "hidden" }}>
+                        {hasCover ? (
+                          <img src={currentCoverUrl!} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                         ) : (
-                          <>
-                            <Camera size={11} className="text-muted-foreground/40" />
-                            <span className="text-[9px] text-muted-foreground/40 font-medium">Add photo</span>
-                          </>
+                          <div
+                            className={`bg-gradient-to-br ${gradient}`}
+                            style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, cursor: isAdmin ? "pointer" : "default" }}
+                            onClick={(e) => { if (isAdmin && !editMode) { e.stopPropagation(); triggerFileInput(group.id, e); } }}
+                          >
+                            {isUploading ? (
+                              <Loader2 size={12} className="animate-spin text-muted-foreground/40" />
+                            ) : (
+                              <>
+                                <Camera size={12} style={{ color: "rgba(0,0,0,0.2)" }} />
+                                <span style={{ fontSize: 8, color: "rgba(0,0,0,0.2)", fontWeight: 500 }}>Add photo</span>
+                              </>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                    {/* Edit button on photo strip for admin */}
-                    {!editMode && hasCover && isAdmin && (
-                      <button
-                        onClick={(e) => triggerFileInput(group.id, e)}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center z-10"
-                        style={{ background: "rgba(255,255,255,0.25)", backdropFilter: "blur(6px)" }}
-                      >
-                        {isUploading ? <Loader2 size={9} className="animate-spin text-white" /> : <Camera size={9} className="text-white" />}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Card Body */}
-                  <div className="p-3 bg-card">
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[14px] font-semibold truncate text-foreground leading-tight">{group.name}</p>
-                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                          {memberNames || "Just you"} · {activeMembers.length + 1} member{activeMembers.length !== 0 ? "s" : ""}
-                          {pendingMembers.length > 0 && <span className="text-muted-foreground/60"> · {pendingMembers.length} pending</span>}
-                        </p>
-                      </div>
-                      <ChevronRight size={16} className="text-muted-foreground/40 flex-shrink-0" />
                     </div>
-                    {/* Interest pills */}
-                    {validPages.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {validPages.slice(0, 4).map((page) => (
-                          <span key={page} className="text-[9px] font-medium bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">
-                            {PAGE_ICONS[page]} {PAGE_LABELS[page]}
-                          </span>
-                        ))}
-                        {validPages.length > 4 && (
-                          <span className="text-[9px] font-medium bg-secondary text-muted-foreground px-1.5 py-0.5 rounded">+{validPages.length - 4}</span>
-                        )}
-                      </div>
-                    )}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
 
             {/* Pending group invites */}
             {pendingGroupInvites.map((invite) => (

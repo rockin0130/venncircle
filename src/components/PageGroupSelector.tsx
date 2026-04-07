@@ -9,12 +9,17 @@ interface PageGroupSelectorProps {
   personalLabel?: string;
   personalEmoji?: string;
   hideAllPill?: boolean;
+  showAvatars?: boolean;
 }
 
 const PERSONAL_SENTINEL = "__personal__";
 
-const PageGroupSelector = ({ page, isHomePage, personalLabel = "Personal", personalEmoji = "👤", hideAllPill = false }: PageGroupSelectorProps) => {
-  const { groups, activeGroup, setActiveGroup } = useAuth();
+const GROUP_PILL_COLORS = [
+  "#3B82F6", "#EC4899", "#059669", "#F97316", "#8B5CF6", "#14B8A6", "#EF4444", "#EAB308",
+];
+
+const PageGroupSelector = ({ page, isHomePage, personalLabel = "Personal", personalEmoji = "👤", hideAllPill = false, showAvatars = false }: PageGroupSelectorProps) => {
+  const { groups, activeGroup, setActiveGroup, profile } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
 
   // Filter groups: on Home page, only show "home" category groups
@@ -36,6 +41,43 @@ const PageGroupSelector = ({ page, isHomePage, personalLabel = "Personal", perso
   const handleSelectPersonal = () => {
     // Use a sentinel group object to represent "Personal"
     setActiveGroup({ _personal: true, id: PERSONAL_SENTINEL, name: "Personal", type: "personal", emoji: "👤", invite_code: "", created_by: "", shared_pages: [], members: [] } as any);
+  };
+
+  // User avatar for personal pill (when showAvatars is true)
+  const renderUserAvatar = () => {
+    if (!showAvatars) return <span className="text-sm leading-none">{personalEmoji}</span>;
+    const avatarUrl = profile?.avatar_url;
+    const initial = (profile?.display_name || "U")[0].toUpperCase();
+    if (avatarUrl) {
+      return <img src={avatarUrl} className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0" alt="" />;
+    }
+    return (
+      <span
+        className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 text-[8px] font-bold text-white"
+        style={{ background: "#6C47FF" }}
+      >
+        {initial}
+      </span>
+    );
+  };
+
+  // Group avatar/cover for group pill (when showAvatars is true)
+  const renderGroupIcon = (group: any, index: number) => {
+    if (!showAvatars) return <span className="text-sm leading-none">{group.emoji}</span>;
+    const coverUrl = group.cover_image_url;
+    const initial = (group.name || "G")[0].toUpperCase();
+    const color = GROUP_PILL_COLORS[index % GROUP_PILL_COLORS.length];
+    if (coverUrl) {
+      return <img src={coverUrl} className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0" alt="" />;
+    }
+    return (
+      <span
+        className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 text-[8px] font-bold text-white"
+        style={{ background: color }}
+      >
+        {initial}
+      </span>
+    );
   };
 
   return (
@@ -65,12 +107,12 @@ const PageGroupSelector = ({ page, isHomePage, personalLabel = "Personal", perso
               : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
           }`}
         >
-          <span className="text-sm leading-none">{personalEmoji}</span>
+          {renderUserAvatar()}
           <span>{personalLabel}</span>
         </button>
 
         {/* Group chips filtered for this page */}
-        {pageGroups.map((group) => {
+        {pageGroups.map((group, index) => {
           const isActive = activeGroup?.id === group.id && !(activeGroup as any)?._personal;
           const isFamily = group.name.toLowerCase() === "family" || group.category === "home";
           return (
@@ -85,7 +127,7 @@ const PageGroupSelector = ({ page, isHomePage, personalLabel = "Personal", perso
                   : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
               }`}
             >
-              <span className="text-sm leading-none">{group.emoji}</span>
+              {renderGroupIcon(group, index)}
               <span className="truncate max-w-[120px]">{group.name}</span>
             </button>
           );

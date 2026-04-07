@@ -16,9 +16,11 @@ import SobrietyPage from "@/components/SobrietyPage";
 import SettingsPage from "@/components/SettingsPage";
 import ShoppingListPage from "@/components/ShoppingListPage";
 import StudyPage from "@/components/StudyPage";
+import TodoPage from "@/components/TodoPage";
 
 import AuthPage from "@/components/AuthPage";
 import ProfileSetupPage from "@/components/ProfileSetupPage";
+import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
 import SharedInterestsPage from "@/components/SharedInterestsPage";
 import GroupHubPage from "@/components/GroupHubPage";
 import ProfilePage from "@/components/ProfilePage";
@@ -61,6 +63,18 @@ const Index = () => {
   }
 
   const needsProfileSetup = profile && !(profile as any).username;
+  const needsOnboarding = profile && !(profile as any).onboarding_completed;
+
+  if (needsOnboarding) {
+    return (
+      <OnboardingFlow
+        userId={user.id}
+        profile={profile}
+        onComplete={() => refreshProfile()}
+      />
+    );
+  }
+
   if (needsProfileSetup) {
     return (
       <ProfileSetupPage
@@ -160,6 +174,7 @@ const Index = () => {
       calendar: "calendar",
       shopping: "shopping",
       study: "study",
+      todo: "todo",
     };
     const tab = tabMap[feature];
     if (!tab) return;
@@ -225,6 +240,7 @@ const Index = () => {
     shopping: <ShoppingListPage onOpenMore={() => setMoreOpen(true)} />,
     calendar: <CalendarPage onOpenMore={() => setMoreOpen(true)} />,
     study: <StudyPage onOpenMore={() => setMoreOpen(true)} />,
+    todo: <TodoPage onOpenMore={() => setMoreOpen(true)} />,
     chat: renderChatView(),
     ai: <AiAssistantPage onOpenMore={() => setMoreOpen(true)} />,
     settings: <SettingsPage />,
