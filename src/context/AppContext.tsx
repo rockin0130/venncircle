@@ -66,6 +66,7 @@ export interface Task {
   hiddenFromPartner?: boolean;
   groupId?: string | null;
   ownerUserId?: string;
+  priority?: "high" | "medium" | "low" | "none";
 }
 
 export type WorkoutOriginType = "manual" | "ai" | "imported" | "merged";
@@ -233,7 +234,7 @@ interface AppContextType {
   toggleTask: (id: string) => void;
   addTask: (task: Omit<Task, "id" | "done">) => void;
   removeTask: (id: string) => void;
-  updateTask: (id: string, updates: Partial<Pick<Task, "title" | "tag" | "scheduledDay" | "scheduledMonth" | "scheduledYear" | "time" | "dueDate" | "priorNoticeDays">>) => void;
+  updateTask: (id: string, updates: Partial<Pick<Task, "title" | "tag" | "scheduledDay" | "scheduledMonth" | "scheduledYear" | "time" | "dueDate" | "priorNoticeDays" | "priority">>) => void;
   waterIntake: number;
   waterGoal: number;
   setWaterIntake: (amount: number) => void;
@@ -457,6 +458,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             priorNoticeDays: t.prior_notice_days ?? 0,
             hiddenFromPartner: t.hidden_from_partner || false,
             groupId: t.group_id || null,
+            priority: (t as any).priority || "none",
           })));
         }
 
@@ -1368,6 +1370,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
     if (task.dueDate !== undefined) insertData.due_date = task.dueDate;
     if (task.priorNoticeDays !== undefined) insertData.prior_notice_days = task.priorNoticeDays;
+    if (task.priority !== undefined) insertData.priority = task.priority;
 
     const { data, error } = await supabase
       .from("tasks")
@@ -1386,6 +1389,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         dueDate: (data as any).due_date ?? null,
         priorNoticeDays: (data as any).prior_notice_days ?? 0,
         groupId,
+        priority: (data as any).priority || "none",
       }]);
     }
   };
@@ -1395,7 +1399,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await supabase.from("tasks").delete().eq("id", id);
   };
 
-  const updateTask = async (id: string, updates: Partial<Pick<Task, "title" | "tag" | "scheduledDay" | "scheduledMonth" | "scheduledYear" | "time" | "dueDate" | "priorNoticeDays">>) => {
+  const updateTask = async (id: string, updates: Partial<Pick<Task, "title" | "tag" | "scheduledDay" | "scheduledMonth" | "scheduledYear" | "time" | "dueDate" | "priorNoticeDays" | "priority">>) => {
     setTasks((t) => t.map((item) => (item.id === id ? { ...item, ...updates } : item)));
     const dbUpdates: any = {};
     if (updates.title !== undefined) dbUpdates.title = updates.title;
@@ -1406,6 +1410,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (updates.time !== undefined) dbUpdates.time = updates.time;
     if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate;
     if (updates.priorNoticeDays !== undefined) dbUpdates.prior_notice_days = updates.priorNoticeDays;
+    if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
     await supabase.from("tasks").update(dbUpdates).eq("id", id);
   };
 

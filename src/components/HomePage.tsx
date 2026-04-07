@@ -36,6 +36,11 @@ interface ClarificationState {
 }
 
 const QUICK_ACCESS_FEATURES = [
+  { id: "todo", label: "To-Do", page: "todo", icon: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  )},
   { id: "workout", label: "Workout", page: "workout", icon: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M6.5 6.5a2 2 0 1 1 0 4" /><path d="M17.5 6.5a2 2 0 1 0 0 4" />
@@ -936,15 +941,6 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
               case "todo":
                 return (
                   <div key={sectionId}>
-                    <TodoListSection
-                      tasks={todoTasks}
-                      onToggle={isViewingPartner ? undefined : toggleTask}
-                      onCongrats={() => setCongratsType("task")}
-                      readOnly={isViewingPartner}
-                      addTask={addTask}
-                      selectedDate={selectedDate}
-                      memberFilters={[]}
-                    />
                     {quickAccessPos === "below-todo" && (
                       <div onClick={(e) => e.stopPropagation()}>
                         <QuickAccessStrip

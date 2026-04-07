@@ -1692,6 +1692,7 @@ export type Database = {
           hidden_from_partner: boolean
           id: string
           prior_notice_days: number
+          priority: string
           scheduled_day: number | null
           scheduled_month: number | null
           scheduled_year: number | null
@@ -1714,6 +1715,7 @@ export type Database = {
           hidden_from_partner?: boolean
           id?: string
           prior_notice_days?: number
+          priority?: string
           scheduled_day?: number | null
           scheduled_month?: number | null
           scheduled_year?: number | null
@@ -1736,6 +1738,7 @@ export type Database = {
           hidden_from_partner?: boolean
           id?: string
           prior_notice_days?: number
+          priority?: string
           scheduled_day?: number | null
           scheduled_month?: number | null
           scheduled_year?: number | null
@@ -2063,6 +2066,7 @@ export type Database = {
           hidden_from_partner: boolean
           id: string
           prior_notice_days: number
+          priority: string
           scheduled_day: number | null
           scheduled_month: number | null
           scheduled_year: number | null
