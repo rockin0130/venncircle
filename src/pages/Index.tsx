@@ -235,7 +235,7 @@ const Index = () => {
         onOpenMore={() => setMoreOpen(true)}
       />
     ),
-    workout: <WorkoutsPage onOpenMore={() => setMoreOpen(true)} isActive={activeTab === "workout"} />,
+    workout: <WorkoutsPage onOpenMore={() => setMoreOpen(true)} isActive={activeTab === "workout"} navigatedGroupId={workoutNavigatedGroupId} />,
     nutrition: <NutritionPage onOpenMore={() => setMoreOpen(true)} />,
     habits: <HabitsPage onOpenMore={() => setMoreOpen(true)} />,
     sobriety: <SobrietyPage onOpenMore={() => setMoreOpen(true)} />,
