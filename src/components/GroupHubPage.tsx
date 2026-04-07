@@ -1,5 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { ArrowLeft, Settings, ChevronRight, Plus, Trash2, LogOut, Pencil, X, Check, Loader2, MoreHorizontal, Heart, MessageCircle, Share2, Image, Activity, Smile, Camera, UserPlus, ShieldCheck, ShieldOff } from "lucide-react";
+import { ArrowLeft, Settings, ChevronRight, Plus, Trash2, LogOut, Pencil, X, Check, Loader2, MoreHorizontal, Heart, MessageCircle, Share2, Image, Activity, Smile, Camera, UserPlus, ShieldCheck, ShieldOff, Trophy } from "lucide-react";
+import { supabase as supabaseClient } from "@/integrations/supabase/client";
+import GroupChallengePage from "@/components/GroupChallengePage";
+import ChallengeDetailModal from "@/components/ChallengeDetailModal";
 import { useAuth, Group, ShareablePage, SHAREABLE_PAGES, PAGE_LABELS, PAGE_ICONS } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
