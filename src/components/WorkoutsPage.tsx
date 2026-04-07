@@ -1395,8 +1395,6 @@ const WorkoutsPage = ({
             </>
           )}
         </section>
-      </>
-
       {/* Exercise Detail Dialog */}
       <ExerciseDetailDialog
         exerciseName={selectedExercise}
