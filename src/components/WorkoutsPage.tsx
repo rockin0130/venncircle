@@ -603,13 +603,22 @@ const WorkoutsPage = ({
   // Sync activeGroup based on mode
   useEffect(() => {
     if (workoutMode === "mine") {
-      // In mine mode, don't set active group (aggregate view)
       setActiveGroup(null);
     } else if (workoutMode === "group" && selectedGroupId) {
       const g = groups.find((g) => g.id === selectedGroupId);
       if (g) setActiveGroup(g);
     }
   }, [workoutMode, selectedGroupId, groups]);
+
+  // Sync new member filter → old userFilterIds for workout data filtering
+  useEffect(() => {
+    if (workoutMode === "group" && selectedGroupId) {
+      const newIds = memberFilter.has("__everyone__")
+        ? new Set([EVERYONE_SENTINEL])
+        : memberFilter;
+      setUserFilterMap((prev) => ({ ...prev, [selectedGroupId]: newIds }));
+    }
+  }, [workoutMode, selectedGroupId, memberFilter]);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [showCustomBuilder, setShowCustomBuilder] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ filter: "all" | "week" | "month" | "date" | "tomorrow"; message: string } | null>(null);
