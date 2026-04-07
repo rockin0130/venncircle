@@ -174,6 +174,7 @@ const Index = () => {
       calendar: "calendar",
       shopping: "shopping",
       study: "study",
+      todo: "todo",
     };
     const tab = tabMap[feature];
     if (!tab) return;
