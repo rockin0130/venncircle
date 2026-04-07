@@ -180,14 +180,16 @@ const Index = () => {
     const tab = tabMap[feature];
     if (!tab) return;
 
+    if (tab === "workout") {
+      setWorkoutNavigatedGroupId(groupId || null);
+    }
+
     if (groupId) {
       const group = groups.find((g) => g.id === groupId);
       const pageKey = TAB_TO_PAGE[tab] || feature;
-      // Only set active group if the group has this feature enabled
       if (group && group.shared_pages?.includes(pageKey as any)) {
         setActiveGroup(group);
       } else {
-        // Group doesn't have this feature — fall back to personal
         setActiveGroup(null);
       }
     }
