@@ -772,13 +772,20 @@ const WorkoutsPage = ({
   }, [filteredWorkouts, filteredPartnerWorkouts, isPersonalView]);
 
   const userFilteredWorkouts = useMemo(() => {
+    // Mine mode: only show logged-in user's workouts (aggregate personal view)
+    if (workoutMode === "mine") {
+      return allContextWorkouts.filter((w) => {
+        const ownerId = w.ownerUserId || user?.id;
+        return ownerId === user?.id;
+      });
+    }
     if (isPersonalView) return filteredWorkouts;
     if (userFilterIds.has(EVERYONE_SENTINEL)) return allContextWorkouts;
     return allContextWorkouts.filter((w) => {
       const ownerId = w.ownerUserId || user?.id;
       return ownerId && userFilterIds.has(ownerId);
     });
-  }, [allContextWorkouts, filteredWorkouts, userFilterIds, isPersonalView, user?.id]);
+  }, [allContextWorkouts, filteredWorkouts, userFilterIds, isPersonalView, user?.id, workoutMode]);
 
   const displayWorkouts = useMemo(
     () => mergeAppWorkoutsWithHealthKit(userFilteredWorkouts, healthKitWorkouts, user?.id || ""),
@@ -791,13 +798,20 @@ const WorkoutsPage = ({
 
   const selectedUserInfos = useMemo(() => {
     const infos: { userId: string; label: string; initial: string; avatarUrl: string | null }[] = [];
+
+    // Mine mode: always single-user (logged-in user only)
+    if (workoutMode === "mine") {
+      infos.push({ userId: user?.id || "me", label: "Mine", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
+      return infos;
+    }
+
     if (isPersonalView) {
       infos.push({ userId: user?.id || "me", label: "Mine", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
       return infos;
     }
 
     const allMembers: { userId: string; label: string; initial: string; avatarUrl: string | null }[] = [];
-    allMembers.push({ userId: user?.id || "me", label: "Mine", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
+    allMembers.push({ userId: user?.id || "me", label: "Me", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
 
     if (isGroupView && activeGroup) {
       activeGroup.members.filter((m: GroupMember) => m.user_id !== user?.id && m.status === "active").forEach((m) => {
@@ -820,7 +834,7 @@ const WorkoutsPage = ({
       if (isEveryone || userFilterIds.has(m.userId)) infos.push(m);
     }
     return infos;
-  }, [user, profile, activeGroup, groups, isPersonalView, isGroupView, isAllView, userFilterIds]);
+  }, [user, profile, activeGroup, groups, isPersonalView, isGroupView, isAllView, userFilterIds, workoutMode]);
 
   const userWorkoutData: UserWorkoutData[] = useMemo(() => {
     return selectedUserInfos.map((u) => ({
