@@ -785,8 +785,7 @@ const WorkoutsPage = ({
       const ownerId = w.ownerUserId || user?.id;
       return ownerId && userFilterIds.has(ownerId);
     });
-    });
-  }, [allContextWorkouts, filteredWorkouts, userFilterIds, isPersonalView, user?.id]);
+  }, [allContextWorkouts, filteredWorkouts, userFilterIds, isPersonalView, user?.id, workoutMode]);
 
   const displayWorkouts = useMemo(
     () => mergeAppWorkoutsWithHealthKit(userFilteredWorkouts, healthKitWorkouts, user?.id || ""),
