@@ -121,10 +121,10 @@ export const MemberSelectorPill = ({
   const members: MemberOption[] = useMemo(() => {
     if (!group || !user) return [];
     const result: MemberOption[] = [];
-    // Current user first
+    // Current user first — always labeled "Me"
     result.push({
       userId: user.id,
-      label: profile?.display_name?.split(" ")[0] || "Me",
+      label: "Me",
       initial: (profile?.display_name || "U")[0].toUpperCase(),
       avatarUrl: profile?.avatar_url || null,
     });
