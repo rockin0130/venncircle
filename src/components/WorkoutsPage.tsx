@@ -798,13 +798,20 @@ const WorkoutsPage = ({
 
   const selectedUserInfos = useMemo(() => {
     const infos: { userId: string; label: string; initial: string; avatarUrl: string | null }[] = [];
+
+    // Mine mode: always single-user (logged-in user only)
+    if (workoutMode === "mine") {
+      infos.push({ userId: user?.id || "me", label: "Mine", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
+      return infos;
+    }
+
     if (isPersonalView) {
       infos.push({ userId: user?.id || "me", label: "Mine", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
       return infos;
     }
 
     const allMembers: { userId: string; label: string; initial: string; avatarUrl: string | null }[] = [];
-    allMembers.push({ userId: user?.id || "me", label: "Mine", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
+    allMembers.push({ userId: user?.id || "me", label: "Me", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
 
     if (isGroupView && activeGroup) {
       activeGroup.members.filter((m: GroupMember) => m.user_id !== user?.id && m.status === "active").forEach((m) => {
@@ -827,7 +834,7 @@ const WorkoutsPage = ({
       if (isEveryone || userFilterIds.has(m.userId)) infos.push(m);
     }
     return infos;
-  }, [user, profile, activeGroup, groups, isPersonalView, isGroupView, isAllView, userFilterIds]);
+  }, [user, profile, activeGroup, groups, isPersonalView, isGroupView, isAllView, userFilterIds, workoutMode]);
 
   const userWorkoutData: UserWorkoutData[] = useMemo(() => {
     return selectedUserInfos.map((u) => ({
