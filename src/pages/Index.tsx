@@ -16,6 +16,7 @@ import SobrietyPage from "@/components/SobrietyPage";
 import SettingsPage from "@/components/SettingsPage";
 import ShoppingListPage from "@/components/ShoppingListPage";
 import StudyPage from "@/components/StudyPage";
+import TodoPage from "@/components/TodoPage";
 
 import AuthPage from "@/components/AuthPage";
 import ProfileSetupPage from "@/components/ProfileSetupPage";
@@ -238,6 +239,7 @@ const Index = () => {
     shopping: <ShoppingListPage onOpenMore={() => setMoreOpen(true)} />,
     calendar: <CalendarPage onOpenMore={() => setMoreOpen(true)} />,
     study: <StudyPage onOpenMore={() => setMoreOpen(true)} />,
+    todo: <TodoPage onOpenMore={() => setMoreOpen(true)} />,
     chat: renderChatView(),
     ai: <AiAssistantPage onOpenMore={() => setMoreOpen(true)} />,
     settings: <SettingsPage />,
