@@ -1194,8 +1194,8 @@ const WorkoutsPage = ({
         </>
       )}
 
-      {/* ── Mine Mode: Hero Stats Card ── */}
-      {workoutMode === "mine" && (
+      {/* ── Hero Stats Card (Mine mode OR Group mode with single user selected) ── */}
+      {(workoutMode === "mine" || (workoutMode === "group" && !isMultiUserView)) && (
         <HeroCard workouts={displayWorkouts} weeklyGoal={weeklyGoal} onGoalChange={saveGoal} />
       )}
 
