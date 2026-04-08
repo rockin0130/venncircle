@@ -687,12 +687,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
   };
 
-  // ── Swipe-to-delete handlers ──
-  const canSwipeDelete = useMemo(() => {
-    if (isPersonal) return true;
-    // Only allow swipe-delete when viewing only own sessions
-    return memberFilterUserIds.length === 1 && memberFilterUserIds[0] === user?.id;
-  }, [isPersonal, memberFilterUserIds, user]);
+  // ── Swipe-to-delete handlers (canSwipeDelete defined after memberFilterUserIds below) ──
 
   const handleSwipeStart = useCallback((e: React.TouchEvent, sessionId: string) => {
     if (!canSwipeDelete) return;
