@@ -200,7 +200,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const [fullscreen, setFullscreen] = useState(false);
   const [chartFilter, setChartFilter] = useState("mine");
   const [chartDropdownOpen, setChartDropdownOpen] = useState(false);
-  const [sessionsFilter, setSessionsFilter] = useState<string[]>(["mine"]);
+  
   const [editMode, setEditMode] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [similarityPrompt, setSimilarityPrompt] = useState<{ newName: string; existing: string } | null>(null);
