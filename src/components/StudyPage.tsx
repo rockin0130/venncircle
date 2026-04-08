@@ -1218,63 +1218,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
             )}
           </div>
 
-          {/* Filter pills (group view) — multi-select */}
-          {!isPersonal && sessionsFilterOptions.length > 0 && (
-            <div className="flex gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
-              {sessionsFilterOptions.map(opt => {
-                const individualKeys = sessionsFilterOptions.filter(o => o.key !== "together").map(o => o.key);
-                const allIndividualsSelected = individualKeys.every(k => sessionsFilter.includes(k));
-                const isTogetherActive = sessionsFilter.includes("together") || allIndividualsSelected;
-                const isActive = opt.key === "together" ? isTogetherActive : sessionsFilter.includes(opt.key) || isTogetherActive;
-                return (
-                  <button
-                    key={opt.key}
-                    onClick={() => {
-                      if (opt.key === "together") {
-                        // If Together is already active (all highlighted), reset to Mine only
-                        if (isTogetherActive) {
-                          setSessionsFilter(["mine"]);
-                        } else {
-                          // Select all individual pills + together
-                          setSessionsFilter([...individualKeys, "together"]);
-                        }
-                      } else {
-                        setSessionsFilter(prev => {
-                          const withoutTogether = prev.filter(k => k !== "together");
-                          if (isTogetherActive && !prev.includes("together")) {
-                            // Was in "all individuals selected" state, deselect this one
-                            return individualKeys.filter(k => k !== opt.key);
-                          }
-                          if (prev.includes("together")) {
-                            // Together was explicitly active, deselect this member
-                            return individualKeys.filter(k => k !== opt.key);
-                          }
-                          if (withoutTogether.includes(opt.key)) {
-                            const next = withoutTogether.filter(k => k !== opt.key);
-                            return next.length === 0 ? [opt.key] : next;
-                          }
-                          const next = [...withoutTogether, opt.key];
-                          // Check if all individuals are now selected
-                          if (individualKeys.every(k => next.includes(k))) {
-                            return [...next, "together"];
-                          }
-                          return next;
-                        });
-                      }
-                      resetSwipe();
-                    }}
-                    className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
-                    style={{
-                      background: isActive ? "#1a1a1a" : "#F4F3F0",
-                      color: isActive ? "#fff" : "#888",
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* Member filtering is now handled by MemberSelectorPill above */}
 
           {/* Column view: Together or multi-select */}
           {!isPersonal && showColumnView ? (
