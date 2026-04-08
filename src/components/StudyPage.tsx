@@ -1500,6 +1500,8 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CreateGroupModal open={showCreateGroup} onOpenChange={setShowCreateGroup} defaultPage="study" />
     </div>
   );
 };
