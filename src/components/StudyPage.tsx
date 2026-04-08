@@ -809,17 +809,8 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     return m;
   }, [groupInfoMap]);
 
-  // Sessions filter options (group view)
-  const sessionsFilterOptions = useMemo(() => {
-    if (isPersonal) return [];
-    const opts: { key: string; label: string }[] = [{ key: "mine", label: "Mine" }];
-    (selectedGroup?.members || []).forEach((m: any) => {
-      if (m.user_id !== user?.id)
-        opts.push({ key: m.user_id, label: memberProfiles[m.user_id]?.display_name || "Member" });
-    });
-    opts.push({ key: "together", label: "Together" });
-    return opts;
-  }, [isPersonal, selectedGroup, user, memberProfiles]);
+
+
 
   // Derive effective user IDs from memberFilter
   const memberFilterUserIds = useMemo(() => {
