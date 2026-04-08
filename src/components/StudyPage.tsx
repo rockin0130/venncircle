@@ -858,6 +858,49 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     return filteredGroupTodaySessions.reduce((sum, s) => sum + s.duration_seconds, 0);
   }, [isPersonal, todaySessions, showColumnView, columnMembers, filteredGroupTodaySessions]);
 
+  // ── Multi-select member dropdown helpers ──
+  const allMemberIds = useMemo(() => new Set(groupMembers.map(m => m.user_id)), [groupMembers]);
+  const isEveryone = memberFilter.has("__everyone__") || (allMemberIds.size > 0 && [...allMemberIds].every(id => memberFilter.has(id)));
+
+  const toggleEveryone = () => {
+    if (isEveryone) {
+      setMemberFilter(new Set([user?.id || ""]));
+    } else {
+      setMemberFilter(new Set(["__everyone__"]));
+    }
+  };
+
+  const toggleMember = (userId: string) => {
+    if (memberFilter.has("__everyone__")) {
+      const next = new Set(allMemberIds);
+      next.delete(userId);
+      if (next.size === 0) return;
+      setMemberFilter(next);
+      return;
+    }
+    const next = new Set(memberFilter);
+    if (next.has(userId)) {
+      next.delete(userId);
+      if (next.size === 0) return;
+    } else {
+      next.add(userId);
+      if ([...allMemberIds].every(id => next.has(id))) {
+        setMemberFilter(new Set(["__everyone__"]));
+        return;
+      }
+    }
+    setMemberFilter(next);
+  };
+
+  const memberPillLabel = useMemo(() => {
+    if (isEveryone) return "Everyone";
+    const names = groupMembers
+      .filter(m => memberFilter.has(m.user_id))
+      .map(m => m.isMe ? "Me" : (m.profile?.display_name?.split(" ")[0] || "Member"));
+    if (names.length === 0) return "Everyone";
+    if (names.length === 1) return names[0];
+    return names.join(", ");
+  }, [isEveryone, groupMembers, memberFilter]);
 
 
 
