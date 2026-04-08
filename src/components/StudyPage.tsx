@@ -929,7 +929,49 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
 
       {/* ── Context toggle ── */}
       <div className="px-4 pb-2">
-        <PageGroupSelector page="study" personalLabel="Mine" hideAllPill showAvatars />
+        <ModeToggleBar mode={studyMode} onModeChange={setStudyMode} />
+        {studyMode === "group" && (
+          <>
+            <div
+              className="flex gap-1.5 overflow-x-auto scrollbar-hide scroll-smooth-touch py-1 -mx-1 px-1 mb-2"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              {studyGroups.map((g) => {
+                const active = selectedGroupId === g.id;
+                return (
+                  <button
+                    key={g.id}
+                    onClick={() => setSelectedGroupId(g.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0"
+                    style={{
+                      background: active ? "#1a1a1a" : "#fff",
+                      color: active ? "#fff" : "#666",
+                      border: active ? "none" : "0.5px solid rgba(0,0,0,0.1)",
+                    }}
+                  >
+                    <span className="text-sm leading-none">{g.emoji}</span>
+                    <span className="truncate max-w-[120px]">{g.name}</span>
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setShowCreateGroup(true)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0"
+                style={{ border: "1.5px dashed rgba(0,0,0,0.15)", color: "#999", background: "transparent" }}
+              >
+                <Plus size={12} />
+                <span>Add</span>
+              </button>
+            </div>
+            {selectedGroupId && (
+              <MemberSelectorPill
+                groupId={selectedGroupId}
+                selectedUserIds={memberFilter}
+                onSelectionChange={setMemberFilter}
+              />
+            )}
+          </>
+        )}
       </div>
 
       <div className="px-4 space-y-3">
