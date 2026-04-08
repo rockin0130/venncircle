@@ -245,7 +245,17 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   }, [studyMode, selectedGroupId, studyGroups]);
 
   // Reset member filter when group changes
-  useEffect(() => { setMemberFilter("__everyone__"); }, [selectedGroupId]);
+  useEffect(() => { setMemberFilter("__everyone__"); setMemberDropdownOpen(false); }, [selectedGroupId]);
+
+  // Close member dropdown on click outside
+  useEffect(() => {
+    if (!memberDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (memberDropdownRef.current && !memberDropdownRef.current.contains(e.target as Node)) setMemberDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [memberDropdownOpen]);
 
   // Derive isPersonal / groupId from mode
   const isPersonal = studyMode === "mine";
