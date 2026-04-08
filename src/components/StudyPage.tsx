@@ -819,28 +819,32 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     return opts;
   }, [isPersonal, selectedGroup, user, memberProfiles]);
 
+  // Derive effective user IDs from memberFilter
+  const memberFilterUserIds = useMemo(() => {
+    if (isPersonal) return [user?.id].filter(Boolean) as string[];
+    if (memberFilter.has("__everyone__")) return groupMembers.map(m => m.user_id);
+    return Array.from(memberFilter);
+  }, [isPersonal, memberFilter, groupMembers, user]);
+
+  const isMultiUserView = !isPersonal && memberFilterUserIds.length > 1;
+
   // Filtered today sessions for group view
   const filteredGroupTodaySessions = useMemo(() => {
     if (isPersonal) return todaySessions;
-    if (sessionsFilter.includes("together")) return [];
-    const selectedUserIds = sessionsFilter.map(k => k === "mine" ? user?.id : k).filter(Boolean) as string[];
-    return groupSessions.filter(s => selectedUserIds.includes(s.user_id) && s.started_at.startsWith(today));
-  }, [isPersonal, sessionsFilter, groupSessions, todaySessions, user, today]);
+    return groupSessions.filter(s => memberFilterUserIds.includes(s.user_id) && s.started_at.startsWith(today));
+  }, [isPersonal, memberFilterUserIds, groupSessions, todaySessions, today]);
 
-  // Whether to show column view (together or multi-select)
+  // Whether to show column view (multiple users selected)
   const showColumnView = useMemo(() => {
     if (isPersonal) return false;
-    if (sessionsFilter.includes("together")) return true;
-    return sessionsFilter.length > 1;
-  }, [isPersonal, sessionsFilter]);
+    return isMultiUserView;
+  }, [isPersonal, isMultiUserView]);
 
   // Members to show in column view
   const columnMembers = useMemo(() => {
     if (isPersonal) return [];
-    if (sessionsFilter.includes("together")) return groupMembers;
-    const selectedUserIds = sessionsFilter.map(k => k === "mine" ? user?.id : k).filter(Boolean) as string[];
-    return groupMembers.filter(m => selectedUserIds.includes(m.user_id));
-  }, [isPersonal, sessionsFilter, groupMembers, user]);
+    return groupMembers.filter(m => memberFilterUserIds.includes(m.user_id));
+  }, [isPersonal, groupMembers, memberFilterUserIds]);
 
   // Total time for header
   const sessionsTotalSeconds = useMemo(() => {
