@@ -814,8 +814,8 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   // Derive effective user IDs from memberFilter
   const memberFilterUserIds = useMemo(() => {
     if (isPersonal) return [user?.id].filter(Boolean) as string[];
-    if (memberFilter === "__everyone__") return groupMembers.map(m => m.user_id);
-    return [memberFilter];
+    if (memberFilter.has("__everyone__")) return groupMembers.map(m => m.user_id);
+    return Array.from(memberFilter);
   }, [isPersonal, memberFilter, groupMembers, user]);
 
   const isMultiUserView = !isPersonal && memberFilterUserIds.length > 1;
