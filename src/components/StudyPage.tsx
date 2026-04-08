@@ -781,13 +781,13 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
       return opts;
     } else {
       const opts: { key: string; label: string }[] = [{ key: "mine", label: "Mine" }];
-      (activeGroup?.members || []).forEach((m: any) => {
+      (selectedGroup?.members || []).forEach((m: any) => {
         if (m.user_id !== user?.id) opts.push({ key: m.user_id, label: memberProfiles[m.user_id]?.display_name || "Member" });
       });
       opts.push({ key: "together", label: "Together" });
       return opts;
     }
-  }, [isPersonal, groups, activeGroup, user, memberProfiles]);
+  }, [isPersonal, groups, selectedGroup, user, memberProfiles, studyEnabledGroupIds]);
 
   // Group info lookup (name, cover photo, color)
   const groupInfoMap = useMemo(() => {
@@ -811,13 +811,13 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const sessionsFilterOptions = useMemo(() => {
     if (isPersonal) return [];
     const opts: { key: string; label: string }[] = [{ key: "mine", label: "Mine" }];
-    (activeGroup?.members || []).forEach((m: any) => {
+    (selectedGroup?.members || []).forEach((m: any) => {
       if (m.user_id !== user?.id)
         opts.push({ key: m.user_id, label: memberProfiles[m.user_id]?.display_name || "Member" });
     });
     opts.push({ key: "together", label: "Together" });
     return opts;
-  }, [isPersonal, activeGroup, user, memberProfiles]);
+  }, [isPersonal, selectedGroup, user, memberProfiles]);
 
   // Filtered today sessions for group view
   const filteredGroupTodaySessions = useMemo(() => {
@@ -880,7 +880,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
 
   // ── Fullscreen ──
   if (fullscreen && activeSession) {
-    const groupName = activeSession.group_id ? groupNameMap[activeSession.group_id] || activeGroup?.name : undefined;
+    const groupName = activeSession.group_id ? groupNameMap[activeSession.group_id] || selectedGroup?.name : undefined;
     return (
       <StudyFullscreenTimer
         subject={activeSession.subject}
