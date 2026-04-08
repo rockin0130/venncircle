@@ -344,13 +344,13 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
 
   // ── Profiles ──
   useEffect(() => {
-    if (!activeGroup || isPersonal) return;
+    if (!selectedGroup || isPersonal) return;
     const profiles: Record<string, { display_name: string; avatar_url: string | null }> = {};
-    activeGroup.members.forEach((m: any) => {
+    selectedGroup.members.forEach((m: any) => {
       profiles[m.user_id] = { display_name: m.display_name || "Member", avatar_url: m.avatar_url };
     });
     setMemberProfiles(profiles);
-  }, [activeGroup, isPersonal]);
+  }, [selectedGroup, isPersonal]);
 
   // ── Realtime ──
   useEffect(() => {
@@ -458,8 +458,8 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
 
   // Group members enriched
   const groupMembers = useMemo(() => {
-    if (!groupId || !activeGroup) return [];
-    return activeGroup.members.map((m: any, idx: number) => {
+    if (!groupId || !selectedGroup) return [];
+    return selectedGroup.members.map((m: any, idx: number) => {
       const memberSessions = groupSessions.filter(s => s.user_id === m.user_id);
       const active = memberSessions.find(s => s.is_active);
       const todayMember = memberSessions.filter(s => s.started_at.startsWith(today));
@@ -477,7 +477,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
         isMe: m.user_id === user?.id,
       };
     });
-  }, [groupId, activeGroup, groupSessions, today, memberProfiles, user]);
+  }, [groupId, selectedGroup, groupSessions, today, memberProfiles, user]);
 
   // ── Resume logic ──
   // Ring resume: within 2-min window (timeout clears lastStoppedSession after 2 min)
