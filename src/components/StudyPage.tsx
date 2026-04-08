@@ -963,13 +963,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
                 <span>Add</span>
               </button>
             </div>
-            {selectedGroupId && (
-              <MemberSelectorPill
-                groupId={selectedGroupId}
-                selectedUserIds={memberFilter}
-                onSelectionChange={setMemberFilter}
-              />
-            )}
+            {/* MemberSelectorPill moved into Today's Sessions card */}
           </>
         )}
       </div>
@@ -1206,11 +1200,18 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>
               Today's sessions
+              {!showColumnView && (
+                <span className="text-xs font-medium ml-2" style={{ color: "#6C47FF" }}>
+                  {fmtDuration(sessionsTotalSeconds)}
+                </span>
+              )}
             </h3>
-            {!showColumnView && (
-              <span className="text-xs" style={{ color: "#6C47FF", fontWeight: 500 }}>
-                {fmtDuration(sessionsTotalSeconds)} total
-              </span>
+            {!isPersonal && selectedGroupId && (
+              <MemberSelectorPill
+                groupId={selectedGroupId}
+                selectedUserIds={memberFilter}
+                onSelectionChange={setMemberFilter}
+              />
             )}
           </div>
 
