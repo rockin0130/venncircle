@@ -222,9 +222,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(() =>
     localStorage.getItem("study_selected_group")
   );
-  const [memberFilter, setMemberFilter] = useState<string>("__everyone__"); // single-select: "__everyone__" or a userId
-  const [memberDropdownOpen, setMemberDropdownOpen] = useState(false);
-  const memberDropdownRef = useRef<HTMLDivElement>(null);
+  const [memberFilter, setMemberFilter] = useState<Set<string>>(new Set(["__everyone__"]));
 
   useEffect(() => { localStorage.setItem("study_mode", studyMode); }, [studyMode]);
   useEffect(() => {
