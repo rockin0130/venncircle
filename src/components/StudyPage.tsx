@@ -245,7 +245,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   }, [studyMode, selectedGroupId, studyGroups]);
 
   // Reset member filter when group changes
-  useEffect(() => { setMemberFilter(new Set(["__everyone__"])); }, [selectedGroupId]);
+  useEffect(() => { setMemberFilter("__everyone__"); }, [selectedGroupId]);
 
   // Derive isPersonal / groupId from mode
   const isPersonal = studyMode === "mine";
