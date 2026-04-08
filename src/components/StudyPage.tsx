@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Clock, MoreHorizontal, ChevronDown, X, Trash2, Plus, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { ModeToggleBar, type WorkoutMode } from "@/components/WorkoutModeToggle";
+import { ModeToggleBar, MemberSelectorPill, type WorkoutMode } from "@/components/WorkoutModeToggle";
 import CreateGroupModal from "@/components/CreateGroupModal";
 import StudyFullscreenTimer from "@/components/StudyFullscreenTimer";
 import StudyLogPage from "@/components/StudyLogPage";
