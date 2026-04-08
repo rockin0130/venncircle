@@ -857,11 +857,8 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     return filteredGroupTodaySessions.reduce((sum, s) => sum + s.duration_seconds, 0);
   }, [isPersonal, todaySessions, showColumnView, columnMembers, filteredGroupTodaySessions]);
 
-  // ── Swipe-to-delete ──
-  const canSwipeDelete = useMemo(() => {
-    if (isPersonal) return true;
-    return memberFilterUserIds.length === 1 && memberFilterUserIds[0] === user?.id;
-  }, [isPersonal, memberFilterUserIds, user]);
+
+
 
   // Weekly sessions count
   const weekSessionsCount = useMemo(() => sessions.filter(s => weekDays.some(d => s.started_at.startsWith(d.date))).length, [sessions, weekDays]);
