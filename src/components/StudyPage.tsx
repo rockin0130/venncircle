@@ -188,7 +188,7 @@ const LiveTimer = ({ startedAt }: { startedAt: string }) => {
 
 // ═══ Main Component ═══
 const StudyPage = ({ onOpenMore }: StudyPageProps) => {
-  const { user, activeGroup, groups } = useAuth();
+  const { user, activeGroup, groups, profile } = useAuth();
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [groupSessions, setGroupSessions] = useState<StudySession[]>([]);
   const [memberProfiles, setMemberProfiles] = useState<Record<string, { display_name: string; avatar_url: string | null }>>({});
@@ -207,6 +207,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const [swipedSessionId, setSwipedSessionId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [fadingSessionId, setFadingSessionId] = useState<string | null>(null);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
   const swipeStartX = useRef<number | null>(null);
   const swipeCurrentX = useRef<number>(0);
   const swipeRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -214,8 +215,40 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const addInputRef = useRef<HTMLInputElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
 
-  const isPersonal = !activeGroup || (activeGroup as any)?._personal;
-  const groupId = isPersonal ? null : activeGroup?.id || null;
+  // ── Mine/Group toggle state ──
+  const [studyMode, setStudyMode] = useState<WorkoutMode>(() =>
+    (localStorage.getItem("study_mode") as WorkoutMode) || "mine"
+  );
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(() =>
+    localStorage.getItem("study_selected_group")
+  );
+  const [memberFilter, setMemberFilter] = useState<Set<string>>(new Set(["__everyone__"]));
+
+  useEffect(() => { localStorage.setItem("study_mode", studyMode); }, [studyMode]);
+  useEffect(() => {
+    if (selectedGroupId) localStorage.setItem("study_selected_group", selectedGroupId);
+    else localStorage.removeItem("study_selected_group");
+  }, [selectedGroupId]);
+
+  const studyGroups = useMemo(
+    () => (groups || []).filter((g: any) => !(g as any)._personal && g.shared_pages?.includes("study")),
+    [groups]
+  );
+
+  // Auto-select first group if none selected
+  useEffect(() => {
+    if (studyMode === "group" && !selectedGroupId && studyGroups.length > 0) {
+      setSelectedGroupId(studyGroups[0].id);
+    }
+  }, [studyMode, selectedGroupId, studyGroups]);
+
+  // Reset member filter when group changes
+  useEffect(() => { setMemberFilter(new Set(["__everyone__"])); }, [selectedGroupId]);
+
+  // Derive isPersonal / groupId from mode
+  const isPersonal = studyMode === "mine";
+  const selectedGroup = useMemo(() => studyGroups.find(g => g.id === selectedGroupId) || null, [studyGroups, selectedGroupId]);
+  const groupId = isPersonal ? null : selectedGroupId;
 
   // Ref to hold the active session ID to prevent re-render issues
   const activeSessionIdRef = useRef<string | null>(null);
