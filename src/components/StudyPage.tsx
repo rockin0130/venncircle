@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Clock, MoreHorizontal, ChevronDown, X, Trash2 } from "lucide-react";
+import { Clock, MoreHorizontal, ChevronDown, X, Trash2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import PageGroupSelector from "@/components/PageGroupSelector";
+import { ModeToggleBar, MemberSelectorPill, type WorkoutMode } from "@/components/WorkoutModeToggle";
+import CreateGroupModal from "@/components/CreateGroupModal";
 import StudyFullscreenTimer from "@/components/StudyFullscreenTimer";
 import StudyLogPage from "@/components/StudyLogPage";
 import {
@@ -187,7 +188,7 @@ const LiveTimer = ({ startedAt }: { startedAt: string }) => {
 
 // ═══ Main Component ═══
 const StudyPage = ({ onOpenMore }: StudyPageProps) => {
-  const { user, activeGroup, groups } = useAuth();
+  const { user, activeGroup, groups, profile } = useAuth();
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [groupSessions, setGroupSessions] = useState<StudySession[]>([]);
   const [memberProfiles, setMemberProfiles] = useState<Record<string, { display_name: string; avatar_url: string | null }>>({});
@@ -199,13 +200,14 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const [fullscreen, setFullscreen] = useState(false);
   const [chartFilter, setChartFilter] = useState("mine");
   const [chartDropdownOpen, setChartDropdownOpen] = useState(false);
-  const [sessionsFilter, setSessionsFilter] = useState<string[]>(["mine"]);
+  
   const [editMode, setEditMode] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [similarityPrompt, setSimilarityPrompt] = useState<{ newName: string; existing: string } | null>(null);
   const [swipedSessionId, setSwipedSessionId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [fadingSessionId, setFadingSessionId] = useState<string | null>(null);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
   const swipeStartX = useRef<number | null>(null);
   const swipeCurrentX = useRef<number>(0);
   const swipeRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -213,8 +215,40 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const addInputRef = useRef<HTMLInputElement>(null);
   const pillsRef = useRef<HTMLDivElement>(null);
 
-  const isPersonal = !activeGroup || (activeGroup as any)?._personal;
-  const groupId = isPersonal ? null : activeGroup?.id || null;
+  // ── Mine/Group toggle state ──
+  const [studyMode, setStudyMode] = useState<WorkoutMode>(() =>
+    (localStorage.getItem("study_mode") as WorkoutMode) || "mine"
+  );
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(() =>
+    localStorage.getItem("study_selected_group")
+  );
+  const [memberFilter, setMemberFilter] = useState<Set<string>>(new Set(["__everyone__"]));
+
+  useEffect(() => { localStorage.setItem("study_mode", studyMode); }, [studyMode]);
+  useEffect(() => {
+    if (selectedGroupId) localStorage.setItem("study_selected_group", selectedGroupId);
+    else localStorage.removeItem("study_selected_group");
+  }, [selectedGroupId]);
+
+  const studyGroups = useMemo(
+    () => (groups || []).filter((g: any) => !(g as any)._personal && g.shared_pages?.includes("study")),
+    [groups]
+  );
+
+  // Auto-select first group if none selected
+  useEffect(() => {
+    if (studyMode === "group" && !selectedGroupId && studyGroups.length > 0) {
+      setSelectedGroupId(studyGroups[0].id);
+    }
+  }, [studyMode, selectedGroupId, studyGroups]);
+
+  // Reset member filter when group changes
+  useEffect(() => { setMemberFilter(new Set(["__everyone__"])); }, [selectedGroupId]);
+
+  // Derive isPersonal / groupId from mode
+  const isPersonal = studyMode === "mine";
+  const selectedGroup = useMemo(() => studyGroups.find(g => g.id === selectedGroupId) || null, [studyGroups, selectedGroupId]);
+  const groupId = isPersonal ? null : selectedGroupId;
 
   // Ref to hold the active session ID to prevent re-render issues
   const activeSessionIdRef = useRef<string | null>(null);
@@ -310,13 +344,13 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
 
   // ── Profiles ──
   useEffect(() => {
-    if (!activeGroup || isPersonal) return;
+    if (!selectedGroup || isPersonal) return;
     const profiles: Record<string, { display_name: string; avatar_url: string | null }> = {};
-    activeGroup.members.forEach((m: any) => {
+    selectedGroup.members.forEach((m: any) => {
       profiles[m.user_id] = { display_name: m.display_name || "Member", avatar_url: m.avatar_url };
     });
     setMemberProfiles(profiles);
-  }, [activeGroup, isPersonal]);
+  }, [selectedGroup, isPersonal]);
 
   // ── Realtime ──
   useEffect(() => {
@@ -424,8 +458,8 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
 
   // Group members enriched
   const groupMembers = useMemo(() => {
-    if (!groupId || !activeGroup) return [];
-    return activeGroup.members.map((m: any, idx: number) => {
+    if (!groupId || !selectedGroup) return [];
+    return selectedGroup.members.map((m: any, idx: number) => {
       const memberSessions = groupSessions.filter(s => s.user_id === m.user_id);
       const active = memberSessions.find(s => s.is_active);
       const todayMember = memberSessions.filter(s => s.started_at.startsWith(today));
@@ -443,7 +477,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
         isMe: m.user_id === user?.id,
       };
     });
-  }, [groupId, activeGroup, groupSessions, today, memberProfiles, user]);
+  }, [groupId, selectedGroup, groupSessions, today, memberProfiles, user]);
 
   // ── Resume logic ──
   // Ring resume: within 2-min window (timeout clears lastStoppedSession after 2 min)
@@ -653,11 +687,13 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
   };
 
-  // ── Swipe-to-delete handlers ──
   const canSwipeDelete = useMemo(() => {
     if (isPersonal) return true;
-    return sessionsFilter.length === 1 && sessionsFilter[0] === "mine";
-  }, [isPersonal, sessionsFilter]);
+    // Only allow swipe-delete when viewing only own sessions
+    const onlyMe = !memberFilter.has("__everyone__") && memberFilter.size === 1 && memberFilter.has(user?.id || "");
+    return onlyMe;
+  }, [isPersonal, memberFilter, user]);
+  // ── Swipe-to-delete handlers ──
 
   const handleSwipeStart = useCallback((e: React.TouchEvent, sessionId: string) => {
     if (!canSwipeDelete) return;
@@ -747,13 +783,13 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
       return opts;
     } else {
       const opts: { key: string; label: string }[] = [{ key: "mine", label: "Mine" }];
-      (activeGroup?.members || []).forEach((m: any) => {
+      (selectedGroup?.members || []).forEach((m: any) => {
         if (m.user_id !== user?.id) opts.push({ key: m.user_id, label: memberProfiles[m.user_id]?.display_name || "Member" });
       });
       opts.push({ key: "together", label: "Together" });
       return opts;
     }
-  }, [isPersonal, groups, activeGroup, user, memberProfiles]);
+  }, [isPersonal, groups, selectedGroup, user, memberProfiles, studyEnabledGroupIds]);
 
   // Group info lookup (name, cover photo, color)
   const groupInfoMap = useMemo(() => {
@@ -773,40 +809,35 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     return m;
   }, [groupInfoMap]);
 
-  // Sessions filter options (group view)
-  const sessionsFilterOptions = useMemo(() => {
-    if (isPersonal) return [];
-    const opts: { key: string; label: string }[] = [{ key: "mine", label: "Mine" }];
-    (activeGroup?.members || []).forEach((m: any) => {
-      if (m.user_id !== user?.id)
-        opts.push({ key: m.user_id, label: memberProfiles[m.user_id]?.display_name || "Member" });
-    });
-    opts.push({ key: "together", label: "Together" });
-    return opts;
-  }, [isPersonal, activeGroup, user, memberProfiles]);
+
+
+
+  // Derive effective user IDs from memberFilter
+  const memberFilterUserIds = useMemo(() => {
+    if (isPersonal) return [user?.id].filter(Boolean) as string[];
+    if (memberFilter.has("__everyone__")) return groupMembers.map(m => m.user_id);
+    return Array.from(memberFilter);
+  }, [isPersonal, memberFilter, groupMembers, user]);
+
+  const isMultiUserView = !isPersonal && memberFilterUserIds.length > 1;
 
   // Filtered today sessions for group view
   const filteredGroupTodaySessions = useMemo(() => {
     if (isPersonal) return todaySessions;
-    if (sessionsFilter.includes("together")) return [];
-    const selectedUserIds = sessionsFilter.map(k => k === "mine" ? user?.id : k).filter(Boolean) as string[];
-    return groupSessions.filter(s => selectedUserIds.includes(s.user_id) && s.started_at.startsWith(today));
-  }, [isPersonal, sessionsFilter, groupSessions, todaySessions, user, today]);
+    return groupSessions.filter(s => memberFilterUserIds.includes(s.user_id) && s.started_at.startsWith(today));
+  }, [isPersonal, memberFilterUserIds, groupSessions, todaySessions, today]);
 
-  // Whether to show column view (together or multi-select)
+  // Whether to show column view (multiple users selected)
   const showColumnView = useMemo(() => {
     if (isPersonal) return false;
-    if (sessionsFilter.includes("together")) return true;
-    return sessionsFilter.length > 1;
-  }, [isPersonal, sessionsFilter]);
+    return isMultiUserView;
+  }, [isPersonal, isMultiUserView]);
 
   // Members to show in column view
   const columnMembers = useMemo(() => {
     if (isPersonal) return [];
-    if (sessionsFilter.includes("together")) return groupMembers;
-    const selectedUserIds = sessionsFilter.map(k => k === "mine" ? user?.id : k).filter(Boolean) as string[];
-    return groupMembers.filter(m => selectedUserIds.includes(m.user_id));
-  }, [isPersonal, sessionsFilter, groupMembers, user]);
+    return groupMembers.filter(m => memberFilterUserIds.includes(m.user_id));
+  }, [isPersonal, groupMembers, memberFilterUserIds]);
 
   // Total time for header
   const sessionsTotalSeconds = useMemo(() => {
@@ -816,6 +847,9 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     }
     return filteredGroupTodaySessions.reduce((sum, s) => sum + s.duration_seconds, 0);
   }, [isPersonal, todaySessions, showColumnView, columnMembers, filteredGroupTodaySessions]);
+
+
+
 
   // Weekly sessions count
   const weekSessionsCount = useMemo(() => sessions.filter(s => weekDays.some(d => s.started_at.startsWith(d.date))).length, [sessions, weekDays]);
@@ -846,7 +880,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
 
   // ── Fullscreen ──
   if (fullscreen && activeSession) {
-    const groupName = activeSession.group_id ? groupNameMap[activeSession.group_id] || activeGroup?.name : undefined;
+    const groupName = activeSession.group_id ? groupNameMap[activeSession.group_id] || selectedGroup?.name : undefined;
     return (
       <StudyFullscreenTimer
         subject={activeSession.subject}
@@ -895,7 +929,49 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
 
       {/* ── Context toggle ── */}
       <div className="px-4 pb-2">
-        <PageGroupSelector page="study" personalLabel="Mine" hideAllPill showAvatars />
+        <ModeToggleBar mode={studyMode} onModeChange={setStudyMode} />
+        {studyMode === "group" && (
+          <>
+            <div
+              className="flex gap-1.5 overflow-x-auto scrollbar-hide scroll-smooth-touch py-1 -mx-1 px-1 mb-2"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              {studyGroups.map((g) => {
+                const active = selectedGroupId === g.id;
+                return (
+                  <button
+                    key={g.id}
+                    onClick={() => setSelectedGroupId(g.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0"
+                    style={{
+                      background: active ? "#1a1a1a" : "#fff",
+                      color: active ? "#fff" : "#666",
+                      border: active ? "none" : "0.5px solid rgba(0,0,0,0.1)",
+                    }}
+                  >
+                    <span className="text-sm leading-none">{g.emoji}</span>
+                    <span className="truncate max-w-[120px]">{g.name}</span>
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setShowCreateGroup(true)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0"
+                style={{ border: "1.5px dashed rgba(0,0,0,0.15)", color: "#999", background: "transparent" }}
+              >
+                <Plus size={12} />
+                <span>Add</span>
+              </button>
+            </div>
+            {selectedGroupId && (
+              <MemberSelectorPill
+                groupId={selectedGroupId}
+                selectedUserIds={memberFilter}
+                onSelectionChange={setMemberFilter}
+              />
+            )}
+          </>
+        )}
       </div>
 
       <div className="px-4 space-y-3">
@@ -1138,63 +1214,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
             )}
           </div>
 
-          {/* Filter pills (group view) — multi-select */}
-          {!isPersonal && sessionsFilterOptions.length > 0 && (
-            <div className="flex gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
-              {sessionsFilterOptions.map(opt => {
-                const individualKeys = sessionsFilterOptions.filter(o => o.key !== "together").map(o => o.key);
-                const allIndividualsSelected = individualKeys.every(k => sessionsFilter.includes(k));
-                const isTogetherActive = sessionsFilter.includes("together") || allIndividualsSelected;
-                const isActive = opt.key === "together" ? isTogetherActive : sessionsFilter.includes(opt.key) || isTogetherActive;
-                return (
-                  <button
-                    key={opt.key}
-                    onClick={() => {
-                      if (opt.key === "together") {
-                        // If Together is already active (all highlighted), reset to Mine only
-                        if (isTogetherActive) {
-                          setSessionsFilter(["mine"]);
-                        } else {
-                          // Select all individual pills + together
-                          setSessionsFilter([...individualKeys, "together"]);
-                        }
-                      } else {
-                        setSessionsFilter(prev => {
-                          const withoutTogether = prev.filter(k => k !== "together");
-                          if (isTogetherActive && !prev.includes("together")) {
-                            // Was in "all individuals selected" state, deselect this one
-                            return individualKeys.filter(k => k !== opt.key);
-                          }
-                          if (prev.includes("together")) {
-                            // Together was explicitly active, deselect this member
-                            return individualKeys.filter(k => k !== opt.key);
-                          }
-                          if (withoutTogether.includes(opt.key)) {
-                            const next = withoutTogether.filter(k => k !== opt.key);
-                            return next.length === 0 ? [opt.key] : next;
-                          }
-                          const next = [...withoutTogether, opt.key];
-                          // Check if all individuals are now selected
-                          if (individualKeys.every(k => next.includes(k))) {
-                            return [...next, "together"];
-                          }
-                          return next;
-                        });
-                      }
-                      resetSwipe();
-                    }}
-                    className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
-                    style={{
-                      background: isActive ? "#1a1a1a" : "#F4F3F0",
-                      color: isActive ? "#fff" : "#888",
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* Member filtering is now handled by MemberSelectorPill above */}
 
           {/* Column view: Together or multi-select */}
           {!isPersonal && showColumnView ? (
@@ -1424,6 +1444,8 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CreateGroupModal open={showCreateGroup} onOpenChange={setShowCreateGroup} defaultPage="study" />
     </div>
   );
 };
