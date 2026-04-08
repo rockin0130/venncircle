@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Clock, MoreHorizontal, ChevronDown, X, Trash2 } from "lucide-react";
+import { Clock, MoreHorizontal, ChevronDown, X, Trash2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import PageGroupSelector from "@/components/PageGroupSelector";
+import { ModeToggleBar, MemberSelectorPill, type WorkoutMode } from "@/components/WorkoutModeToggle";
+import CreateGroupModal from "@/components/CreateGroupModal";
 import StudyFullscreenTimer from "@/components/StudyFullscreenTimer";
 import StudyLogPage from "@/components/StudyLogPage";
 import {
