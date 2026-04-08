@@ -692,8 +692,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   const canSwipeDelete = useMemo(() => {
     if (isPersonal) return true;
     // Only allow swipe-delete when viewing only own sessions
-    const onlyMe = !memberFilter.has("__everyone__") && memberFilter.size === 1 && memberFilter.has(user?.id || "");
-    return onlyMe;
+    return memberFilter === user?.id;
   }, [isPersonal, memberFilter, user]);
   // ── Swipe-to-delete handlers ──
 
