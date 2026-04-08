@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Clock, MoreHorizontal, ChevronDown, X, Trash2, Plus } from "lucide-react";
+import { Clock, MoreHorizontal, ChevronDown, X, Trash2, Plus, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { ModeToggleBar, MemberSelectorPill, type WorkoutMode } from "@/components/WorkoutModeToggle";
+import { ModeToggleBar, type WorkoutMode } from "@/components/WorkoutModeToggle";
 import CreateGroupModal from "@/components/CreateGroupModal";
 import StudyFullscreenTimer from "@/components/StudyFullscreenTimer";
 import StudyLogPage from "@/components/StudyLogPage";
@@ -223,6 +223,8 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     localStorage.getItem("study_selected_group")
   );
   const [memberFilter, setMemberFilter] = useState<Set<string>>(new Set(["__everyone__"]));
+  const [memberDropdownOpen, setMemberDropdownOpen] = useState(false);
+  const memberDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { localStorage.setItem("study_mode", studyMode); }, [studyMode]);
   useEffect(() => {
@@ -243,7 +245,16 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   }, [studyMode, selectedGroupId, studyGroups]);
 
   // Reset member filter when group changes
-  useEffect(() => { setMemberFilter(new Set(["__everyone__"])); }, [selectedGroupId]);
+  useEffect(() => { setMemberFilter(new Set(["__everyone__"])); setMemberDropdownOpen(false); }, [selectedGroupId]);
+
+  useEffect(() => {
+    if (!memberDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (memberDropdownRef.current && !memberDropdownRef.current.contains(e.target as Node)) setMemberDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [memberDropdownOpen]);
 
   // Derive isPersonal / groupId from mode
   const isPersonal = studyMode === "mine";
@@ -847,6 +858,49 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
     return filteredGroupTodaySessions.reduce((sum, s) => sum + s.duration_seconds, 0);
   }, [isPersonal, todaySessions, showColumnView, columnMembers, filteredGroupTodaySessions]);
 
+  // ── Multi-select member dropdown helpers ──
+  const allMemberIds = useMemo(() => new Set(groupMembers.map(m => m.user_id)), [groupMembers]);
+  const isEveryone = memberFilter.has("__everyone__") || (allMemberIds.size > 0 && [...allMemberIds].every(id => memberFilter.has(id)));
+
+  const toggleEveryone = () => {
+    if (isEveryone) {
+      setMemberFilter(new Set([user?.id || ""]));
+    } else {
+      setMemberFilter(new Set(["__everyone__"]));
+    }
+  };
+
+  const toggleMember = (userId: string) => {
+    if (memberFilter.has("__everyone__")) {
+      const next = new Set(allMemberIds);
+      next.delete(userId);
+      if (next.size === 0) return;
+      setMemberFilter(next);
+      return;
+    }
+    const next = new Set(memberFilter);
+    if (next.has(userId)) {
+      next.delete(userId);
+      if (next.size === 0) return;
+    } else {
+      next.add(userId);
+      if ([...allMemberIds].every(id => next.has(id))) {
+        setMemberFilter(new Set(["__everyone__"]));
+        return;
+      }
+    }
+    setMemberFilter(next);
+  };
+
+  const memberPillLabel = useMemo(() => {
+    if (isEveryone) return "Everyone";
+    const names = groupMembers
+      .filter(m => memberFilter.has(m.user_id))
+      .map(m => m.isMe ? "Me" : (m.profile?.display_name?.split(" ")[0] || "Member"));
+    if (names.length === 0) return "Everyone";
+    if (names.length === 1) return names[0];
+    return names.join(", ");
+  }, [isEveryone, groupMembers, memberFilter]);
 
 
 
@@ -1205,12 +1259,85 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
                 </span>
               )}
             </h3>
-            {!isPersonal && selectedGroupId && (
-              <MemberSelectorPill
-                groupId={selectedGroupId}
-                selectedUserIds={memberFilter}
-                onSelectionChange={setMemberFilter}
-              />
+            {!isPersonal && selectedGroupId && groupMembers.length > 1 && (
+              <div className="relative" ref={memberDropdownRef}>
+                <button
+                  onClick={() => setMemberDropdownOpen(p => !p)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all"
+                  style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.1)", color: "#1a1a1a" }}
+                >
+                  {isEveryone && <span className="text-[11px] leading-none">👥</span>}
+                  <span className="truncate max-w-[140px]">{memberPillLabel}</span>
+                  <ChevronDown size={12} className="text-muted-foreground" />
+                </button>
+
+                {memberDropdownOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-1 z-50 py-1 min-w-[200px]"
+                    style={{
+                      background: "#fff",
+                      borderRadius: 12,
+                      border: "0.5px solid rgba(0,0,0,0.08)",
+                      boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                    }}
+                  >
+                    {/* Everyone row */}
+                    <button
+                      onClick={toggleEveryone}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="text-[13px] leading-none">👥</span>
+                      <span className="flex-1 text-left text-[13px] font-medium" style={{ color: "#1a1a1a" }}>Everyone</span>
+                      <div
+                        className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
+                        style={{
+                          background: isEveryone ? "#1a1a1a" : "transparent",
+                          border: isEveryone ? "none" : "2px solid #ccc",
+                        }}
+                      >
+                        {isEveryone && <Check size={11} color="#fff" />}
+                      </div>
+                    </button>
+
+                    <div style={{ height: "0.5px", background: "rgba(0,0,0,0.06)", margin: "0 12px" }} />
+
+                    {/* Individual members */}
+                    {groupMembers.map((m) => {
+                      const checked = isEveryone || memberFilter.has(m.user_id);
+                      return (
+                        <button
+                          key={m.user_id}
+                          onClick={() => toggleMember(m.user_id)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-gray-50 transition-colors"
+                        >
+                          {m.profile?.avatar_url ? (
+                            <img src={m.profile.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                          ) : (
+                            <span
+                              className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-white"
+                              style={{ background: m.color }}
+                            >
+                              {(m.profile?.display_name || "?")[0]}
+                            </span>
+                          )}
+                          <span className="flex-1 text-left text-[13px] font-medium" style={{ color: "#1a1a1a" }}>
+                            {m.isMe ? "Me" : m.profile?.display_name || "Member"}
+                          </span>
+                          <div
+                            className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
+                            style={{
+                              background: checked ? m.color : "transparent",
+                              border: checked ? "none" : "2px solid #ccc",
+                            }}
+                          >
+                            {checked && <Check size={11} color="#fff" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
