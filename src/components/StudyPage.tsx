@@ -1205,93 +1205,12 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
                 </span>
               )}
             </h3>
-            {!isPersonal && selectedGroupId && groupMembers.length > 1 && (
-              <div className="relative" ref={memberDropdownRef}>
-                <button
-                  onClick={() => setMemberDropdownOpen(p => !p)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all"
-                  style={{ background: "#fff", border: "0.5px solid rgba(0,0,0,0.1)", color: "#1a1a1a" }}
-                >
-                  {memberFilter === "__everyone__" && <span className="text-[11px] leading-none">👥</span>}
-                  {memberFilter !== "__everyone__" && (() => {
-                    const m = groupMembers.find(gm => gm.user_id === memberFilter);
-                    if (!m) return null;
-                    return m.profile?.avatar_url ? (
-                      <img src={m.profile.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
-                    ) : (
-                      <span className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-bold text-white flex-shrink-0" style={{ background: m.color }}>
-                        {(m.profile?.display_name || "?")[0]}
-                      </span>
-                    );
-                  })()}
-                  <span className="truncate max-w-[120px]">
-                    {memberFilter === "__everyone__" ? "Everyone" : (() => {
-                      const m = groupMembers.find(gm => gm.user_id === memberFilter);
-                      return m?.isMe ? "Me" : m?.profile?.display_name || "Member";
-                    })()}
-                  </span>
-                  <ChevronDown size={12} className="text-muted-foreground" />
-                </button>
-
-                {memberDropdownOpen && (
-                  <div
-                    className="absolute right-0 top-full mt-1 z-50 py-1 min-w-[200px]"
-                    style={{
-                      background: "#fff",
-                      borderRadius: 12,
-                      border: "0.5px solid rgba(0,0,0,0.08)",
-                      boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-                    }}
-                  >
-                    {/* Everyone row */}
-                    <button
-                      onClick={() => { setMemberFilter("__everyone__"); setMemberDropdownOpen(false); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-gray-50 transition-colors"
-                    >
-                      <span className="text-[13px] leading-none">{selectedGroup?.emoji || "👥"}</span>
-                      <span className="flex-1 text-left text-[13px] font-medium" style={{ color: "#1a1a1a" }}>Everyone</span>
-                      {memberFilter === "__everyone__" && (
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#1a1a1a" }}>
-                          <Check size={11} color="#fff" />
-                        </div>
-                      )}
-                    </button>
-
-                    <div style={{ height: "0.5px", background: "rgba(0,0,0,0.06)", margin: "0 12px" }} />
-
-                    {/* Individual members */}
-                    {groupMembers.map((m) => {
-                      const selected = memberFilter === m.user_id;
-                      return (
-                        <button
-                          key={m.user_id}
-                          onClick={() => { setMemberFilter(m.user_id); setMemberDropdownOpen(false); }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-gray-50 transition-colors"
-                        >
-                          {m.profile?.avatar_url ? (
-                            <img src={m.profile.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
-                          ) : (
-                            <span
-                              className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-white"
-                              style={{ background: m.color }}
-                            >
-                              {(m.profile?.display_name || "?")[0]}
-                            </span>
-                          )}
-                          <span className="flex-1 text-left text-[13px] font-medium" style={{ color: "#1a1a1a" }}>
-                            {m.isMe ? "Me" : m.profile?.display_name || "Member"}
-                          </span>
-                          {selected && (
-                            <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: m.color }}>
-                              <Check size={11} color="#fff" />
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+            {!isPersonal && selectedGroupId && (
+              <MemberSelectorPill
+                groupId={selectedGroupId}
+                selectedUserIds={memberFilter}
+                onSelectionChange={setMemberFilter}
+              />
             )}
           </div>
 
