@@ -16,7 +16,7 @@ interface MigrateItemsModalProps {
 }
 
 const ITEM_CATEGORIES = [
-  { key: "habits", label: "Habits", emoji: "🎯", description: "All your tracked habits" },
+  { key: "habits", label: "Routines", emoji: "🎯", description: "All your tracked routines" },
   { key: "tasks", label: "Tasks", emoji: "✅", description: "Incomplete tasks only" },
   { key: "events", label: "Events", emoji: "📅", description: "Future events only" },
   { key: "workouts", label: "Workouts", emoji: "💪", description: "Incomplete workouts only" },
