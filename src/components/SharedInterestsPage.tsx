@@ -467,7 +467,7 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
         {/* Top: My Groups */}
         <div style={{ height: `${topPct}%` }} className="flex flex-col min-h-0">
           <div className="px-5 py-1.5 flex items-center justify-between flex-shrink-0">
-            <h2 className="text-sm font-semibold text-foreground">My Groups</h2>
+            <h2 className="text-sm font-semibold text-foreground">My Circles</h2>
             <button
               onClick={() => toggleExpand("groups")}
               className="p-1 rounded-md hover:bg-muted transition-colors"
