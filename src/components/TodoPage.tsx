@@ -59,6 +59,15 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
   const [editTitle, setEditTitle] = useState("");
   const [editPriority, setEditPriority] = useState<Priority>("none");
   const [editDueDate, setEditDueDate] = useState<string | null>(null);
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+
+  const toggleParentExpanded = (id: string) => {
+    setExpandedParents(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   // Filter tasks - only non-scheduled tasks (to-do items, not calendar events)
   const myTasks = useMemo(() => {
@@ -67,7 +76,18 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
   }, [tasks, user]);
 
   const isTaskScheduled = (t: Task) => t.scheduledDay != null && t.scheduledMonth != null && t.scheduledYear != null;
-  const todoItems = useMemo(() => myTasks.filter(t => !isTaskScheduled(t)), [myTasks]);
+
+  // All non-scheduled, top-level only
+  const todoItems = useMemo(() => myTasks.filter(t => !isTaskScheduled(t) && !t.parentId), [myTasks]);
+  // All subtasks indexed by parentId
+  const subtasksByParent = useMemo(() => {
+    const map: Record<string, Task[]> = {};
+    myTasks.filter(t => !isTaskScheduled(t) && t.parentId).forEach(t => {
+      if (!map[t.parentId!]) map[t.parentId!] = [];
+      map[t.parentId!].push(t);
+    });
+    return map;
+  }, [myTasks]);
 
   const highTasks = todoItems.filter(t => t.priority === "high");
   const mediumTasks = todoItems.filter(t => t.priority === "medium");
@@ -140,17 +160,22 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
     }
   };
 
-  const handleAddBreakdownSteps = () => {
-    breakdownSteps.forEach((step) => {
-      addTask({
+  const handleAddBreakdownSteps = async () => {
+    if (!selectedTask) return;
+    const parentId = selectedTask.id;
+    for (const step of breakdownSteps) {
+      await addTask({
         title: step.title,
         time: "",
         tag: "Personal",
         assignee: "me",
         priority: "none",
+        parentId,
       });
-    });
-    toast.success(`${breakdownSteps.length} tasks added`);
+    }
+    // Auto-expand parent
+    setExpandedParents(prev => new Set(prev).add(parentId));
+    toast.success(`${breakdownSteps.length} subtasks added`);
     setShowBreakdown(false);
     setSelectedTask(null);
     setBreakdownSteps([]);
@@ -213,7 +238,14 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
     }
   };
 
-  const renderTaskRow = (task: Task, showIcon?: boolean) => {
+  const getSubtaskBadge = (taskId: string) => {
+    const subs = subtasksByParent[taskId];
+    if (!subs || subs.length === 0) return null;
+    const doneCount = subs.filter(s => s.done).length;
+    return { total: subs.length, done: doneCount };
+  };
+
+  const renderSubtaskRow = (task: Task) => {
     const dueDateLabel = task.dueDate
       ? new Date(task.dueDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
       : null;
@@ -224,33 +256,104 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
         layout
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-3 py-2.5 px-1"
+        className="flex items-center gap-3 py-2 pl-8 pr-1"
       >
         <button
           onClick={(e) => { e.stopPropagation(); if (!task.done) toast.success("Done! 🎉"); toggleTask(task.id); }}
-          className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-            task.done ? "bg-foreground border-foreground" : "border-muted-foreground/40 hover:border-primary"
+          className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+            task.done ? "bg-foreground border-foreground" : "border-muted-foreground/30 hover:border-primary"
           }`}
         >
-          {task.done && <Check size={12} className="text-background" />}
+          {task.done && <Check size={10} className="text-background" />}
         </button>
-        {showIcon && (
-          <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <ListTodo size={12} className="text-primary" />
-          </div>
-        )}
         <button
           onClick={() => handleTaskTap(task)}
           className="flex-1 min-w-0 text-left"
         >
-          <span className={`text-sm font-medium ${task.done ? "line-through text-muted-foreground" : "text-foreground"}`}>
+          <span className={`text-xs font-medium ${task.done ? "line-through text-muted-foreground/60" : "text-foreground/80"}`}>
             {task.title}
           </span>
           {dueDateLabel && (
-            <p className="text-[10px] text-muted-foreground mt-0.5">Due {dueDateLabel}</p>
+            <p className="text-[9px] text-muted-foreground mt-0.5">Due {dueDateLabel}</p>
           )}
         </button>
       </motion.div>
+    );
+  };
+
+  const renderTaskRow = (task: Task, showIcon?: boolean) => {
+    const dueDateLabel = task.dueDate
+      ? new Date(task.dueDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      : null;
+    const badge = getSubtaskBadge(task.id);
+    const isExpanded = expandedParents.has(task.id);
+    const subs = subtasksByParent[task.id] || [];
+
+    return (
+      <div key={task.id}>
+        <motion.div
+          layout
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 py-2.5 px-1"
+        >
+          {badge ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleParentExpanded(task.id); }}
+              className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground"
+            >
+              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </button>
+          ) : (
+            <div className="w-5" />
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); if (!task.done) toast.success("Done! 🎉"); toggleTask(task.id); }}
+            className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+              task.done ? "bg-foreground border-foreground" : "border-muted-foreground/40 hover:border-primary"
+            }`}
+          >
+            {task.done && <Check size={12} className="text-background" />}
+          </button>
+          {showIcon && (
+            <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <ListTodo size={12} className="text-primary" />
+            </div>
+          )}
+          <button
+            onClick={() => handleTaskTap(task)}
+            className="flex-1 min-w-0 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium ${task.done ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                {task.title}
+              </span>
+              {badge && !isExpanded && (
+                <span className="text-[10px] font-medium text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-md">
+                  {badge.done}/{badge.total} done
+                </span>
+              )}
+            </div>
+            {dueDateLabel && (
+              <p className="text-[10px] text-muted-foreground mt-0.5">Due {dueDateLabel}</p>
+            )}
+          </button>
+        </motion.div>
+        <AnimatePresence>
+          {isExpanded && subs.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="divide-y divide-border/20 border-l-2 border-border/20 ml-3">
+                {subs.map(s => renderSubtaskRow(s))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     );
   };
 
@@ -389,10 +492,13 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
                 <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center"><CalendarIcon size={16} className="text-blue-600" /></div>
                 <div className="text-left"><p className="text-sm font-medium">Schedule</p><p className="text-[11px] text-muted-foreground">Add to calendar and home page</p></div>
               </button>
-              <button onClick={handleBreakdown} className="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-secondary/60 transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center"><Sparkles size={16} className="text-purple-600" /></div>
-                <div className="text-left"><p className="text-sm font-medium">AI breakdown</p><p className="text-[11px] text-muted-foreground">Break into smaller steps with AI</p></div>
-              </button>
+              {/* Only show AI breakdown for top-level tasks */}
+              {!selectedTask?.parentId && (
+                <button onClick={handleBreakdown} className="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-secondary/60 transition-colors">
+                  <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center"><Sparkles size={16} className="text-purple-600" /></div>
+                  <div className="text-left"><p className="text-sm font-medium">AI breakdown</p><p className="text-[11px] text-muted-foreground">Break into smaller steps with AI</p></div>
+                </button>
+              )}
               <button onClick={handleEdit} className="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-secondary/60 transition-colors">
                 <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center"><Pencil size={16} className="text-gray-500" /></div>
                 <div className="text-left"><p className="text-sm font-medium">Edit</p><p className="text-[11px] text-muted-foreground">Change name, priority, due date</p></div>
@@ -468,7 +574,7 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
             {!breakdownLoading && breakdownSteps.length > 0 && (
               <div className="flex gap-2">
                 <button onClick={handleAddBreakdownSteps} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: "#6C47FF" }}>
-                  Add all as tasks
+                  Add as subtasks
                 </button>
                 <button onClick={() => { setShowBreakdown(false); setBreakdownSteps([]); }} className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-secondary text-muted-foreground">
                   Dismiss
@@ -492,23 +598,26 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
                 className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-sm outline-none"
               />
             </div>
-            <div>
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase mb-2 block">Priority</label>
-              <div className="flex gap-2">
-                {(["high", "medium", "low", "none"] as Priority[]).map(p => (
-                  <button
-                    key={p}
-                    onClick={() => setEditPriority(p)}
-                    className={cn(
-                      "flex-1 py-2 rounded-lg text-[11px] font-semibold border transition-all",
-                      editPriority === p ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"
-                    )}
-                  >
-                    {p === "none" ? "None" : p.charAt(0).toUpperCase() + p.slice(1)}
-                  </button>
-                ))}
+            {/* Only show priority editing for top-level tasks */}
+            {!selectedTask?.parentId && (
+              <div>
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase mb-2 block">Priority</label>
+                <div className="flex gap-2">
+                  {(["high", "medium", "low", "none"] as Priority[]).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setEditPriority(p)}
+                      className={cn(
+                        "flex-1 py-2 rounded-lg text-[11px] font-semibold border transition-all",
+                        editPriority === p ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"
+                      )}
+                    >
+                      {p === "none" ? "None" : p.charAt(0).toUpperCase() + p.slice(1)}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
             <div>
               <label className="text-[11px] font-semibold text-muted-foreground uppercase mb-1 block">Due date</label>
               <input

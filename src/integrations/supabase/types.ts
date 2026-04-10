@@ -1691,6 +1691,7 @@ export type Database = {
           group_id: string | null
           hidden_from_partner: boolean
           id: string
+          parent_id: string | null
           prior_notice_days: number
           priority: string
           scheduled_day: number | null
@@ -1714,6 +1715,7 @@ export type Database = {
           group_id?: string | null
           hidden_from_partner?: boolean
           id?: string
+          parent_id?: string | null
           prior_notice_days?: number
           priority?: string
           scheduled_day?: number | null
@@ -1737,6 +1739,7 @@ export type Database = {
           group_id?: string | null
           hidden_from_partner?: boolean
           id?: string
+          parent_id?: string | null
           prior_notice_days?: number
           priority?: string
           scheduled_day?: number | null
@@ -1755,6 +1758,13 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -2065,6 +2075,7 @@ export type Database = {
           group_id: string | null
           hidden_from_partner: boolean
           id: string
+          parent_id: string | null
           prior_notice_days: number
           priority: string
           scheduled_day: number | null
