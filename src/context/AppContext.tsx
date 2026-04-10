@@ -805,6 +805,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               hiddenFromPartner: t.hidden_from_partner || false,
               groupId: t.group_id || null,
               ownerUserId: otherUserId,
+              parentId: (t as any).parent_id ?? null,
             })));
           }
 
