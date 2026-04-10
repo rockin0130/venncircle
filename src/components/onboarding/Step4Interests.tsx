@@ -6,7 +6,7 @@ const INTERESTS = [
   { key: "calendar", label: "Calendar", subtitle: "Plan together", icon: CalendarDays, color: "#3B82F6", bg: "rgba(59,130,246,0.08)" },
   { key: "workout", label: "Workout", subtitle: "Train smarter", icon: Dumbbell, color: "#EF4444", bg: "rgba(239,68,68,0.08)" },
   { key: "nutrition", label: "Nutrition", subtitle: "Eat better", icon: Apple, color: "#22C55E", bg: "rgba(34,197,94,0.08)" },
-  { key: "habits", label: "Habits", subtitle: "Build routines", icon: Flame, color: "#F59E0B", bg: "rgba(245,158,11,0.08)" },
+  { key: "habits", label: "Routines", subtitle: "Build routines", icon: Flame, color: "#F59E0B", bg: "rgba(245,158,11,0.08)" },
   { key: "study", label: "Study", subtitle: "Focus deeper", icon: BookOpen, color: "#8B5CF6", bg: "rgba(139,92,246,0.08)" },
   { key: "sobriety", label: "Sobriety", subtitle: "Stay strong", icon: Trophy, color: "#14B8A6", bg: "rgba(20,184,166,0.08)" },
 ];

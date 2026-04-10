@@ -301,8 +301,8 @@ const HabitsSetup = ({ userId, onDone }: { userId: string; onDone: () => void })
     <div className="px-6 py-6 flex flex-col h-full">
       <div className="flex-1 space-y-6">
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 500, color: "#1a1a1a" }} className="mb-1">What habits matter to you?</h1>
-          <p style={{ fontSize: 13, color: "#888" }}>Pick categories — we'll suggest specific habits inside.</p>
+          <h1 style={{ fontSize: 22, fontWeight: 500, color: "#1a1a1a" }} className="mb-1">What routines matter to you?</h1>
+          <p style={{ fontSize: 13, color: "#888" }}>Pick categories — we'll suggest specific routines inside.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -331,7 +331,7 @@ const HabitsSetup = ({ userId, onDone }: { userId: string; onDone: () => void })
         </div>
 
         <div>
-          <SectionLabel>Best time for habits</SectionLabel>
+          <SectionLabel>Best time for routines</SectionLabel>
           <ChipSelect
             options={["Morning", "Afternoon", "Evening", "Flexible"]}
             selected={time}
