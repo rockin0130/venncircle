@@ -286,7 +286,7 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
   const doAddHabit = () => {
     if (!newHabitLabel.trim() || !addingToSection) return;
     addHabit(newHabitLabel.trim(), addingToSection, selectedContexts.length > 0 ? selectedContexts : undefined);
-    toast.success(`Habit "${newHabitLabel.trim()}" added!`);
+    toast.success(`Routine "${newHabitLabel.trim()}" added!`);
     setNewHabitLabel("");
     setAddingToSection(null);
     setSelectedContexts([]);
@@ -357,14 +357,14 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
       {/* ── Header ── */}
       <header className="pt-12 pb-4 flex items-start justify-between">
         <div>
-          <h1 className="text-[1.75rem] font-bold tracking-display">Habits</h1>
+          <h1 className="text-[1.75rem] font-bold tracking-display">Routines</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Build a better routine</p>
         </div>
         <div className="flex items-center gap-1.5 mt-1">
           <button
             onClick={() => setAddingToSection(addingToSection ? null : "morning")}
             className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-md active:scale-95 transition-transform"
-            aria-label="Add habit"
+            aria-label="Add routine"
           >
             <Plus size={18} strokeWidth={2.5} />
           </button>
@@ -695,7 +695,7 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
                   onSubmit={handleAdd}
                   selectedContexts={selectedContexts}
                   onChangeContexts={setSelectedContexts}
-                  placeholder={`Add ${section.label.toLowerCase()} habit...`}
+                  placeholder={`Add ${section.label.toLowerCase()} routine...`}
                 />
               )}
 
@@ -744,7 +744,7 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
       <AlertDialog open={!!duplicateConfirm} onOpenChange={(open) => { if (!open) setDuplicateConfirm(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Already have this habit</AlertDialogTitle>
+            <AlertDialogTitle>Already have this routine</AlertDialogTitle>
             <AlertDialogDescription>
               You already have "{duplicateConfirm?.existingName}" in this section. Are you sure you want to add it again?
             </AlertDialogDescription>
