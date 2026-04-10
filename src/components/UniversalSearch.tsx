@@ -144,7 +144,7 @@ const UniversalSearch = ({ open, onClose, onNavigate }: Props) => {
     if (pendingTasks.length > 0) suggestions.push(`Pending tasks (${pendingTasks.length})`);
     
     const incompleteHabits = habits.filter((h) => !h.completionDates.includes(todayStr));
-    if (incompleteHabits.length > 0) suggestions.push(`Incomplete habits`);
+    if (incompleteHabits.length > 0) suggestions.push(`Incomplete routines`);
 
     return suggestions;
   }, [query, events, tasks, habits]);

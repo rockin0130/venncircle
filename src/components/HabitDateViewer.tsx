@@ -57,7 +57,7 @@ const HabitDateViewer = () => {
           className="flex items-center gap-2 text-sm text-primary font-medium"
         >
           <CalendarDays size={16} />
-          View past habits
+          View past routines
         </button>
       </section>
     );
@@ -72,7 +72,7 @@ const HabitDateViewer = () => {
           </button>
           <div className="text-center">
             <p className="text-sm font-semibold">{formatLabel(dateToView)}</p>
-            <p className="text-[10px] text-muted-foreground">{completed.length} habits completed</p>
+            <p className="text-[10px] text-muted-foreground">{completed.length} routines completed</p>
           </div>
           <button onClick={() => shiftDate(1)} className="p-1 rounded-lg bg-secondary">
             <ChevronRight size={16} />
@@ -95,7 +95,7 @@ const HabitDateViewer = () => {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-2">No habits tracked on this date</p>
+          <p className="text-sm text-muted-foreground text-center py-2">No routines tracked on this date</p>
         )}
 
         {/* Water intake for this date */}
