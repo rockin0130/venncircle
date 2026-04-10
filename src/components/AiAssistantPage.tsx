@@ -647,13 +647,13 @@ const AiAssistantPage = ({ onBack, onOpenMore }: { onBack?: () => void; onOpenMo
             </div>
             <h2 className="text-xl font-bold mb-2">Hey{profile?.display_name ? `, ${profile.display_name}` : ""}! 👋</h2>
             <p className="text-sm text-muted-foreground max-w-[300px] mb-8 leading-relaxed">
-              I can do anything in the app — create workouts, schedule events, manage habits, send messages, and more. Just ask!
+              I can do anything in the app — create workouts, schedule events, manage routines, send messages, and more. Just ask!
             </p>
             <div className="flex flex-wrap gap-2 justify-center max-w-[320px]">
               {[
                 "Create a 4-day workout plan",
                 "Schedule dinner tomorrow at 7pm",
-                "Add a morning habits section",
+                "Add a morning routines section",
                 "Set up a sobriety tracker",
                 "Send a message to the group",
                 "Delete all my workouts",

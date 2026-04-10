@@ -285,10 +285,10 @@ const HomeSectionCustomizer = ({
   const habitSubItems = (() => {
     const items: { id: string; label: string; icon: string }[] = [];
     const categories = [
-      { key: "morning", label: "Morning Habits", icon: "🌅" },
-      { key: "afternoon", label: "Afternoon Habits", icon: "☀️" },
-      { key: "evening", label: "Evening Habits", icon: "🌙" },
-      { key: "other", label: "Other Habits", icon: "📋" },
+      { key: "morning", label: "Morning Routines", icon: "🌅" },
+      { key: "afternoon", label: "Afternoon Routines", icon: "☀️" },
+      { key: "evening", label: "Evening Routines", icon: "🌙" },
+      { key: "other", label: "Other Routines", icon: "📋" },
     ];
     for (const cat of categories) {
       items.push({ id: `habit:${cat.key}`, label: cat.label, icon: cat.icon });

@@ -33,8 +33,8 @@ const TEMPLATES: Record<string, ChallengeTemplate[]> = {
     { title: "Weekly Goal Streak", goalDescription: "Hit weekly study goal 4 weeks in a row", durationWeeks: 4, difficulty: "Hard", targetPerWeek: 5 },
   ],
   habits: [
-    { title: "21-Day Habit Lock", goalDescription: "Complete all habits daily for 3 weeks", durationWeeks: 3, difficulty: "Medium", targetPerWeek: 7 },
-    { title: "Morning Routine Challenge", goalDescription: "Complete morning habits for 30 days", durationWeeks: 4, difficulty: "Hard", targetPerWeek: 7 },
+    { title: "21-Day Routine Lock", goalDescription: "Complete all routines daily for 3 weeks", durationWeeks: 3, difficulty: "Medium", targetPerWeek: 7 },
+    { title: "Morning Routine Challenge", goalDescription: "Complete morning routines for 30 days", durationWeeks: 4, difficulty: "Hard", targetPerWeek: 7 },
   ],
   sobriety: [
     { title: "7-Day Clean Start", goalDescription: "7 days of check-ins each", durationWeeks: 1, difficulty: "Easy", targetPerWeek: 7 },

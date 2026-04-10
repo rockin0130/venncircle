@@ -74,7 +74,7 @@ const QUICK_ACCESS_FEATURES = [
       <polyline points="12 6 12 12 16 14" />
     </svg>
   )},
-  { id: "habits", label: "Habits", page: "habits", icon: (
+  { id: "habits", label: "Routines", page: "habits", icon: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
       <polyline points="22 4 12 14.01 9 11.01" />

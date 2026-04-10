@@ -65,8 +65,8 @@ const NotificationCenter = ({ open, onClose }: Props) => {
       notifs.push({
         id: "habit-reminder",
         type: "habit_streak",
-        title: "Habit Reminder",
-        description: `You have ${incompleteHabits.length} habit${incompleteHabits.length > 1 ? "s" : ""} left to complete today`,
+        title: "Routine Reminder",
+        description: `You have ${incompleteHabits.length} routine${incompleteHabits.length > 1 ? "s" : ""} left to complete today`,
         timestamp: now,
         read: false,
       });
