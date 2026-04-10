@@ -69,7 +69,7 @@ const HabitEditModal = ({ habit, open, onClose }: HabitEditModalProps) => {
       .update({ shared_group_ids: selectedGroupIds } as any)
       .eq("id", habit.id);
 
-    toast.success("Habit updated");
+    toast.success("Routine updated");
     onClose();
     refreshData();
   };
@@ -77,7 +77,7 @@ const HabitEditModal = ({ habit, open, onClose }: HabitEditModalProps) => {
   const handleDelete = async () => {
     if (!habit || !user) return;
     await removeHabit(habit.id);
-    toast.success("Habit deleted");
+    toast.success("Routine deleted");
     setShowDeleteConfirm(false);
     onClose();
   };
@@ -102,7 +102,7 @@ const HabitEditModal = ({ habit, open, onClose }: HabitEditModalProps) => {
                 value={editedLabel}
                 onChange={(e) => setEditedLabel(e.target.value)}
                 className="w-full mt-1.5 bg-card border border-border rounded-lg px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground focus:border-primary transition-colors"
-                placeholder="Habit name"
+                placeholder="Routine name"
               />
             </div>
 
