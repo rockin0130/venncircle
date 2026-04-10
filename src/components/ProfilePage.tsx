@@ -1,9 +1,6 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
-  Search,
-  Info,
   MoreHorizontal,
-  Plus,
   Dumbbell,
   Heart,
   Shield,
@@ -12,6 +9,11 @@ import {
   Star,
   Camera,
   X,
+  Settings,
+  CalendarDays,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
@@ -19,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import EditProfileModal from "@/components/EditProfileModal";
 import AddFriendModal from "@/components/AddFriendModal";
 import { useFriendships } from "@/hooks/useFriendships";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 
 interface ProfilePageProps {
   onNavigate?: (tab: string) => void;
@@ -54,6 +57,15 @@ const FEATURE_ICONS: Record<ActivityItem["type"], typeof Dumbbell> = {
   shopping: ShoppingCart,
 };
 
+const FEATURE_EMOJI: Record<ActivityItem["type"], string> = {
+  workout: "🏋️",
+  habits: "✅",
+  nutrition: "🍎",
+  sobriety: "⏰",
+  specialday: "⭐",
+  shopping: "🛒",
+};
+
 const USER_COLORS = [
   "#6C47FF", "#3B82F6", "#10B981", "#F97316", "#EC4899",
   "#8B5CF6", "#14B8A6", "#EF4444", "#F59E0B", "#6366F1",
@@ -65,31 +77,16 @@ function hashColor(str: string) {
   return USER_COLORS[Math.abs(hash) % USER_COLORS.length];
 }
 
-function timeAgo(date: Date) {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
 const cardStyle = { background: "#fff", borderRadius: 16, border: "0.5px solid rgba(0,0,0,0.07)" } as const;
 
 const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProps) => {
   const { profile, user, groups, signOut, refreshProfile } = useAuth();
-  const {
-    habits,
-    workouts,
-    getHabitStreak,
-  } = useAppContext();
+  const { habits, workouts, getHabitStreak } = useAppContext();
   const { activeFriends } = useFriendships();
+
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showAddFriend, setShowAddFriend] = useState(false);
+  const [showFriendsSheet, setShowFriendsSheet] = useState(false);
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
   const [showCropEditor, setShowCropEditor] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -102,6 +99,11 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
   const cropContainerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const pinchRef = useRef<{ dist0: number; scale0: number } | null>(null);
+
+  // Date picker state
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   const handlePhotoSelected = (file: File) => {
     const url = URL.createObjectURL(file);
@@ -117,7 +119,6 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
     if (!selectedFile || !user) return;
     setUploading(true);
     try {
-      // Create canvas to crop
       const img = new Image();
       img.crossOrigin = "anonymous";
       await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; img.src = selectedImage!; });
@@ -155,7 +156,6 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
     }
   };
 
-  // Touch handlers for crop editor
   const handleCropTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -199,14 +199,14 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
     })();
   }, [user]);
 
-  // ─── Activity feed ───
-  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
-  useEffect(() => {
-    if (!user) return;
+  // ─── Activity feed (date-filtered) ───
+  const activityForDate = useMemo(() => {
+    if (!user) return [];
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
     const items: ActivityItem[] = [];
 
     workouts
-      .filter((w) => w.done && w.completedDate)
+      .filter((w) => w.done && w.completedDate && w.completedDate === dateStr)
       .forEach((w) => {
         const g = w.groupId ? groups.find((gr) => gr.id === w.groupId) : null;
         items.push({
@@ -219,25 +219,27 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
         });
       });
 
-    habits
-      .filter((h) => h.done)
-      .forEach((h) => {
-        const streak = getHabitStreak(h.id);
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    if (dateStr === todayStr) {
+      const doneHabits = habits.filter((h) => h.done);
+      if (doneHabits.length > 0) {
+        const sections = [...new Set(doneHabits.map(h => h.category || "Other"))];
         items.push({
-          id: `h-${h.id}`,
+          id: `h-summary-${dateStr}`,
           type: "habits",
-          title: `${h.label} ✓`,
-          detail: streak > 1 ? `${streak}-day streak` : "Completed today",
+          title: `Completed ${doneHabits.length} habits`,
+          detail: sections.join(" · "),
           group: "Personal",
           timestamp: new Date(),
         });
-      });
+      }
+    }
 
     items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-    setRecentActivity(items.slice(0, 4));
-  }, [user, workouts, habits, groups, getHabitStreak]);
+    return items;
+  }, [user, workouts, habits, groups, selectedDate]);
 
-  // ─── Stats computation ───
+  // ─── Stats ───
   const bestStreak = useMemo(() => {
     if (habits.length === 0) return 0;
     return Math.max(0, ...habits.map((h) => getHabitStreak(h.id)));
@@ -257,6 +259,7 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
   const initial = profile?.display_name?.charAt(0)?.toUpperCase() || "?";
   const avatarColor = user?.id ? hashColor(user.id) : "#6C47FF";
 
+  // Friend group map for friends sheet
   const friendGroupMap = useMemo(() => {
     const map: Record<string, string[]> = {};
     for (const f of activeFriends) {
@@ -269,20 +272,26 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
     return map;
   }, [activeFriends, groups]);
 
+  // Calendar grid
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(calendarMonth);
+    const monthEnd = endOfMonth(calendarMonth);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    return eachDayOfInterval({ start: gridStart, end: gridEnd });
+  }, [calendarMonth]);
+
+  const isToday = isSameDay(selectedDate, new Date());
+  const dateLabel = isToday ? "today" : format(selectedDate, "MMM d, yyyy");
+
   return (
-    <div className="px-4 pb-28" style={{ background: "#F4F3F0" }}>
+    <div className="px-3 pb-28" style={{ background: "#F4F3F0" }}>
+      {/* ─── Header ─── */}
       <header className="pt-12 pb-4 flex items-center justify-between">
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", fontFamily: "'DM Sans', sans-serif" }}>
           Profile
         </h1>
         <div className="flex items-center gap-1.5">
-          <button
-            className="w-[30px] h-[30px] rounded-full flex items-center justify-center"
-            style={{ background: "#F4F3F0" }}
-            aria-label="Search"
-          >
-            <Search size={15} color="#888" />
-          </button>
           {onOpenSettings && (
             <button
               onClick={onOpenSettings}
@@ -290,7 +299,7 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
               style={{ background: "#F4F3F0" }}
               aria-label="Settings"
             >
-              <Info size={15} color="#888" />
+              <Settings size={15} color="#888" />
             </button>
           )}
           {onOpenMore && (
@@ -306,232 +315,340 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
         </div>
       </header>
 
-      {/* Identity Card */}
-      <div className="mb-4 flex flex-col items-center py-6 px-4" style={cardStyle}>
-        <div className="relative mb-3">
-          <div
-            className="w-[76px] h-[76px] rounded-full flex items-center justify-center text-white text-2xl font-semibold overflow-hidden"
-            style={{ background: avatarColor }}
-          >
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              initial
+      {/* ─── Profile Card (Instagram-style) ─── */}
+      <div className="mb-4 px-1 py-5" style={cardStyle}>
+        {/* Top row: photo + name */}
+        <div className="flex items-center gap-4 px-4 mb-4">
+          <div className="relative shrink-0">
+            <div
+              className="w-[80px] h-[80px] rounded-full flex items-center justify-center text-white text-2xl font-semibold overflow-hidden"
+              style={{ background: avatarColor }}
+            >
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                initial
+              )}
+            </div>
+            <button
+              onClick={() => setShowPhotoSheet(true)}
+              className="absolute -bottom-0.5 -right-0.5 w-[24px] h-[24px] rounded-full flex items-center justify-center"
+              style={{ background: "#222", border: "2px solid #fff" }}
+              aria-label="Change photo"
+            >
+              <Camera size={11} color="#fff" />
+            </button>
+          </div>
+          <div className="min-w-0">
+            <p style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", fontFamily: "'DM Sans', sans-serif" }}>
+              {profile?.display_name || "You"}
+            </p>
+            {(profile as { username?: string })?.username && (
+              <p style={{ fontSize: 13, color: "#999", marginTop: 1 }}>@{(profile as { username?: string }).username}</p>
             )}
           </div>
+        </div>
+
+        {/* Stats row: Groups | Friends | Rewards */}
+        <div className="flex items-center justify-around px-4 mb-4">
+          <div className="flex-1 text-center">
+            <p style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{groups.length}</p>
+            <p style={{ fontSize: 12, color: "#666" }}>Groups</p>
+          </div>
+          <div style={{ width: 1, height: 28, background: "rgba(0,0,0,0.1)" }} />
+          <button className="flex-1 text-center" onClick={() => setShowFriendsSheet(true)}>
+            <p style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{activeFriends.length}</p>
+            <p style={{ fontSize: 12, color: "#666" }}>Friends</p>
+          </button>
+          <div style={{ width: 1, height: 28, background: "rgba(0,0,0,0.1)" }} />
+          <div className="flex-1 text-center">
+            <p style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>0</p>
+            <p style={{ fontSize: 12, color: "#666" }}>Rewards</p>
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-2 px-4">
           <button
-            onClick={() => setShowPhotoSheet(true)}
-            className="absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] rounded-full flex items-center justify-center"
-            style={{ background: "#222", border: "2px solid #fff" }}
-            aria-label="Change photo"
+            onClick={() => setShowEditProfile(true)}
+            className="flex-1 py-2.5 text-center"
+            style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "#fff" }}
           >
-            <Camera size={10} color="#fff" />
+            Edit profile
+          </button>
+          <button
+            className="flex-1 py-2.5 text-center"
+            style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", borderRadius: 8, border: "1px solid rgba(0,0,0,0.12)", background: "#fff" }}
+          >
+            Share profile
           </button>
         </div>
-        <p style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A", fontFamily: "'DM Sans', sans-serif" }}>
-          {profile?.display_name || "You"}
-        </p>
-        {(profile as { username?: string })?.username && (
-          <p style={{ fontSize: 13, color: "#999", marginTop: 2 }}>@{((profile as { username?: string }).username)}</p>
-        )}
-        <button
-          onClick={() => setShowEditProfile(true)}
-          className="mt-3 px-5 py-1.5"
-          style={{
-            fontSize: 12,
-            fontWeight: 500,
-            color: "#666",
-            background: "#F4F3F0",
-            borderRadius: 100,
-            border: "0.5px solid rgba(0,0,0,0.07)",
-          }}
-        >
-          Edit profile
-        </button>
       </div>
 
-      {/* Stats Grid */}
+      {/* ─── Stats Section ─── */}
       {(hasHabits || hasWorkouts || hasSobriety) && (
-        <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: `repeat(${[hasHabits, hasWorkouts, hasSobriety].filter(Boolean).length}, 1fr)` }}>
-          {hasHabits && (
-            <div style={{ ...cardStyle, padding: "14px 12px" }}>
-              <div
-                className="w-[26px] h-[26px] rounded-lg flex items-center justify-center mb-2"
-                style={{ background: "#FFF7ED" }}
-              >
-                <Heart size={13} color="#F97316" />
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <p style={{ fontSize: 15, fontWeight: 700, color: "#1A1A1A" }}>Stats</p>
+            <button style={{ fontSize: 13, fontWeight: 500, color: "#3B82F6" }}>See all</button>
+          </div>
+          <div
+            className="flex gap-2 overflow-x-auto px-1"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+          >
+            <style>{`.stats-scroll::-webkit-scrollbar { display: none; }`}</style>
+            {hasHabits && (
+              <div className="shrink-0" style={{ ...cardStyle, padding: "14px 16px", minWidth: 110 }}>
+                <div className="flex justify-center mb-2">
+                  <span style={{ fontSize: 20 }}>❤️</span>
+                </div>
+                <p className="text-center" style={{ fontSize: 24, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.1 }}>{bestStreak}</p>
+                <p className="text-center" style={{ fontSize: 11, color: "#888", marginTop: 3 }}>Habit streak</p>
+                {bestStreak >= 1 && (
+                  <div className="flex justify-center mt-2">
+                    <span
+                      className="inline-flex px-2 py-0.5 rounded-full"
+                      style={{ background: "#FFF7ED", fontSize: 10, fontWeight: 600, color: "#F97316" }}
+                    >
+                      Best {bestStreak}d
+                    </span>
+                  </div>
+                )}
               </div>
-              <p style={{ fontSize: 22, fontWeight: 500, color: "#1A1A1A", lineHeight: 1.1 }}>{bestStreak}</p>
-              <p style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Habit streak</p>
-              <div
-                className="mt-2 inline-flex px-2 py-0.5 rounded-full"
-                style={{ background: "#FFF7ED", fontSize: 9, fontWeight: 600, color: "#F97316" }}
-              >
-                Best {bestStreak}d
+            )}
+            {hasWorkouts && (
+              <div className="shrink-0" style={{ ...cardStyle, padding: "14px 16px", minWidth: 110 }}>
+                <div className="flex justify-center mb-2">
+                  <span style={{ fontSize: 20 }}>🏋️</span>
+                </div>
+                <p className="text-center" style={{ fontSize: 24, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.1 }}>{workoutsThisWeek}</p>
+                <p className="text-center" style={{ fontSize: 11, color: "#888", marginTop: 3 }}>Workouts</p>
+                <div className="flex justify-center mt-2">
+                  <span
+                    className="inline-flex px-2 py-0.5 rounded-full"
+                    style={{ background: "#EEF4FF", fontSize: 10, fontWeight: 600, color: "#3B82F6" }}
+                  >
+                    This week
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
-          {hasWorkouts && (
-            <div style={{ ...cardStyle, padding: "14px 12px" }}>
-              <div
-                className="w-[26px] h-[26px] rounded-lg flex items-center justify-center mb-2"
-                style={{ background: "#EEF4FF" }}
-              >
-                <Dumbbell size={13} color="#3B82F6" />
+            )}
+            {hasSobriety && sobrietyDays !== null && (
+              <div className="shrink-0" style={{ ...cardStyle, padding: "14px 16px", minWidth: 110 }}>
+                <div className="flex justify-center mb-2">
+                  <span style={{ fontSize: 20 }}>⏰</span>
+                </div>
+                <p className="text-center" style={{ fontSize: 24, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.1 }}>{sobrietyDays}</p>
+                <p className="text-center" style={{ fontSize: 11, color: "#888", marginTop: 3 }}>Sober days</p>
+                <div className="flex justify-center mt-2">
+                  <span
+                    className="inline-flex px-2 py-0.5 rounded-full"
+                    style={{ background: "#ECFDF5", fontSize: 10, fontWeight: 600, color: "#10B981" }}
+                  >
+                    On track
+                  </span>
+                </div>
               </div>
-              <p style={{ fontSize: 22, fontWeight: 500, color: "#1A1A1A", lineHeight: 1.1 }}>{workoutsThisWeek}</p>
-              <p style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Workouts</p>
-              <div
-                className="mt-2 inline-flex px-2 py-0.5 rounded-full"
-                style={{ background: "#EEF4FF", fontSize: 9, fontWeight: 600, color: "#3B82F6" }}
-              >
-                This week
-              </div>
-            </div>
-          )}
-          {hasSobriety && sobrietyDays !== null && (
-            <div style={{ ...cardStyle, padding: "14px 12px" }}>
-              <div
-                className="w-[26px] h-[26px] rounded-lg flex items-center justify-center mb-2"
-                style={{ background: "#ECFDF5" }}
-              >
-                <Shield size={13} color="#10B981" />
-              </div>
-              <p style={{ fontSize: 22, fontWeight: 500, color: "#1A1A1A", lineHeight: 1.1 }}>{sobrietyDays}</p>
-              <p style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Sober days</p>
-              <div
-                className="mt-2 inline-flex px-2 py-0.5 rounded-full"
-                style={{ background: "#ECFDF5", fontSize: 9, fontWeight: 600, color: "#10B981" }}
-              >
-                On track
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
-      {/* Friends */}
+      {/* ─── My Activity Section ─── */}
       <div className="mb-4">
-        <div className="flex items-center justify-between mb-2 px-0.5">
-          <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>Friends</p>
-          <button
-            onClick={() => onNavigate?.("shared-interests")}
-            style={{ fontSize: 12, fontWeight: 500, color: "#6C47FF" }}
-          >
-            See all
-          </button>
-        </div>
-        <div style={{ ...cardStyle, overflow: "hidden" }}>
-          {activeFriends.slice(0, 5).map((f, i) => {
-            if (!f.friend) return null;
-            const fInitial = f.friend.display_name?.charAt(0)?.toUpperCase() || "?";
-            const fColor = hashColor(f.friend.id);
-            const sharedGroups = friendGroupMap[f.friend.id] || [];
-            return (
-              <div
-                key={f.id}
-                className="flex items-center gap-3 px-4 py-3"
-                style={{ borderTop: i > 0 ? "0.5px solid rgba(0,0,0,0.05)" : "none" }}
-              >
-                <div className="relative">
-                  <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-semibold overflow-hidden"
-                    style={{ background: fColor }}
-                  >
-                    {f.friend.avatar_url ? (
-                      <img src={f.friend.avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      fInitial
-                    )}
-                  </div>
-                  <div
-                    className="absolute -bottom-0.5 -right-0.5 w-[9px] h-[9px] rounded-full"
-                    style={{ background: "#10B981", border: "1.5px solid #fff" }}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A" }} className="truncate">
-                    {f.friend.display_name}
-                  </p>
-                  {sharedGroups.length > 0 && (
-                    <p style={{ fontSize: 11, color: "#999" }} className="truncate">
-                      {sharedGroups.join(", ")}
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+        <p className="px-1 mb-2" style={{ fontSize: 15, fontWeight: 700, color: "#1A1A1A" }}>My activity</p>
 
+        {/* Date picker row */}
+        <div className="flex items-center gap-2 mb-3 px-1 relative">
           <button
-            onClick={() => setShowAddFriend(true)}
-            className="flex items-center gap-3 px-4 py-3 w-full"
-            style={{ borderTop: activeFriends.length > 0 ? "0.5px solid rgba(0,0,0,0.05)" : "none" }}
+            onClick={() => { setShowCalendar(!showCalendar); setCalendarMonth(selectedDate); }}
+            className="flex items-center gap-2 px-3 py-2"
+            style={{ borderRadius: 20, border: "1px solid rgba(0,0,0,0.12)", background: "#fff", fontSize: 13, fontWeight: 500, color: "#1A1A1A" }}
           >
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center"
-              style={{ background: "#F4F3F0" }}
+            <CalendarDays size={14} color="#666" />
+            {format(selectedDate, "MMM d, yyyy")}
+            <ChevronDown size={14} color="#888" />
+          </button>
+          {!isToday && (
+            <button
+              onClick={() => { setSelectedDate(new Date()); setShowCalendar(false); }}
+              className="px-3.5 py-2"
+              style={{ borderRadius: 20, background: "#7C3AED", color: "#fff", fontSize: 13, fontWeight: 600 }}
             >
-              <Plus size={16} color="#999" />
-            </div>
-            <p style={{ fontSize: 13, fontWeight: 500, color: "#999" }}>Add a friend</p>
-          </button>
+              Today
+            </button>
+          )}
+          {isToday && (
+            <span
+              className="px-3.5 py-2"
+              style={{ borderRadius: 20, background: "#7C3AED", color: "#fff", fontSize: 13, fontWeight: 600 }}
+            >
+              Today
+            </span>
+          )}
         </div>
-      </div>
 
-      {/* My Activity */}
-      {recentActivity.length > 0 && (
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2 px-0.5">
-            <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>My activity</p>
-            <button style={{ fontSize: 12, fontWeight: 500, color: "#6C47FF" }}>See all</button>
+        {/* Calendar dropdown */}
+        {showCalendar && (
+          <div className="mx-1 mb-3 p-3" style={{ ...cardStyle, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
+            <div className="flex items-center justify-between mb-3">
+              <button onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))} className="p-1">
+                <ChevronLeft size={18} color="#666" />
+              </button>
+              <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
+                {format(calendarMonth, "MMMM yyyy")}
+              </p>
+              <button onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))} className="p-1">
+                <ChevronRight size={18} color="#666" />
+              </button>
+            </div>
+            <div className="grid grid-cols-7 gap-0">
+              {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+                <div key={d} className="text-center py-1" style={{ fontSize: 11, fontWeight: 500, color: "#999" }}>{d}</div>
+              ))}
+              {calendarDays.map((day) => {
+                const inMonth = isSameMonth(day, calendarMonth);
+                const isSelected = isSameDay(day, selectedDate);
+                const isDayToday = isSameDay(day, new Date());
+                return (
+                  <button
+                    key={day.toISOString()}
+                    onClick={() => { setSelectedDate(day); setShowCalendar(false); }}
+                    className="flex items-center justify-center py-1.5"
+                  >
+                    <span
+                      className="w-8 h-8 rounded-full flex items-center justify-center"
+                      style={{
+                        fontSize: 13,
+                        fontWeight: isSelected || isDayToday ? 600 : 400,
+                        color: isSelected ? "#fff" : !inMonth ? "#ccc" : "#1A1A1A",
+                        background: isSelected ? "#7C3AED" : isDayToday ? "rgba(124,58,237,0.1)" : "transparent",
+                      }}
+                    >
+                      {format(day, "d")}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div style={{ ...cardStyle, overflow: "hidden" }}>
-            {recentActivity.map((item, i) => {
+        )}
+
+        {/* Activity cards */}
+        {activityForDate.length > 0 ? (
+          <div className="space-y-2 px-1">
+            {activityForDate.map((item) => {
               const colors = FEATURE_COLORS[item.type];
-              const Icon = FEATURE_ICONS[item.type];
+              const emoji = FEATURE_EMOJI[item.type];
               return (
-                <div
-                  key={item.id}
-                  className="flex items-start gap-3 px-4 py-3"
-                  style={{ borderTop: i > 0 ? "0.5px solid rgba(0,0,0,0.05)" : "none" }}
-                >
+                <div key={item.id} className="flex items-center gap-3 px-4 py-3.5" style={cardStyle}>
                   <div
-                    className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 mt-0.5"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                     style={{ background: colors.bg }}
                   >
-                    <Icon size={14} color={colors.text} />
+                    <span style={{ fontSize: 18 }}>{emoji}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A" }} className="truncate">
+                    <p style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }} className="truncate">
                       {item.title}
                     </p>
-                    <p style={{ fontSize: 11, color: "#999" }} className="truncate">
+                    <p style={{ fontSize: 12, color: "#999" }} className="truncate">
                       {item.detail}
                     </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span
-                        className="inline-flex px-2 py-0.5 rounded-full"
-                        style={{ fontSize: 9, fontWeight: 600, color: colors.text, background: colors.bg }}
-                      >
-                        {item.group || "Personal"}
-                      </span>
-                      <span style={{ fontSize: 10, color: "#bbb" }}>{timeAgo(item.timestamp)}</span>
-                    </div>
                   </div>
+                  {item.group && item.group !== "Personal" && (
+                    <span
+                      className="shrink-0 px-2 py-0.5 rounded-full"
+                      style={{ fontSize: 10, fontWeight: 600, color: "#3B82F6", background: "#EEF4FF" }}
+                    >
+                      {item.group}
+                    </span>
+                  )}
+                  {item.group === "Personal" && (
+                    <span
+                      className="shrink-0 px-2 py-0.5 rounded-full"
+                      style={{ fontSize: 10, fontWeight: 600, color: "#10B981", background: "#ECFDF5" }}
+                    >
+                      Personal
+                    </span>
+                  )}
                 </div>
               );
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="py-10 text-center">
+            <p style={{ fontSize: 14, color: "#999" }}>No activity for this date.</p>
+          </div>
+        )}
 
+        <p className="text-center mt-4" style={{ fontSize: 12, color: "#bbb" }}>
+          End of activity for {dateLabel}
+        </p>
+      </div>
+
+      {/* ─── Modals ─── */}
       <EditProfileModal open={showEditProfile} onOpenChange={setShowEditProfile} />
       <AddFriendModal open={showAddFriend} onOpenChange={setShowAddFriend} />
 
       {/* Hidden file inputs */}
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handlePhotoSelected(e.target.files[0]); e.target.value = ""; }} />
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handlePhotoSelected(e.target.files[0]); e.target.value = ""; }} />
+
+      {/* Friends Bottom Sheet */}
+      {showFriendsSheet && (
+        <div className="fixed inset-0 z-[9998] flex items-end justify-center" onClick={() => setShowFriendsSheet(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative w-full max-w-md mx-0 animate-in slide-in-from-bottom-4 duration-200"
+            style={{ background: "#fff", borderRadius: "16px 16px 0 0", maxHeight: "70vh" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+              <p style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A" }}>Friends</p>
+              <button onClick={() => setShowFriendsSheet(false)}>
+                <X size={20} color="#888" />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-5 pb-8" style={{ maxHeight: "calc(70vh - 60px)" }}>
+              {activeFriends.length === 0 && (
+                <p className="text-center py-8" style={{ fontSize: 14, color: "#999" }}>No friends yet</p>
+              )}
+              {activeFriends.map((f) => {
+                if (!f.friend) return null;
+                const fInitial = f.friend.display_name?.charAt(0)?.toUpperCase() || "?";
+                const fColor = hashColor(f.friend.id);
+                const sharedGroups = friendGroupMap[f.friend.id] || [];
+                return (
+                  <div key={f.id} className="flex items-center gap-3 py-3" style={{ borderBottom: "0.5px solid rgba(0,0,0,0.06)" }}>
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold overflow-hidden shrink-0"
+                      style={{ background: fColor }}
+                    >
+                      {f.friend.avatar_url ? (
+                        <img src={f.friend.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : fInitial}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }} className="truncate">{f.friend.display_name}</p>
+                      {sharedGroups.length > 0 && (
+                        <p style={{ fontSize: 12, color: "#999" }} className="truncate">{sharedGroups.join(", ")}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <button
+                onClick={() => { setShowFriendsSheet(false); setShowAddFriend(true); }}
+                className="w-full mt-3 py-3 text-center"
+                style={{ fontSize: 14, fontWeight: 500, color: "#7C3AED" }}
+              >
+                + Add a friend
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Photo picker action sheet */}
       {showPhotoSheet && (
@@ -568,15 +685,12 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
       {/* Crop / position editor */}
       {showCropEditor && selectedImage && (
         <div className="fixed inset-0 z-[10000] flex flex-col" style={{ background: "#000" }}>
-          {/* Header */}
           <div className="flex items-center justify-between px-4 pt-12 pb-3">
             <p style={{ fontSize: 17, fontWeight: 600, color: "#fff" }}>Move and Scale</p>
             <button onClick={() => { setShowCropEditor(false); setSelectedImage(null); setSelectedFile(null); }}>
               <X size={22} color="#fff" />
             </button>
           </div>
-
-          {/* Crop area */}
           <div
             ref={cropContainerRef}
             className="flex-1 relative flex items-center justify-center overflow-hidden"
@@ -584,7 +698,6 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
             onTouchMove={handleCropTouchMove}
             onTouchEnd={handleCropTouchEnd}
           >
-            {/* Photo behind mask */}
             <img
               src={selectedImage}
               alt=""
@@ -598,7 +711,6 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
                 transition: dragRef.current || pinchRef.current ? "none" : "transform 0.1s ease",
               }}
             />
-            {/* Circle mask overlay */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
               <defs>
                 <mask id="crop-mask">
@@ -608,14 +720,11 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
               </defs>
               <rect width="100%" height="100%" fill="rgba(0,0,0,0.6)" mask="url(#crop-mask)" />
             </svg>
-            {/* Circle outline */}
             <div
               className="absolute rounded-full pointer-events-none"
               style={{ width: 280, height: 280, border: "2px solid rgba(255,255,255,0.5)" }}
             />
           </div>
-
-          {/* Bottom buttons */}
           <div className="flex items-center justify-between px-6 pb-10 pt-4">
             <button
               onClick={() => { setShowCropEditor(false); setSelectedImage(null); setSelectedFile(null); }}
