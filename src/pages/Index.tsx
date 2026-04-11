@@ -46,6 +46,7 @@ const Index = () => {
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [createGroupCategory, setCreateGroupCategory] = useState<"home" | "interest" | undefined>(undefined);
   const [hubGroup, setHubGroup] = useState<Group | null>(null);
+  const [workoutNavigatedGroupId, setWorkoutNavigatedGroupId] = useState<string | null>(null);
   const { navStyle, setNavStyle } = useNavStyle();
   const { weekStart, setWeekStart } = useWeekStart();
 
@@ -179,14 +180,16 @@ const Index = () => {
     const tab = tabMap[feature];
     if (!tab) return;
 
+    if (tab === "workout") {
+      setWorkoutNavigatedGroupId(groupId || null);
+    }
+
     if (groupId) {
       const group = groups.find((g) => g.id === groupId);
       const pageKey = TAB_TO_PAGE[tab] || feature;
-      // Only set active group if the group has this feature enabled
       if (group && group.shared_pages?.includes(pageKey as any)) {
         setActiveGroup(group);
       } else {
-        // Group doesn't have this feature — fall back to personal
         setActiveGroup(null);
       }
     }
@@ -232,7 +235,7 @@ const Index = () => {
         onOpenMore={() => setMoreOpen(true)}
       />
     ),
-    workout: <WorkoutsPage onOpenMore={() => setMoreOpen(true)} isActive={activeTab === "workout"} />,
+    workout: <WorkoutsPage onOpenMore={() => setMoreOpen(true)} isActive={activeTab === "workout"} navigatedGroupId={workoutNavigatedGroupId} />,
     nutrition: <NutritionPage onOpenMore={() => setMoreOpen(true)} />,
     habits: <HabitsPage onOpenMore={() => setMoreOpen(true)} />,
     sobriety: <SobrietyPage onOpenMore={() => setMoreOpen(true)} />,

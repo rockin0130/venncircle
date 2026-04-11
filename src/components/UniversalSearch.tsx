@@ -28,7 +28,7 @@ const FILTER_OPTIONS: { id: FilterType; label: string }[] = [
   { id: "tasks", label: "Tasks" },
   { id: "calendar", label: "Calendar" },
   { id: "chat", label: "Chat" },
-  { id: "habits", label: "Habits" },
+  { id: "habits", label: "Routines" },
   { id: "more", label: "More" },
 ];
 
@@ -144,7 +144,7 @@ const UniversalSearch = ({ open, onClose, onNavigate }: Props) => {
     if (pendingTasks.length > 0) suggestions.push(`Pending tasks (${pendingTasks.length})`);
     
     const incompleteHabits = habits.filter((h) => !h.completionDates.includes(todayStr));
-    if (incompleteHabits.length > 0) suggestions.push(`Incomplete habits`);
+    if (incompleteHabits.length > 0) suggestions.push(`Incomplete routines`);
 
     return suggestions;
   }, [query, events, tasks, habits]);
@@ -160,7 +160,7 @@ const UniversalSearch = ({ open, onClose, onNavigate }: Props) => {
   const typeLabels: Record<string, string> = {
     task: "Tasks",
     event: "Calendar Events",
-    habit: "Habits",
+    habit: "Routines",
     workout: "Workouts",
     special_day: "Special Days",
     meal: "Nutrition",

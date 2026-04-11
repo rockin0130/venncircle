@@ -29,7 +29,7 @@ export const PAGE_LABELS: Record<ShareablePage, string> = {
   calendar: "Calendar",
   workout: "Workout",
   nutrition: "Nutrition",
-  habits: "Habits",
+  habits: "Routines",
   sobriety: "Sobriety",
   shopping: "Shopping",
   study: "Study",

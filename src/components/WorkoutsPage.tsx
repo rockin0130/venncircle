@@ -17,7 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import CongratsPopup from "@/components/CongratsPopup";
-import PageGroupSelector from "@/components/PageGroupSelector";
+import { ModeToggleBar, GroupPillsRow, MemberSelectorPill, MemberSummaryCards, type WorkoutMode, type MemberOption } from "@/components/WorkoutModeToggle";
 
 import WorkoutPhotoPrompt, { isWorkoutPhotoPromptSuppressed } from "@/components/WorkoutPhotoPrompt";
 import ShareToFeedSheet from "@/components/ShareToFeedSheet";
@@ -536,7 +536,8 @@ const WorkoutsPage = ({
   onOpenSettings,
   onOpenMore,
   isActive = true,
-}: { onOpenSettings?: () => void; onOpenMore?: () => void; isActive?: boolean } = {}) => {
+  navigatedGroupId,
+}: { onOpenSettings?: () => void; onOpenMore?: () => void; isActive?: boolean; navigatedGroupId?: string | null } = {}) => {
   const {
     workouts,
     filteredWorkouts,
@@ -554,8 +555,73 @@ const WorkoutsPage = ({
     healthKitWorkoutsLoading,
     refreshHealthKitWorkouts,
   } = useAppContext();
-  const { user, profile, activeGroup, groups } = useAuth();
+  const { user, profile, activeGroup, groups, setActiveGroup } = useAuth();
   const [showCongrats, setShowCongrats] = useState(false);
+
+  // ── Mode toggle state ──
+  const [workoutMode, setWorkoutMode] = useState<WorkoutMode>(() => {
+    if (navigatedGroupId) return "group";
+    return (localStorage.getItem("workout_mode") as WorkoutMode) || "mine";
+  });
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(() => {
+    if (navigatedGroupId) return navigatedGroupId;
+    return localStorage.getItem("workout_selected_group") || null;
+  });
+  const [memberFilterMap, setMemberFilterMap] = useState<Record<string, Set<string>>>({});
+
+  // Auto-select first workout group if none selected
+  const workoutGroups = useMemo(() => groups.filter((g) => g.shared_pages?.includes("workout")), [groups]);
+  useEffect(() => {
+    if (workoutMode === "group" && (!selectedGroupId || !workoutGroups.find((g) => g.id === selectedGroupId))) {
+      if (workoutGroups.length > 0) setSelectedGroupId(workoutGroups[0].id);
+    }
+  }, [workoutMode, selectedGroupId, workoutGroups]);
+
+  // Persist mode and group
+  useEffect(() => { localStorage.setItem("workout_mode", workoutMode); }, [workoutMode]);
+  useEffect(() => { if (selectedGroupId) localStorage.setItem("workout_selected_group", selectedGroupId); }, [selectedGroupId]);
+
+  // Handle navigatedGroupId changes
+  useEffect(() => {
+    if (navigatedGroupId) {
+      setWorkoutMode("group");
+      setSelectedGroupId(navigatedGroupId);
+    }
+  }, [navigatedGroupId]);
+
+  const handleGroupSelect = (gid: string) => {
+    setSelectedGroupId(gid);
+    // Reset member filter when switching groups
+    setMemberFilterMap((prev) => ({ ...prev, [gid]: new Set(["__everyone__"]) }));
+  };
+
+  const memberFilter = useMemo(
+    () => selectedGroupId ? (memberFilterMap[selectedGroupId] ?? new Set(["__everyone__"])) : new Set(["__everyone__"]),
+    [selectedGroupId, memberFilterMap]
+  );
+  const setMemberFilter = useCallback((ids: Set<string>) => {
+    if (selectedGroupId) setMemberFilterMap((prev) => ({ ...prev, [selectedGroupId]: ids }));
+  }, [selectedGroupId]);
+
+  // Sync activeGroup based on mode
+  useEffect(() => {
+    if (workoutMode === "mine") {
+      setActiveGroup(null);
+    } else if (workoutMode === "group" && selectedGroupId) {
+      const g = groups.find((g) => g.id === selectedGroupId);
+      if (g) setActiveGroup(g);
+    }
+  }, [workoutMode, selectedGroupId, groups]);
+
+  // Sync new member filter → old userFilterIds for workout data filtering
+  useEffect(() => {
+    if (workoutMode === "group" && selectedGroupId) {
+      const newIds = memberFilter.has("__everyone__")
+        ? new Set([EVERYONE_SENTINEL])
+        : memberFilter;
+      setUserFilterMap((prev) => ({ ...prev, [selectedGroupId]: newIds }));
+    }
+  }, [workoutMode, selectedGroupId, memberFilter]);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [showCustomBuilder, setShowCustomBuilder] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ filter: "all" | "week" | "month" | "date" | "tomorrow"; message: string } | null>(null);
@@ -671,6 +737,13 @@ const WorkoutsPage = ({
   }, [filteredWorkouts, filteredPartnerWorkouts, isPersonalView]);
 
   const userFilteredWorkouts = useMemo(() => {
+    // Mine mode: only show logged-in user's workouts (aggregate personal view)
+    if (workoutMode === "mine") {
+      return allContextWorkouts.filter((w) => {
+        const ownerId = w.ownerUserId || user?.id;
+        return ownerId === user?.id;
+      });
+    }
     if (isPersonalView) return filteredWorkouts;
     if (userFilterIds.has(EVERYONE_SENTINEL)) return allContextWorkouts;
     if (userFilterIds.size === 0) return [];
@@ -678,7 +751,7 @@ const WorkoutsPage = ({
       const ownerId = w.ownerUserId || user?.id;
       return ownerId && userFilterIds.has(ownerId);
     });
-  }, [allContextWorkouts, filteredWorkouts, userFilterIds, isPersonalView, user?.id]);
+  }, [allContextWorkouts, filteredWorkouts, userFilterIds, isPersonalView, user?.id, workoutMode]);
 
   const displayWorkouts = useMemo(() => {
     const includeHk =
@@ -689,13 +762,20 @@ const WorkoutsPage = ({
 
   const selectedUserInfos = useMemo(() => {
     const infos: { userId: string; label: string; initial: string; avatarUrl: string | null }[] = [];
+
+    // Mine mode: always single-user (logged-in user only)
+    if (workoutMode === "mine") {
+      infos.push({ userId: user?.id || "me", label: "Mine", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
+      return infos;
+    }
+
     if (isPersonalView) {
       infos.push({ userId: user?.id || "me", label: "Mine", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
       return infos;
     }
 
     const allMembers: { userId: string; label: string; initial: string; avatarUrl: string | null }[] = [];
-    allMembers.push({ userId: user?.id || "me", label: "Mine", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
+    allMembers.push({ userId: user?.id || "me", label: "Me", initial: profile?.display_name?.charAt(0)?.toUpperCase() || "?", avatarUrl: profile?.avatar_url || null });
 
     if (isGroupView && activeGroup) {
       activeGroup.members.filter((m: GroupMember) => m.user_id !== user?.id && m.status === "active").forEach((m) => {
@@ -718,7 +798,7 @@ const WorkoutsPage = ({
       if (isEveryone || userFilterIds.has(m.userId)) infos.push(m);
     }
     return infos;
-  }, [user, profile, activeGroup, groups, isPersonalView, isGroupView, isAllView, userFilterIds]);
+  }, [user, profile, activeGroup, groups, isPersonalView, isGroupView, isAllView, userFilterIds, workoutMode]);
 
   const userWorkoutData: UserWorkoutData[] = useMemo(() => {
     return selectedUserInfos.map((u) => ({
@@ -1018,24 +1098,70 @@ const WorkoutsPage = ({
         </div>
       </header>
 
-      <PageGroupSelector page="workout" personalLabel="Mine" hideAllPill showAvatars />
+      {/* ── Mode Toggle ── */}
+      <ModeToggleBar mode={workoutMode} onModeChange={setWorkoutMode} />
 
-      {/* User filter pills */}
-      {!isPersonalView && (
-        <WorkoutUserFilter
-          selectedUserIds={userFilterIds}
-          onSelectionChange={setUserFilterIds}
-        />
+      {/* ── Group Mode layers ── */}
+      {workoutMode === "group" && (
+        <>
+          <GroupPillsRow selectedGroupId={selectedGroupId} onSelectGroup={handleGroupSelect} />
+          {selectedGroupId && (
+            <MemberSelectorPill
+              groupId={selectedGroupId}
+              selectedUserIds={memberFilter}
+              onSelectionChange={setMemberFilter}
+            />
+          )}
+          {/* Per-member summary cards */}
+          {selectedGroupId && (() => {
+            const group = groups.find((g) => g.id === selectedGroupId);
+            if (!group) return null;
+            const memberOptions: MemberOption[] = [];
+            if (user) {
+              memberOptions.push({
+                userId: user.id,
+                label: profile?.display_name?.split(" ")[0] || "Me",
+                initial: (profile?.display_name || "U")[0].toUpperCase(),
+                avatarUrl: profile?.avatar_url || null,
+              });
+            }
+            group.members
+              .filter((m: GroupMember) => m.user_id !== user?.id && m.status === "active")
+              .forEach((m) => {
+                const name = m.display_name || "Member";
+                memberOptions.push({
+                  userId: m.user_id,
+                  label: name.split(" ")[0],
+                  initial: name[0].toUpperCase(),
+                  avatarUrl: m.avatar_url,
+                });
+              });
+            // Filter to selected members
+            const isEveryone = memberFilter.has("__everyone__");
+            const visibleMembers = isEveryone ? memberOptions : memberOptions.filter((m) => memberFilter.has(m.userId));
+            if (visibleMembers.length <= 1) return null;
+            const weekStart = loadWeekStart();
+            const startStr = getWeekStartDate(new Date(), weekStart);
+            const today = todayStr();
+            const memberData = visibleMembers.map((m) => {
+              const mWorkouts = allContextWorkouts.filter((w) => (w.ownerUserId || user?.id) === m.userId);
+              const weekWorkouts = mWorkouts.filter((w) => w.done && (w.completedDate || w.scheduledDate || "") >= startStr && (w.completedDate || w.scheduledDate || "") <= today);
+              return {
+                userId: m.userId,
+                done: new Set(weekWorkouts.map((w) => w.completedDate || w.scheduledDate!)).size,
+                kcal: weekWorkouts.reduce((s, w) => s + (w.cal || 0), 0),
+                distance: weekWorkouts.reduce((s, w) => s + (w.distance || 0), 0),
+              };
+            });
+            return <MemberSummaryCards members={visibleMembers} weeklyGoal={weeklyGoal} memberWorkouts={memberData} />;
+          })()}
+        </>
       )}
 
-      {/* Main workout view */}
-      <>
-        {/* Hero Stats Card */}
-        {isMultiUserView ? (
-          <MultiUserHeroCard userData={userWorkoutData} weeklyGoal={weeklyGoal} />
-        ) : (
-          <HeroCard workouts={displayWorkouts} weeklyGoal={weeklyGoal} onGoalChange={saveGoal} />
-        )}
+      {/* ── Hero Stats Card (Mine mode OR Group mode with single user selected) ── */}
+      {(workoutMode === "mine" || (workoutMode === "group" && !isMultiUserView)) && (
+        <HeroCard workouts={displayWorkouts} weeklyGoal={weeklyGoal} onGoalChange={saveGoal} />
+      )}
 
         {/* Missed Workouts Banner */}
         {missedWorkouts.length > 0 && (
@@ -1266,8 +1392,6 @@ const WorkoutsPage = ({
             </>
           )}
         </section>
-      </>
-
       {/* Exercise Detail Dialog */}
       <ExerciseDetailDialog
         exerciseName={selectedExercise}

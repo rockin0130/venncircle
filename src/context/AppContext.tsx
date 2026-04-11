@@ -67,6 +67,7 @@ export interface Task {
   groupId?: string | null;
   ownerUserId?: string;
   priority?: "high" | "medium" | "low" | "none";
+  parentId?: string | null;
 }
 
 export type WorkoutOriginType = "manual" | "ai" | "imported" | "merged";
@@ -232,7 +233,7 @@ interface AppContextType {
   tasks: Task[];
   filteredTasks: Task[];
   toggleTask: (id: string) => void;
-  addTask: (task: Omit<Task, "id" | "done">) => void;
+  addTask: (task: Omit<Task, "id" | "done">) => Promise<Task | undefined>;
   removeTask: (id: string) => void;
   updateTask: (id: string, updates: Partial<Pick<Task, "title" | "tag" | "scheduledDay" | "scheduledMonth" | "scheduledYear" | "time" | "dueDate" | "priorNoticeDays" | "priority">>) => void;
   waterIntake: number;
@@ -537,6 +538,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             hiddenFromPartner: t.hidden_from_partner || false,
             groupId: t.group_id || null,
             priority: (t as any).priority || "none",
+            parentId: (t as any).parent_id ?? null,
           })));
         }
 
@@ -881,6 +883,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               hiddenFromPartner: t.hidden_from_partner || false,
               groupId: t.group_id || null,
               ownerUserId: otherUserId,
+              parentId: (t as any).parent_id ?? null,
             })));
           }
 
@@ -1449,6 +1452,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (task.dueDate !== undefined) insertData.due_date = task.dueDate;
     if (task.priorNoticeDays !== undefined) insertData.prior_notice_days = task.priorNoticeDays;
     if (task.priority !== undefined) insertData.priority = task.priority;
+    if (task.parentId !== undefined && task.parentId !== null) insertData.parent_id = task.parentId;
 
     const { data, error } = await supabase
       .from("tasks")
@@ -1457,7 +1461,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .single();
 
     if (data && !error) {
-      setTasks((t) => [...t, {
+      const newTask: Task = {
         ...task,
         id: data.id,
         done: false,
@@ -1468,8 +1472,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         priorNoticeDays: (data as any).prior_notice_days ?? 0,
         groupId,
         priority: (data as any).priority || "none",
-      }]);
+        parentId: (data as any).parent_id ?? null,
+      };
+      setTasks((t) => [...t, newTask]);
+      return newTask;
     }
+    return undefined;
   };
 
   const removeTask = async (id: string) => {

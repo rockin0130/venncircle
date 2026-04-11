@@ -74,6 +74,12 @@ const QUICK_ACCESS_FEATURES = [
       <polyline points="12 6 12 12 16 14" />
     </svg>
   )},
+  { id: "habits", label: "Routines", page: "habits", icon: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <polyline points="22 4 12 14.01 9 11.01" />
+    </svg>
+  )},
 ];
 
 const getStoredQuickAccessPos = (): "above-scheduled" | "below-todo" | null => {
@@ -103,7 +109,7 @@ const QuickAccessStrip = ({ enabledSections, onNavigate, isWiggling, onLongPress
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragStartY = useRef<number | null>(null);
   const clearLp = () => { if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; } };
-  const tiles = QUICK_ACCESS_FEATURES.filter(f => enabledSections.has(f.id));
+  const tiles = QUICK_ACCESS_FEATURES.filter(f => f.id === "habits" || enabledSections.has(f.id));
   if (tiles.length === 0) return null;
 
   return (

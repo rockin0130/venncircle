@@ -1,0 +1,1 @@
+ALTER TABLE public.tasks ADD COLUMN parent_id uuid REFERENCES public.tasks(id) ON DELETE CASCADE DEFAULT NULL;

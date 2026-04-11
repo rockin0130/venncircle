@@ -10,7 +10,7 @@ export type Tab =
 export const ALL_PAGE_META: Record<string, { label: string; icon: typeof Home; desc: string }> = {
   calendar: { label: "Calendar", icon: Home, desc: "View and manage your schedule" },
   workout: { label: "Workout", icon: Home, desc: "Track workouts and exercise plans" },
-  habits: { label: "Habits", icon: Home, desc: "Daily habit tracking and streaks" },
+  habits: { label: "Routines", icon: Home, desc: "Daily routine tracking and streaks" },
   nutrition: { label: "Nutrition", icon: Home, desc: "Track protein, meals & AI suggestions" },
   sobriety: { label: "Sobriety", icon: Home, desc: "Track sobriety milestones" },
   

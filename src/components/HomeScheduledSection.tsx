@@ -516,7 +516,7 @@ const HomeScheduledSection = ({
               {periodHabits.length > 0 && (
                 <div className="rounded-xl bg-card border border-border mb-2" style={{ padding: "8px 12px", borderRadius: 12, borderWidth: "0.5px", borderColor: "rgba(0,0,0,0.07)" }}>
                   <div className="flex items-center gap-2.5">
-                    <span className="text-[10px] font-medium uppercase text-[#aaa] flex-shrink-0 tracking-wide">Habits</span>
+                    <span className="text-[10px] font-medium uppercase text-[#aaa] flex-shrink-0 tracking-wide">Routines</span>
                     <div className="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
                       <div className="flex gap-1.5 w-max">
                         {(() => {

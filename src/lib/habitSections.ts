@@ -9,7 +9,7 @@ export interface HabitSectionMeta {
 }
 
 const DEFAULT_SECTIONS: HabitSectionMeta[] = [
-  { key: "morning", label: "Morning Habits", icon: "☀️", sortOrder: 0 },
+  { key: "morning", label: "Morning Routines", icon: "☀️", sortOrder: 0 },
 ];
 
 // ── localStorage helpers (legacy fallback) ──
