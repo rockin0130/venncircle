@@ -1319,7 +1319,15 @@ const WorkoutsPage = ({
 
                     {/* Workout cards */}
                     {section.workouts.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-4 px-2" style={{ border: "1.5px dashed rgba(0,0,0,0.12)", borderRadius: "0 10px 10px 0" }}>
+                      <div
+                        className="flex flex-col items-center justify-center px-2"
+                        style={{
+                          minHeight: 72,
+                          border: "1.5px dashed rgba(0,0,0,0.12)",
+                          borderRadius: 14,
+                          background: "rgba(0,0,0,0.015)",
+                        }}
+                      >
                         <span style={{ fontSize: 11, color: "#999", textAlign: "center" }}>No workout today</span>
                         {showNudge && (
                           <button
@@ -1362,6 +1370,7 @@ const WorkoutsPage = ({
                             progress={workoutProgress[w.id]?.progress}
                             onCopyWorkout={handleCopyWorkout}
                             accentBorder={colColor.border}
+                            compact
                           />
                         );
                       })
