@@ -377,12 +377,34 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
         </div>
       </header>
 
-      <PageGroupSelector page="habits" personalLabel="Mine" hideAllPill showAvatars />
-
-      <HabitUserFilter
-        selectedUserIds={selectedUserIds}
-        onSelectionChange={setSelectedUserIds}
+      <ModeToggleBar
+        mode={isPersonalActive || isAllActive ? "mine" : "group"}
+        onModeChange={(m) => {
+          if (m === "mine") {
+            setActiveGroup({ _personal: true, id: "__personal__", name: "Mine", type: "personal", emoji: "👤", invite_code: "", created_by: "", shared_pages: [], members: [] } as any);
+          } else {
+            const first = groups.find((g) => g.shared_pages?.includes("habits"));
+            if (first) setActiveGroup(first);
+          }
+        }}
       />
+      {!isPersonalActive && !isAllActive && (
+        <GroupPillsRow
+          page="habits"
+          selectedGroupId={activeGroup?.id || null}
+          onSelectGroup={(gid) => {
+            const next = groups.find((g) => g.id === gid);
+            if (next) setActiveGroup(next);
+          }}
+        />
+      )}
+      {isGroupActive && activeGroup && (
+        <MemberSelectorPill
+          groupId={activeGroup.id}
+          selectedUserIds={selectedUserIds}
+          onSelectionChange={setSelectedUserIds}
+        />
+      )}
 
       {/* ── Progress Card ── */}
       <div className="bg-card rounded-xl p-4 border border-border shadow-card mb-5">
