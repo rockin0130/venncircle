@@ -48,7 +48,7 @@ export const GroupPillsRow = ({
 }: {
   selectedGroupId: string | null;
   onSelectGroup: (groupId: string) => void;
-  page?: string;
+  page?: "calendar" | "habits" | "nutrition" | "shopping" | "sobriety" | "study" | "workout";
 }) => {
   const { groups } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
