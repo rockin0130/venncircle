@@ -1304,7 +1304,7 @@ const WorkoutsPage = ({
                 const showNudge = !isOwnSection && section.workouts.length === 0 && !weeklyGoalMet;
 
                 return (
-                  <div key={section.userId} className="flex-shrink-0 flex flex-col gap-1.5" style={{ width: 150 }}>
+                  <div key={section.userId} className="flex-shrink-0 flex flex-col gap-1.5" style={{ width: 180 }}>
                     {/* Column header */}
                     <div className="flex items-center gap-1.5 mb-0.5">
                       {section.avatarUrl ? (
