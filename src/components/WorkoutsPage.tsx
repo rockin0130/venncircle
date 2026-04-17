@@ -1595,6 +1595,63 @@ const WorkoutCard = ({
           ...(accentBorder?.startsWith("#") ? { borderLeftColor: accentBorder, borderLeftWidth: 2.5 } : {}),
         }}
       >
+        {compact ? (
+          <div style={{ padding: "10px 0 10px 11px" }} className="flex items-center gap-2.5">
+            {/* Emoji */}
+            <div className="flex-shrink-0 flex items-center justify-center" style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(0,0,0,0.04)" }}>
+              <span className="text-base">{workout.emoji}</span>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 min-w-0 cursor-pointer py-0.5" onClick={() => setShowDetail(true)}>
+              <div className="flex items-center gap-1 min-w-0">
+                {isHealthKitEntry && (
+                  <span className="text-[11px] shrink-0 leading-none" title="Apple Health">🍎</span>
+                )}
+                <p style={{ fontSize: 12.5, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.2 }} className="truncate">{workout.title}</p>
+              </div>
+              <div className="flex items-center gap-1 mt-1 text-[10px]" style={{ color: "#999" }}>
+                <Clock size={9} />
+                <span>{workout.duration}</span>
+                <span className="opacity-50">•</span>
+                <Flame size={9} />
+                <span>{workout.cal} kcal</span>
+              </div>
+              {workout.tag && (
+                <div className="mt-1.5">
+                  <span
+                    className="inline-block px-1.5 py-[1px] rounded-full text-[9.5px] font-semibold"
+                    style={{ background: "#E5EFFF", color: "#1E5CCC" }}
+                  >
+                    {workout.tag}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Action zone — vertical divider + circle */}
+            <div
+              role={readOnly ? undefined : "button"}
+              onClick={readOnly ? undefined : (e) => { e.stopPropagation(); onToggle(workout.id); }}
+              className={`flex items-center justify-center flex-shrink-0 self-stretch ${readOnly ? "pointer-events-none" : "cursor-pointer"} transition-all`}
+              style={{
+                width: 38,
+                borderLeft: "0.5px solid rgba(0,0,0,0.06)",
+                background: workout.done ? "rgba(26,26,26,0.03)" : "rgba(0,0,0,0.015)",
+              }}
+            >
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center transition-all"
+                style={{
+                  background: workout.done ? "#1a1a1a" : "transparent",
+                  border: workout.done ? "none" : "2px solid rgba(0,0,0,0.18)",
+                }}
+              >
+                {workout.done && <Check size={12} color="#fff" />}
+              </div>
+            </div>
+          </div>
+        ) : (
         <div style={{ padding: "11px 13px" }} className="flex items-center gap-3">
           {/* Emoji icon in colored square */}
           <div className="flex-shrink-0 flex items-center justify-center" style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(0,0,0,0.04)" }}>
@@ -1653,6 +1710,7 @@ const WorkoutCard = ({
             {workout.done && <Check size={14} color="#fff" />}
           </div>
         </div>
+        )}
       </motion.div>
 
       {/* Detail Modal */}
