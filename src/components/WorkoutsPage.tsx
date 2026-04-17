@@ -1489,6 +1489,7 @@ const WorkoutCard = ({
   progress,
   onCopyWorkout,
   accentBorder,
+  compact,
 }: {
   workout: Workout;
   onToggle: (id: string) => void;
@@ -1508,6 +1509,7 @@ const WorkoutCard = ({
   progress?: number;
   onCopyWorkout?: (workout: Workout, scheduledDate: string) => void;
   accentBorder?: string;
+  compact?: boolean;
 }) => {
   const [showDetail, setShowDetail] = useState(false);
   const [cascadeConfirm, setCascadeConfirm] = useState<{ newDate: string; diffDays: number; followingCount: number } | null>(null);
