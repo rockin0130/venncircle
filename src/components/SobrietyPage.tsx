@@ -7,7 +7,7 @@ import { Plus, DollarSign, Lock, Check, Calendar, Flame, MoreHorizontal } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EVERYONE_SENTINEL } from "@/components/SobrietyUserFilter";
-import { ModeToggleBar, GroupPillsRow, type WorkoutMode } from "@/components/WorkoutModeToggle";
+import { ModeToggleBar, GroupPillsRow, MemberSelectorPill, type WorkoutMode } from "@/components/WorkoutModeToggle";
 import { useSobrietyViewMode, buildViewQueryPlan } from "@/hooks/useSobrietyViewMode";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -941,47 +941,12 @@ const SobrietyPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
         </div>
 
         {isGroupView && filterUsers.length > 1 && (
-          <div className="mt-3 flex gap-2 overflow-x-auto scroll-smooth-touch pb-1">
-            {filterUsers.map((member) => {
-              const tone = getUserTone(member.colorIndex);
-              const selected = isUserSelected(member.id);
-              return (
-                <button
-                  key={member.id}
-                  type="button"
-                  onClick={() => toggleUserPill(member.id)}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all"
-                  style={{
-                    backgroundColor: selected ? tone.pill : "hsl(var(--sobriety-surface))",
-                    borderColor: selected ? tone.border : "hsl(var(--sobriety-outline-strong))",
-                    color: selected ? tone.text : "hsl(var(--foreground))",
-                  }}
-                >
-                  <span
-                    className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[10px] font-semibold"
-                    style={{
-                      backgroundColor: selected ? tone.accent : "hsl(var(--secondary))",
-                      color: selected ? "hsl(var(--primary-foreground))" : "hsl(var(--muted-foreground))",
-                    }}
-                  >
-                    {member.initial}
-                  </span>
-                  <span>{member.name}</span>
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={toggleEveryonePill}
-              className="flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all"
-              style={{
-                backgroundColor: everyoneSelected ? "hsl(var(--primary) / 0.1)" : "hsl(var(--sobriety-surface))",
-                borderColor: everyoneSelected ? "hsl(var(--primary) / 0.35)" : "hsl(var(--sobriety-outline-strong))",
-                color: everyoneSelected ? "hsl(var(--primary))" : "hsl(var(--foreground))",
-              }}
-            >
-              <span>Everyone</span>
-            </button>
+          <div className="mt-3">
+            <MemberSelectorPill
+              groupId={activeGroup!.id}
+              selectedUserIds={selectedUserIds}
+              onSelectionChange={(ids) => persistSelectedUserIds(ids)}
+            />
           </div>
         )}
 
