@@ -342,25 +342,36 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
 
   const checkInviteCode = async (code: string) => {
     setInviteState({ type: "checking" });
+    const upperCode = code.toUpperCase();
     try {
-      const { data: group } = await supabase
-        .from("groups")
-        .select("id, name, invite_code")
-        .eq("invite_code", code.toUpperCase())
-        .maybeSingle();
-
-      if (!group) {
-        setInviteState({ type: "invalid" });
+      // First, check if the user is already a member of a group with this code
+      const existing = visibleGroups.find((g) => g.invite_code?.toUpperCase() === upperCode);
+      if (existing) {
+        setInviteState({ type: "already_member", groupName: existing.name });
         return;
       }
 
-      const alreadyMember = visibleGroups.some((g) => g.id === group.id);
-      if (alreadyMember) {
-        setInviteState({ type: "already_member", groupName: group.name });
+      // Use RPC to validate + fetch group name (bypasses RLS via SECURITY DEFINER)
+      const { data, error } = await supabase.rpc("join_group", { _code: upperCode });
+
+      if (error || !data || (data as any).error) {
+        const msg = (data as any)?.error || error?.message || "";
+        if (msg.toLowerCase().includes("already")) {
+          setInviteState({ type: "already_member", groupName: (data as any)?.group_name || "Group" });
+        } else {
+          setInviteState({ type: "invalid" });
+        }
         return;
       }
 
-      setInviteState({ type: "found", groupName: group.name, code: code.toUpperCase() });
+      // join_group already added us as a member — proceed straight to joined state
+      const result = data as any;
+      await refreshGroups();
+      setInviteState({
+        type: "joined",
+        groupName: result.group_name || "Group",
+        groupId: result.group_id || "",
+      });
     } catch {
       setInviteState({ type: "invalid" });
     }
@@ -378,14 +389,7 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
     }
 
     await refreshGroups();
-
-    const { data: group } = await supabase
-      .from("groups")
-      .select("id, name")
-      .eq("invite_code", code)
-      .maybeSingle();
-
-    setInviteState({ type: "joined", groupName: result.group_name || group?.name || "Group", groupId: group?.id || "" });
+    setInviteState({ type: "joined", groupName: result.group_name || "Group", groupId: result.group_id || "" });
   };
 
   const dismissInvite = () => {
