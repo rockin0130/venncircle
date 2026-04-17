@@ -44,16 +44,18 @@ export const ModeToggleBar = ({
 export const GroupPillsRow = ({
   selectedGroupId,
   onSelectGroup,
+  page = "workout",
 }: {
   selectedGroupId: string | null;
   onSelectGroup: (groupId: string) => void;
+  page?: string;
 }) => {
   const { groups } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
 
   const workoutGroups = useMemo(
-    () => groups.filter((g) => g.shared_pages?.includes("workout")),
-    [groups]
+    () => groups.filter((g) => g.shared_pages?.includes(page)),
+    [groups, page]
   );
 
   return (
