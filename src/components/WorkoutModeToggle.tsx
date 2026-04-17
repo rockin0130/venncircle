@@ -91,7 +91,7 @@ export const GroupPillsRow = ({
           <span>Add</span>
         </button>
       </div>
-      <CreateGroupModal open={showCreate} onOpenChange={setShowCreate} defaultPage="workout" />
+      <CreateGroupModal open={showCreate} onOpenChange={setShowCreate} defaultPage={page} />
     </>
   );
 };
