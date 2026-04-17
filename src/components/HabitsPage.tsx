@@ -12,6 +12,7 @@ import PartnerHabitDetailModal from "@/components/PartnerHabitDetailModal";
 
 import PageGroupSelector from "@/components/PageGroupSelector";
 import HabitUserFilter, { EVERYONE_SENTINEL } from "@/components/HabitUserFilter";
+import { ModeToggleBar, GroupPillsRow, MemberSelectorPill } from "@/components/WorkoutModeToggle";
 import HabitContextSelector from "@/components/HabitContextSelector";
 import HabitEditModal from "@/components/HabitEditModal";
 import type { Habit } from "@/context/AppContext";
