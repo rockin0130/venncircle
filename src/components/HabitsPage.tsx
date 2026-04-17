@@ -69,7 +69,7 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
     waterIntake, waterGoal, partnerWaterIntake, partnerWaterGoal, partnerWaterMap,
     setWaterIntake, setWaterGoal, resetWater,
   } = useAppContext();
-  const { user, partner, profile, activeGroup, groups } = useAuth();
+  const { user, partner, profile, activeGroup, groups, setActiveGroup } = useAuth();
   const [newHabitLabel, setNewHabitLabel] = useState("");
   const [addingToSection, setAddingToSection] = useState<string | null>(null);
   const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
