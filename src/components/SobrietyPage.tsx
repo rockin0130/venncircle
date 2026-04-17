@@ -7,7 +7,7 @@ import { Plus, DollarSign, Lock, Check, Calendar, Flame, MoreHorizontal } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EVERYONE_SENTINEL } from "@/components/SobrietyUserFilter";
-import { ModeToggleBar, GroupPillsRow, type WorkoutMode } from "@/components/WorkoutModeToggle";
+import { ModeToggleBar, GroupPillsRow, MemberSelectorPill, type WorkoutMode } from "@/components/WorkoutModeToggle";
 import { useSobrietyViewMode, buildViewQueryPlan } from "@/hooks/useSobrietyViewMode";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
