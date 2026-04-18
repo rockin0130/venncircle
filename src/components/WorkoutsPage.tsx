@@ -551,9 +551,6 @@ const WorkoutsPage = ({
     rescheduleWorkout,
     rescheduleWorkoutCascade,
     appleFitnessSyncEnabled,
-    healthKitWorkouts,
-    healthKitWorkoutsLoading,
-    refreshHealthKitWorkouts,
   } = useAppContext();
   const { user, profile, activeGroup, groups, setActiveGroup } = useAuth();
   const [showCongrats, setShowCongrats] = useState(false);
@@ -636,11 +633,49 @@ const WorkoutsPage = ({
   const [showHistory, setShowHistory] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [nudgeCooldown, setNudgeCooldown] = useState<Set<string>>(new Set());
+  const [healthKitWorkouts, setHealthKitWorkouts] = useState<Workout[]>([]);
+  const [healthKitLoading, setHealthKitLoading] = useState(false);
+
   const selectedDate = todayStr(); // Main page always shows today
 
+  const fetchHealthKitHistory = useCallback(async () => {
+    if (!appleFitnessSyncEnabled || !user?.id) {
+      setHealthKitWorkouts([]);
+      return;
+    }
+    setHealthKitLoading(true);
+    try {
+      const { fetchHealthKitWorkoutHistory90Days } = await import("@/integrations/appleHealth");
+      const list = await fetchHealthKitWorkoutHistory90Days(user.id);
+      setHealthKitWorkouts(list);
+    } catch (e) {
+      console.warn("HealthKit workout history:", e);
+    } finally {
+      setHealthKitLoading(false);
+    }
+  }, [appleFitnessSyncEnabled, user?.id]);
+
   useEffect(() => {
-    if (isActive && appleFitnessSyncEnabled && user?.id) void refreshHealthKitWorkouts();
-  }, [isActive, appleFitnessSyncEnabled, user?.id, refreshHealthKitWorkouts]);
+    if (!isActive || !appleFitnessSyncEnabled || !user?.id) return;
+    void fetchHealthKitHistory();
+  }, [isActive, appleFitnessSyncEnabled, user?.id, fetchHealthKitHistory]);
+
+  useEffect(() => {
+    let remove: (() => void) | undefined;
+    let cancelled = false;
+    import("@capacitor/app").then(({ App }) => {
+      if (cancelled) return;
+      App.addListener("appStateChange", ({ isActive: appActive }) => {
+        if (appActive && appleFitnessSyncEnabled && user?.id) void fetchHealthKitHistory();
+      }).then((handle) => {
+        remove = () => handle.remove();
+      });
+    });
+    return () => {
+      cancelled = true;
+      remove?.();
+    };
+  }, [appleFitnessSyncEnabled, fetchHealthKitHistory, user?.id]);
 
   const [weeklyGoal, setWeeklyGoal] = useState(() => {
     const saved = localStorage.getItem("workout_weekly_goal");
@@ -746,19 +781,20 @@ const WorkoutsPage = ({
     }
     if (isPersonalView) return filteredWorkouts;
     if (userFilterIds.has(EVERYONE_SENTINEL)) return allContextWorkouts;
-    if (userFilterIds.size === 0) return [];
     return allContextWorkouts.filter((w) => {
       const ownerId = w.ownerUserId || user?.id;
       return ownerId && userFilterIds.has(ownerId);
     });
   }, [allContextWorkouts, filteredWorkouts, userFilterIds, isPersonalView, user?.id, workoutMode]);
 
-  const displayWorkouts = useMemo(() => {
-    const includeHk =
-      userFilterIds.has(EVERYONE_SENTINEL) || userFilterIds.has(user?.id || "");
-    const hk = includeHk ? healthKitWorkouts : [];
-    return mergeAppWorkoutsWithHealthKit(userFilteredWorkouts, hk, user?.id || "");
-  }, [userFilteredWorkouts, healthKitWorkouts, user?.id, userFilterIds]);
+  const displayWorkouts = useMemo(
+    () => mergeAppWorkoutsWithHealthKit(userFilteredWorkouts, healthKitWorkouts, user?.id || ""),
+    [userFilteredWorkouts, healthKitWorkouts, user?.id]
+  );
+
+  useEffect(() => {
+    if (!appleFitnessSyncEnabled) setHealthKitWorkouts([]);
+  }, [appleFitnessSyncEnabled]);
 
   const selectedUserInfos = useMemo(() => {
     const infos: { userId: string; label: string; initial: string; avatarUrl: string | null }[] = [];
@@ -1219,15 +1255,6 @@ const WorkoutsPage = ({
 
         {/* Today's Workouts Section */}
         <section className="mb-6">
-<<<<<<< HEAD
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Today's Workouts</h3>
-              {appleFitnessSyncEnabled && healthKitWorkoutsLoading && (
-                <Loader2 size={12} className="animate-spin text-muted-foreground" aria-hidden />
-              )}
-            </div>
-=======
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <span style={{ fontSize: 17, fontWeight: 500, color: "#1a1a1a", fontFamily: "'DM Sans', sans-serif" }} className="mr-auto">
               Today's workouts
@@ -1242,7 +1269,6 @@ const WorkoutsPage = ({
             >
               <Plus size={10} /> Custom
             </button>
->>>>>>> origin/main
             <WorkoutAiSuggest
               selectedDate={selectedDate}
               recentWorkouts={displayWorkouts}
