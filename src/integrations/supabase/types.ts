@@ -2011,6 +2011,7 @@ export type Database = {
         }
         Returns: Json
       }
+      preview_group_by_invite_code: { Args: { _code: string }; Returns: Json }
       search_users_by_identifier: {
         Args: { _identifier: string }
         Returns: {
