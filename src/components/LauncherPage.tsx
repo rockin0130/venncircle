@@ -568,11 +568,78 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
           <div className="flex items-center justify-between mb-3 flex-shrink-0">
             <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">My Groups</p>
             <div className="flex items-center gap-2">
-              {onCreateGroup && (
-                <button onClick={onCreateGroup} className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors">
+              <div className="relative">
+                <button
+                  onClick={() => { setAddMenuOpen((v) => !v); setShowInviteInput(false); }}
+                  className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                >
                   <Plus size={12} />Add Group
                 </button>
-              )}
+                {addMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => { setAddMenuOpen(false); setShowInviteInput(false); }} />
+                    <div className="absolute right-0 top-full mt-2 z-50 w-64 bg-card border border-border rounded-xl shadow-lg overflow-hidden">
+                      {!showInviteInput ? (
+                        <>
+                          <button
+                            onClick={() => { setAddMenuOpen(false); onCreateGroup?.(); }}
+                            className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-foreground hover:bg-secondary/60 transition-colors text-left"
+                          >
+                            <Plus size={14} className="text-primary" /> Create Group
+                          </button>
+                          <div className="h-px bg-border" />
+                          <button
+                            onClick={() => setShowInviteInput(true)}
+                            className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-foreground hover:bg-secondary/60 transition-colors text-left"
+                          >
+                            <UserPlus size={14} className="text-primary" /> Join with Invite Code
+                          </button>
+                        </>
+                      ) : (
+                        <div className="p-3">
+                          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Enter invite code</p>
+                          <input
+                            autoFocus
+                            value={inviteCodeInput}
+                            onChange={(e) => setInviteCodeInput(e.target.value.toUpperCase())}
+                            placeholder="e.g. 2248DCDE"
+                            maxLength={10}
+                            className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm font-mono tracking-wider outline-none focus:border-primary"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && INVITE_CODE_REGEX.test(inviteCodeInput)) {
+                                checkInviteCode(inviteCodeInput);
+                                setAddMenuOpen(false);
+                                setShowInviteInput(false);
+                                setInviteCodeInput("");
+                              }
+                            }}
+                          />
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => { setShowInviteInput(false); setInviteCodeInput(""); }}
+                              className="flex-1 px-3 py-2 rounded-lg bg-secondary text-foreground text-xs font-medium hover:bg-secondary/80 transition-colors"
+                            >
+                              Back
+                            </button>
+                            <button
+                              disabled={!INVITE_CODE_REGEX.test(inviteCodeInput)}
+                              onClick={() => {
+                                checkInviteCode(inviteCodeInput);
+                                setAddMenuOpen(false);
+                                setShowInviteInput(false);
+                                setInviteCodeInput("");
+                              }}
+                              className="flex-1 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              Join
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
               <button
                 onClick={() => { setGroupsExpanded(!groupsExpanded); setActivityExpanded(false); }}
                 className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all"
