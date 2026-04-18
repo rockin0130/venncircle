@@ -3,6 +3,7 @@ import { Search, Plus, MoreHorizontal, MessageCircle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, Group } from "@/context/AuthContext";
 import { useFriendships } from "@/hooks/useFriendships";
+import GroupInviteRequestCard from "@/components/GroupInviteRequestCard";
 
 interface LastMessage {
   content: string;
@@ -45,7 +46,7 @@ const ChatListPage = ({
   onOpenChat: (group: Group) => void;
   onOpenMore?: () => void;
 }) => {
-  const { user, groups } = useAuth();
+  const { user, groups, pendingGroupInvites } = useAuth();
   const { activeFriends } = useFriendships();
   const [previews, setPreviews] = useState<ChatPreview[]>([]);
   const [loading, setLoading] = useState(true);
