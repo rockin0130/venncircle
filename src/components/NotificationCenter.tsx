@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Bell, Check, Calendar, ListTodo, Heart, Dumbbell } from "lucide-react";
+import { X, Bell, Check, Calendar, ListTodo, Heart, Dumbbell, UserPlus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useModalScrollLock } from "@/hooks/useModalScrollLock";
+import GroupInviteRequestCard from "@/components/GroupInviteRequestCard";
 
 interface Notification {
   id: string;
@@ -25,7 +26,7 @@ interface Props {
 
 const NotificationCenter = ({ open, onClose }: Props) => {
   useModalScrollLock(open);
-  const { profile, groups } = useAuth();
+  const { profile, groups, pendingGroupInvites } = useAuth();
   const { tasks, events, habits } = useAppContext();
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
@@ -88,7 +89,7 @@ const NotificationCenter = ({ open, onClose }: Props) => {
     setNotifications(notifs.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()));
   }, [open, events, habits, tasks, profile]);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length + pendingGroupInvites.length;
 
   const todayNotifs = notifications.filter((n) => {
     const today = new Date();
@@ -155,7 +156,22 @@ const NotificationCenter = ({ open, onClose }: Props) => {
           </div>
 
           <div className="px-5 py-3">
-            {notifications.length === 0 ? (
+            {/* Group invite requests — Instagram-style */}
+            {pendingGroupInvites.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                  <UserPlus size={11} />
+                  Group invites
+                </p>
+                <div className="space-y-2">
+                  {pendingGroupInvites.map((invite) => (
+                    <GroupInviteRequestCard key={invite.group_id} invite={invite} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {notifications.length === 0 && pendingGroupInvites.length === 0 ? (
               <div className="text-center py-12">
                 <Bell size={32} className="mx-auto text-muted-foreground/30 mb-3" />
                 <p className="text-sm text-muted-foreground">No notifications yet</p>

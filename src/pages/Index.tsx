@@ -32,11 +32,15 @@ import { AppProvider } from "@/context/AppContext";
 import { useAuth, Group } from "@/context/AuthContext";
 import { useNavStyle } from "@/hooks/useNavStyle";
 import { useWeekStart } from "@/hooks/useWeekStart";
+import { useInviteNotifications } from "@/hooks/useInviteNotifications";
 import { Loader2, MoreHorizontal } from "lucide-react";
 
 
 const Index = () => {
   const { user, loading, profile, groups, activeGroup, setActiveGroup, refreshProfile } = useAuth();
+  // Surface incoming group invites as toasts + best-effort web notifications.
+  // (Native push is a separate follow-up — requires Capacitor + APNs/Firebase.)
+  useInviteNotifications();
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [navPages] = useState<Tab[]>(() => loadNavPages());
   const [chatGroup, setChatGroup] = useState<Group | null>(null);
