@@ -344,33 +344,24 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
     setInviteState({ type: "checking" });
     const upperCode = code.toUpperCase();
     try {
-      // First, check if the user is already a member of a group with this code
       const existing = visibleGroups.find((g) => g.invite_code?.toUpperCase() === upperCode);
       if (existing) {
         setInviteState({ type: "already_member", groupName: existing.name });
         return;
       }
 
-      // Use RPC to validate + fetch group name (bypasses RLS via SECURITY DEFINER)
-      const { data, error } = await supabase.rpc("join_group", { _code: upperCode });
+      const { data, error } = await supabase.rpc("preview_group_by_invite_code", { _code: upperCode });
 
       if (error || !data || (data as any).error) {
-        const msg = (data as any)?.error || error?.message || "";
-        if (msg.toLowerCase().includes("already")) {
-          setInviteState({ type: "already_member", groupName: (data as any)?.group_name || "Group" });
-        } else {
-          setInviteState({ type: "invalid" });
-        }
+        setInviteState({ type: "invalid" });
         return;
       }
 
-      // join_group already added us as a member — proceed straight to joined state
       const result = data as any;
-      await refreshGroups();
       setInviteState({
-        type: "joined",
+        type: "found",
         groupName: result.group_name || "Group",
-        groupId: result.group_id || "",
+        code: upperCode,
       });
     } catch {
       setInviteState({ type: "invalid" });
@@ -379,17 +370,21 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
 
   const handleJoinGroup = async () => {
     if (inviteState.type !== "found") return;
-    const { code } = inviteState;
+    const { code, groupName } = inviteState;
     setInviteState({ type: "joining" });
 
     const result = await joinGroup(code);
     if (result.error) {
-      setInviteState({ type: "invalid" });
+      if (result.error.toLowerCase().includes("already")) {
+        setInviteState({ type: "already_member", groupName: result.group_name || groupName });
+      } else {
+        setInviteState({ type: "invalid" });
+      }
       return;
     }
 
     await refreshGroups();
-    setInviteState({ type: "joined", groupName: result.group_name || "Group", groupId: result.group_id || "" });
+    setInviteState({ type: "joined", groupName: result.group_name || groupName, groupId: result.group_id || "" });
   };
 
   const dismissInvite = () => {
