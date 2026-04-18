@@ -84,15 +84,22 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
     setJoining(true);
     setInviteError("");
     try {
-      const result = await joinGroup(inviteCode.trim());
+      const result = await joinGroup(inviteCode.trim().toUpperCase());
       if (result.error) {
-        setInviteError("Code not found — check and try again");
+        const msg = result.error.toLowerCase();
+        if (msg.includes("already")) {
+          setInviteError("You're already a member of this group");
+        } else if (msg.includes("invalid") || msg.includes("not found")) {
+          setInviteError("Code not found — check and try again");
+        } else {
+          setInviteError(result.error);
+        }
       } else {
         toast.success("Joined group! 🎉");
         handleOpenChange(false);
       }
-    } catch {
-      setInviteError("Code not found — check and try again");
+    } catch (e: any) {
+      setInviteError(e?.message || "Something went wrong — please try again");
     }
     setJoining(false);
   };
