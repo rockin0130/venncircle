@@ -350,21 +350,24 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
         return;
       }
 
-      const { data, error } = await supabase
-        .from("groups")
-        .select("id, name, invite_code")
-        .eq("invite_code", upperCode)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc("join_group", { _code: upperCode });
 
-      if (error || !data) {
-        setInviteState({ type: "invalid" });
+      if (error || !data || (data as any).error) {
+        const msg = (data as any)?.error || error?.message || "";
+        if (msg.toLowerCase().includes("already")) {
+          setInviteState({ type: "already_member", groupName: (data as any)?.group_name || "Group" });
+        } else {
+          setInviteState({ type: "invalid" });
+        }
         return;
       }
 
+      const result = data as any;
+      await refreshGroups();
       setInviteState({
-        type: "found",
-        groupName: data.name || "Group",
-        code: upperCode,
+        type: "joined",
+        groupName: result.group_name || "Group",
+        groupId: result.group_id || "",
       });
     } catch {
       setInviteState({ type: "invalid" });
@@ -373,22 +376,17 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
 
   const handleJoinGroup = async () => {
     if (inviteState.type !== "found") return;
-    const { code, groupName } = inviteState;
+    const { code } = inviteState;
     setInviteState({ type: "joining" });
 
     const result = await joinGroup(code);
     if (result.error) {
-      const msg = result.error.toLowerCase();
-      if (msg.includes("already")) {
-        setInviteState({ type: "already_member", groupName: result.group_name || groupName || "Group" });
-      } else {
-        setInviteState({ type: "invalid" });
-      }
+      setInviteState({ type: "invalid" });
       return;
     }
 
     await refreshGroups();
-    setInviteState({ type: "joined", groupName: result.group_name || groupName || "Group", groupId: result.group_id || "" });
+    setInviteState({ type: "joined", groupName: result.group_name || "Group", groupId: result.group_id || "" });
   };
 
   const dismissInvite = () => {
