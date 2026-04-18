@@ -7,6 +7,7 @@ import { Plus, DollarSign, Lock, Check, Calendar, Flame, MoreHorizontal } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EVERYONE_SENTINEL } from "@/components/SobrietyUserFilter";
+import { ModeToggleBar, GroupPillsRow, MemberSelectorPill, type WorkoutMode } from "@/components/WorkoutModeToggle";
 import { useSobrietyViewMode, buildViewQueryPlan } from "@/hooks/useSobrietyViewMode";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -911,107 +912,41 @@ const SobrietyPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
           </div>
         </div>
 
-        <div className="mt-4 flex gap-2 overflow-x-auto scroll-smooth-touch pb-1">
-          <button
-            type="button"
-            onClick={() => setActiveGroup(PERSONAL_GROUP)}
-            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-              isPersonalActive
-                ? "border-primary/30 bg-primary/10 text-primary"
-                : "border-[hsl(var(--sobriety-outline-strong))] bg-[hsl(var(--sobriety-surface))] text-foreground"
-            }`}
-          >
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="" className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0" />
-            ) : (
-              <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 text-[8px] font-bold text-white" style={{ background: "#6C47FF" }}>
-                {(profile?.display_name || "U")[0].toUpperCase()}
-              </span>
-            )}
-            Mine
-          </button>
-          {contextGroups.map((group, index) => {
-            const selected = activeGroup?.id === group.id && !(activeGroup as any)?._personal;
-            const coverUrl = (group as any).cover_image_url;
-            const gInitial = (group.name || "G")[0].toUpperCase();
-            const GROUP_COLORS = ["#3B82F6", "#EC4899", "#059669", "#F97316", "#8B5CF6", "#14B8A6", "#EF4444", "#EAB308"];
-            const gColor = GROUP_COLORS[index % GROUP_COLORS.length];
-            return (
-              <button
-                key={group.id}
-                type="button"
-                onClick={() => {
-                  const nextGroup = groups.find((candidate) => candidate.id === group.id);
-                  if (nextGroup) setActiveGroup(nextGroup);
-                }}
-                className={`flex shrink-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-                  selected
-                    ? "border-primary/30 bg-primary/10 text-primary"
-                    : "border-[hsl(var(--sobriety-outline-strong))] bg-[hsl(var(--sobriety-surface))] text-foreground"
-                }`}
-              >
-                {coverUrl ? (
-                  <img src={coverUrl} alt="" className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0" />
-                ) : (
-                  <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 text-[8px] font-bold text-white" style={{ background: gColor }}>
-                    {gInitial}
-                  </span>
-                )}
-                {group.name}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => setShowCreateGroup(true)}
-            className="flex shrink-0 items-center rounded-full border border-[hsl(var(--sobriety-outline-strong))] bg-[hsl(var(--sobriety-surface))] px-4 py-2 text-sm font-medium text-foreground"
-          >
-            + Add Group
-          </button>
+        <div className="mt-4">
+          <ModeToggleBar
+            mode={isPersonalActive ? "mine" : "group"}
+            onModeChange={(m) => {
+              if (m === "mine") {
+                setActiveGroup(PERSONAL_GROUP);
+              } else {
+                const first = sobrietyGroups[0];
+                if (first) {
+                  setActiveGroup(first);
+                } else {
+                  setShowCreateGroup(true);
+                }
+              }
+            }}
+          />
+          {!isPersonalActive && (
+            <GroupPillsRow
+              page="sobriety"
+              selectedGroupId={groupId}
+              onSelectGroup={(gid) => {
+                const next = groups.find((g) => g.id === gid);
+                if (next) setActiveGroup(next);
+              }}
+            />
+          )}
         </div>
 
         {isGroupView && filterUsers.length > 1 && (
-          <div className="mt-3 flex gap-2 overflow-x-auto scroll-smooth-touch pb-1">
-            {filterUsers.map((member) => {
-              const tone = getUserTone(member.colorIndex);
-              const selected = isUserSelected(member.id);
-              return (
-                <button
-                  key={member.id}
-                  type="button"
-                  onClick={() => toggleUserPill(member.id)}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all"
-                  style={{
-                    backgroundColor: selected ? tone.pill : "hsl(var(--sobriety-surface))",
-                    borderColor: selected ? tone.border : "hsl(var(--sobriety-outline-strong))",
-                    color: selected ? tone.text : "hsl(var(--foreground))",
-                  }}
-                >
-                  <span
-                    className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[10px] font-semibold"
-                    style={{
-                      backgroundColor: selected ? tone.accent : "hsl(var(--secondary))",
-                      color: selected ? "hsl(var(--primary-foreground))" : "hsl(var(--muted-foreground))",
-                    }}
-                  >
-                    {member.initial}
-                  </span>
-                  <span>{member.name}</span>
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={toggleEveryonePill}
-              className="flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all"
-              style={{
-                backgroundColor: everyoneSelected ? "hsl(var(--primary) / 0.1)" : "hsl(var(--sobriety-surface))",
-                borderColor: everyoneSelected ? "hsl(var(--primary) / 0.35)" : "hsl(var(--sobriety-outline-strong))",
-                color: everyoneSelected ? "hsl(var(--primary))" : "hsl(var(--foreground))",
-              }}
-            >
-              <span>Everyone</span>
-            </button>
+          <div className="mt-3">
+            <MemberSelectorPill
+              groupId={activeGroup!.id}
+              selectedUserIds={selectedUserIds}
+              onSelectionChange={(ids) => persistSelectedUserIds(ids)}
+            />
           </div>
         )}
 

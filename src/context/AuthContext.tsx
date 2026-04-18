@@ -96,7 +96,7 @@ interface AuthContextType {
   disconnectPartner: () => Promise<{ success?: boolean; error?: string }>;
   createGroup: (name: string, type: string, emoji: string, sharedPages?: ShareablePage[], category?: "home" | "interest") => Promise<{ id?: string; invite_code?: string; error?: string }>;
   updateGroupSharedPages: (groupId: string, sharedPages: ShareablePage[]) => Promise<{ success?: boolean; error?: string }>;
-  joinGroup: (code: string) => Promise<{ success?: boolean; group_name?: string; error?: string }>;
+  joinGroup: (code: string) => Promise<{ success?: boolean; group_name?: string; group_id?: string; error?: string }>;
   leaveGroup: (groupId: string) => Promise<{ success?: boolean; error?: string }>;
   inviteToGroup: (groupId: string, userId: string) => Promise<{ success?: boolean; error?: string }>;
   acceptGroupInvite: (groupId: string) => Promise<{ success?: boolean; error?: string }>;
@@ -638,7 +638,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const result = data as any;
     if (result?.error) return { error: result.error };
     await fetchGroups();
-    return { success: true, group_name: result.group_name };
+    return { success: true, group_name: result.group_name, group_id: result.group_id };
   };
 
   const leaveGroup = async (groupId: string) => {
