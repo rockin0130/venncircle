@@ -3,6 +3,7 @@ import { Search, Plus, MoreHorizontal, MessageCircle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, Group } from "@/context/AuthContext";
 import { useFriendships } from "@/hooks/useFriendships";
+import GroupInviteRequestCard from "@/components/GroupInviteRequestCard";
 
 interface LastMessage {
   content: string;
@@ -45,7 +46,7 @@ const ChatListPage = ({
   onOpenChat: (group: Group) => void;
   onOpenMore?: () => void;
 }) => {
-  const { user, groups } = useAuth();
+  const { user, groups, pendingGroupInvites } = useAuth();
   const { activeFriends } = useFriendships();
   const [previews, setPreviews] = useState<ChatPreview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -389,6 +390,18 @@ const ChatListPage = ({
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+        {/* Pinned: pending group invite requests */}
+        {pendingGroupInvites.length > 0 && (
+          <div className="px-4 pt-3 pb-1 space-y-2">
+            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-[0.08em] px-1">
+              Group invites
+            </p>
+            {pendingGroupInvites.map((invite) => (
+              <GroupInviteRequestCard key={invite.group_id} invite={invite} variant="compact" />
+            ))}
+          </div>
+        )}
+
         {loading && (
           <div className="flex justify-center py-12">
             <span className="text-xs text-muted-foreground">Loading chats...</span>
