@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Bell, Check, Calendar, ListTodo, Heart, Dumbbell } from "lucide-react";
+import { X, Bell, Check, Calendar, ListTodo, Heart, Dumbbell, UserPlus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useModalScrollLock } from "@/hooks/useModalScrollLock";
+import GroupInviteRequestCard from "@/components/GroupInviteRequestCard";
 
 interface Notification {
   id: string;
@@ -25,7 +26,7 @@ interface Props {
 
 const NotificationCenter = ({ open, onClose }: Props) => {
   useModalScrollLock(open);
-  const { profile, groups } = useAuth();
+  const { profile, groups, pendingGroupInvites } = useAuth();
   const { tasks, events, habits } = useAppContext();
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
