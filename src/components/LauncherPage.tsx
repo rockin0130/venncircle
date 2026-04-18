@@ -66,6 +66,9 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
     sendFriendRequest, acceptFriendRequest, declineFriendRequest, cancelFriendRequest, removeFriend, searchUsers,
   } = useFriendships();
   const [inviteState, setInviteState] = useState<InviteState>({ type: "idle" });
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [showInviteInput, setShowInviteInput] = useState(false);
+  const [inviteCodeInput, setInviteCodeInput] = useState("");
   const [fallbackGroups, setFallbackGroups] = useState<Group[]>([]);
   const [localCoverMap, setLocalCoverMap] = useState<Record<string, string>>({});
   const [uploadingGroupId, setUploadingGroupId] = useState<string | null>(null);
