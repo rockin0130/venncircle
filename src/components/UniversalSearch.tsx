@@ -177,7 +177,7 @@ const UniversalSearch = ({ open, onClose, onNavigate }: Props) => {
       >
         <div className="max-w-md mx-auto h-full flex flex-col">
           {/* Search header */}
-          <div className="px-4 pt-12 pb-3">
+          <div className="px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3">
             <div className="flex items-center gap-3 bg-secondary/60 rounded-2xl px-4 py-3 border border-border/50">
               <Search size={18} className="text-muted-foreground flex-shrink-0" />
               <input

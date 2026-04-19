@@ -553,7 +553,7 @@ const AiAssistantPage = ({ onBack, onOpenMore }: { onBack?: () => void; onOpenMo
 
   return (
     <div className="flex flex-col h-[calc(100svh-5rem)]">
-      <header className="px-4 pt-12 pb-3 border-b border-border bg-card/80 backdrop-blur-sm flex-shrink-0">
+      <header className="px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 border-b border-border bg-card/80 backdrop-blur-sm flex-shrink-0">
         <div className="flex items-center gap-3">
           {onBack && (
             <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors -ml-1">

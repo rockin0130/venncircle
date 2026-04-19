@@ -400,7 +400,7 @@ const ChatPage = ({
   return (
     <div className="flex flex-col h-[calc(100svh-5rem)]" style={{ backgroundColor: "#F4F3F0" }}>
       {/* Header */}
-      <header className="px-3 pt-12 pb-2.5 bg-white shrink-0" style={{ borderBottom: "0.5px solid rgba(0,0,0,0.07)" }}>
+      <header className="px-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-2.5 bg-white shrink-0" style={{ borderBottom: "0.5px solid rgba(0,0,0,0.07)" }}>
         <div className="flex items-center gap-2.5">
           <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground -ml-1" aria-label="Back">
             <ArrowLeft size={20} />
@@ -661,7 +661,7 @@ const ChatPage = ({
             className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
             onClick={() => setPreviewImage(null)}
           >
-            <button onClick={() => setPreviewImage(null)} className="absolute top-12 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white">
+            <button onClick={() => setPreviewImage(null)} className="absolute right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white" style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}>
               <X size={22} />
             </button>
             <img src={previewImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-xl" onClick={(e) => e.stopPropagation()} />
