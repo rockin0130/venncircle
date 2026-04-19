@@ -920,12 +920,14 @@ const WorkoutsPage = ({
       if (workout.groupId && !isWorkoutPhotoPromptSuppressed()) {
         setTimeout(() => setPhotoPromptWorkout(workout), 1200);
       }
-      // Trigger feed share prompt for workouts in groups with feed
-      const workoutGroups = groups.filter(
-        (g) => g.id === workout.groupId || (workout as any).sharedGroupIds?.includes(g.id)
-      );
-      if (workoutGroups.length > 0) {
-        setTimeout(() => setFeedShareWorkout(workout), workout.groupId ? 1800 : 1200);
+      // Trigger feed share prompt only when no photo prompt will show (avoid duplicate overlapping modals)
+      if (!workout.groupId) {
+        const workoutGroups = groups.filter(
+          (g) => (workout as any).sharedGroupIds?.includes(g.id)
+        );
+        if (workoutGroups.length > 0) {
+          setTimeout(() => setFeedShareWorkout(workout), 1200);
+        }
       }
     }
     toggleWorkout(id);
@@ -1637,7 +1639,7 @@ const WorkoutCard = ({
               style={{
                 width: 38,
                 borderLeft: "0.5px solid rgba(0,0,0,0.06)",
-                background: workout.done ? "rgba(26,26,26,0.03)" : "rgba(0,0,0,0.015)",
+                background: "transparent",
               }}
             >
               <div
