@@ -356,7 +356,7 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
             <p style={{ fontSize: 12, color: "#666" }}>Groups</p>
           </div>
           <div style={{ width: 1, height: 28, background: "rgba(0,0,0,0.1)" }} />
-          <button className="flex-1 text-center" onClick={() => setShowFriendsSheet(true)}>
+          <button className="flex-1 text-center" onClick={() => onNavigate?.("friends")}>
             <p style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{activeFriends.length}</p>
             <p style={{ fontSize: 12, color: "#666" }}>Friends</p>
           </button>
@@ -595,60 +595,7 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handlePhotoSelected(e.target.files[0]); e.target.value = ""; }} />
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handlePhotoSelected(e.target.files[0]); e.target.value = ""; }} />
 
-      {/* Friends Bottom Sheet */}
-      {showFriendsSheet && (
-        <div className="fixed inset-0 z-[9998] flex items-end justify-center" onClick={() => setShowFriendsSheet(false)}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div
-            className="relative w-full max-w-md mx-0 animate-in slide-in-from-bottom-4 duration-200"
-            style={{ background: "#fff", borderRadius: "16px 16px 0 0", maxHeight: "70vh" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 pt-5 pb-3">
-              <p style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A" }}>Friends</p>
-              <button onClick={() => setShowFriendsSheet(false)}>
-                <X size={20} color="#888" />
-              </button>
-            </div>
-            <div className="overflow-y-auto px-5 pb-8" style={{ maxHeight: "calc(70vh - 60px)" }}>
-              {activeFriends.length === 0 && (
-                <p className="text-center py-8" style={{ fontSize: 14, color: "#999" }}>No friends yet</p>
-              )}
-              {activeFriends.map((f) => {
-                if (!f.friend) return null;
-                const fInitial = f.friend.display_name?.charAt(0)?.toUpperCase() || "?";
-                const fColor = hashColor(f.friend.id);
-                const sharedGroups = friendGroupMap[f.friend.id] || [];
-                return (
-                  <div key={f.id} className="flex items-center gap-3 py-3" style={{ borderBottom: "0.5px solid rgba(0,0,0,0.06)" }}>
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold overflow-hidden shrink-0"
-                      style={{ background: fColor }}
-                    >
-                      {f.friend.avatar_url ? (
-                        <img src={f.friend.avatar_url} alt="" className="w-full h-full object-cover" />
-                      ) : fInitial}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }} className="truncate">{f.friend.display_name}</p>
-                      {sharedGroups.length > 0 && (
-                        <p style={{ fontSize: 12, color: "#999" }} className="truncate">{sharedGroups.join(", ")}</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              <button
-                onClick={() => { setShowFriendsSheet(false); setShowAddFriend(true); }}
-                className="w-full mt-3 py-3 text-center"
-                style={{ fontSize: 14, fontWeight: 500, color: "#7C3AED" }}
-              >
-                + Add a friend
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Friends now has its own dedicated page (see FriendsPage). */}
 
       {/* Photo picker action sheet */}
       {showPhotoSheet && (
