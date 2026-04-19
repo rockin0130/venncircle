@@ -1000,7 +1000,7 @@ const WorkoutsPage = ({
   // Sub-pages
   if (showHistory) {
     return (
-      <div className="px-5 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
+      <div className="px-5 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
         <ExerciseHistoryPage onBack={() => setShowHistory(false)} />
       </div>
     );
@@ -1073,7 +1073,7 @@ const WorkoutsPage = ({
       <>
 
       {/* ── NEW HEADER ── */}
-      <header className="pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 flex items-start justify-between">
+      <header className="safe-area-top pt-3 pb-3 flex items-start justify-between">
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", fontFamily: "'DM Sans', sans-serif" }}>Workouts</h1>
           <p style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{todayFormatted}</p>

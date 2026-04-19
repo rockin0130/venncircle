@@ -4,7 +4,6 @@ import type { HealthDataType, Workout as HKWorkout, WorkoutType } from "@capgo/c
 import type { Workout } from "@/context/AppContext";
 import { formatHealthKitWorkoutLabel } from "@/lib/healthKitWorkoutTypes";
 import { getWorkoutTypeEmoji, normalizeWorkoutType, parseWorkoutDurationToMinutes } from "@/lib/workoutSync";
-import { toast } from "sonner";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -14,7 +13,6 @@ const READ_TYPES_FOR_CHECK: HealthDataType[] = [
   "distance",
   "distanceCycling",
   "heartRate",
-  "basalCalories",
 ];
 
 const READ_TYPES: HealthDataType[] = [...READ_TYPES_FOR_CHECK, "workouts" as HealthDataType];
@@ -140,33 +138,6 @@ export function mapHealthKitWorkoutToWorkout(w: HKWorkout, metrics: HealthKitWor
   };
 }
 
-async function sumBasalEnergyKcalDuringWorkout(best: HKWorkout): Promise<number> {
-  const attempts: { dataType: HealthDataType; label: string }[] = [
-    { dataType: "basalCalories", label: "basalCalories" },
-    { dataType: "basalEnergyBurned" as HealthDataType, label: "basalEnergyBurned" },
-  ];
-
-  for (const { dataType, label } of attempts) {
-    try {
-      const { samples } = await Health.readSamples({
-        dataType,
-        startDate: best.startDate,
-        endDate: best.endDate,
-        limit: 5000,
-        ascending: true,
-      });
-      const sum = samples.reduce((s, x) => s + x.value, 0);
-      console.log(
-        `[HealthKit] basal kcal (${label}): sampleCount=${samples.length}, sumKcal=${sum.toFixed(2)}`
-      );
-      if (sum > 0) return sum;
-    } catch (e) {
-      console.warn(`[HealthKit] basal readSamples (${label}) failed:`, e);
-    }
-  }
-  return 0;
-}
-
 async function buildMetricsFromHKWorkout(best: HKWorkout): Promise<HealthKitWorkoutMetrics> {
   let heartRateAvg: number | null = null;
   try {
@@ -184,12 +155,8 @@ async function buildMetricsFromHKWorkout(best: HKWorkout): Promise<HealthKitWork
     /* heart rate optional */
   }
 
-  const activeKcal = best.totalEnergyBurned ?? 0;
-  const basalKcal = await sumBasalEnergyKcalDuringWorkout(best);
-  console.log(
-    `[HealthKit] calories: activeKcal=${activeKcal.toFixed(2)}, basalKcal=${basalKcal.toFixed(2)}, total=${Math.round(activeKcal + basalKcal)}`
-  );
-  const totalKcal = Math.round(activeKcal + basalKcal);
+  /** Match source apps (e.g. Nike Run Club): use HKWorkout totalEnergyBurned only — do not add basal samples. */
+  const totalKcal = Math.round(best.totalEnergyBurned ?? 0);
 
   const distanceM = best.totalDistance ?? 0;
   const distanceKm = distanceM / 1000;
@@ -260,8 +227,6 @@ export async function fetchHealthKitWorkoutHistory90Days(userId: string): Promis
   const start = new Date(end.getTime() - 90 * MS_PER_DAY);
   const startIso = start.toISOString();
   const endIso = end.toISOString();
-
-  toast.info(`HK query range: ${startIso} to ${endIso}`);
 
   const raw: HKWorkout[] = [];
   try {

@@ -456,7 +456,7 @@ const ShoppingListPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
   return (
     <div className="flex flex-col min-h-full">
       {/* Header */}
-      <div className="px-5 pt-6 pb-3">
+      <div className="px-5 safe-area-top pt-3 pb-3">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">

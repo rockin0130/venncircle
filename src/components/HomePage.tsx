@@ -24,6 +24,7 @@ import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { speak, stopSpeaking } from "@/lib/speak";
 import { useGroupContext } from "@/hooks/useGroupContext";
 import { cn } from "@/lib/utils";
+import { GcalSourcePill } from "@/components/GcalSourcePill";
 
 type Filter = string; // "mine" | "partner" | "household" | "member:{userId}"
 type AllViewFilter = string; // user IDs that are selected in All view
@@ -713,7 +714,7 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
         <CongratsPopup type={congratsType} show={true} onClose={() => setCongratsType(null)} />
       )}
 
-      <header className="pt-10 pb-3">
+      <header className="safe-area-top pt-3 pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-0.5 flex-1 min-w-0">
             <button onClick={() => shiftDate(-1)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary/60 active:scale-95 transition-all" style={{ color: "hsl(25, 30%, 45%)" }}>
@@ -1128,7 +1129,7 @@ const GCalEventCard = ({ event, onToggle, onHide, onDesignate, onCongrats }: {
         <div className="flex items-center gap-2 mb-2">
           <Clock size={13} className="text-muted-foreground" />
           <span className="text-xs font-medium text-muted-foreground">{timeStr}</span>
-          <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Google</span>
+          <GcalSourcePill isApple={event.isApple} className="rounded" />
         </div>
       )}
       <div className="flex items-center gap-3">
@@ -1190,7 +1191,7 @@ const GCalEventCard = ({ event, onToggle, onHide, onDesignate, onCongrats }: {
       {timeStr === "All day" && (
         <div className="mt-2 ml-9 flex items-center gap-2">
           <span className="text-xs text-muted-foreground">All day</span>
-          <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Google</span>
+          <GcalSourcePill isApple={event.isApple} className="rounded" />
         </div>
       )}
     </motion.div>

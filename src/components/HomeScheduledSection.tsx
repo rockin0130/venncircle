@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { GcalSourcePill } from "@/components/GcalSourcePill";
 import { normalizeCalendarAssignees, getAssignedAvatarMembers, getAvatarPalette } from "@/lib/calendarAssignees";
 import { MEMBER_COLORS, type FilterUser } from "@/components/CalendarUserFilter";
 
@@ -671,7 +672,10 @@ const HomeScheduledSection = ({
                             {/* Context tag */}
                             {tag && renderGroupPill(tag)}
                             {item.kind === "gcal" && (
-                              <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">Google</span>
+                              <GcalSourcePill
+                                isApple={(item.raw as GoogleCalendarEvent).isApple}
+                                className="rounded-full"
+                              />
                             )}
                           </div>
                         </div>

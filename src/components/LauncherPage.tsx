@@ -406,7 +406,7 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
       />
 
       {/* Header */}
-      <header className="pt-[calc(env(safe-area-inset-top,0px)+1.25rem)] pb-2 flex items-start justify-between gap-3">
+      <header className="safe-area-top pt-5 pb-2 flex items-start justify-between gap-3">
         <motion.h1
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

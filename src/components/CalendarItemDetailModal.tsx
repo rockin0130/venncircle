@@ -41,7 +41,8 @@ const CalendarItemDetailModal = ({ item, onClose, onEdit }: Props) => {
       toast.success("Task deleted");
     } else if (item.type === "gcal") {
       hideGcalEvent(realId);
-      toast.success("Google Calendar event hidden");
+      const isApple = (item.raw as GoogleCalendarEvent).isApple;
+      toast.success(isApple ? "Apple Calendar event hidden" : "Google Calendar event hidden");
     }
     onClose();
   };
@@ -102,6 +103,11 @@ const CalendarItemDetailModal = ({ item, onClose, onEdit }: Props) => {
               <p className={cn("text-lg font-bold text-foreground", item.done && "line-through opacity-50")}>{item.title}</p>
               <p className="text-sm text-muted-foreground">{displayDate()}</p>
               <p className="text-sm text-muted-foreground">{displayTime()}</p>
+              {item.type === "gcal" && (
+                <p className="text-xs text-muted-foreground">
+                  {(item.raw as GoogleCalendarEvent).isApple ? "Apple Calendar" : "Google Calendar"}
+                </p>
+              )}
               {item.type === "event" && (item.raw as ScheduledEvent).description && (
                 <p className="text-sm text-muted-foreground mt-1">{(item.raw as ScheduledEvent).description}</p>
               )}

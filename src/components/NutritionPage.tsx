@@ -984,7 +984,7 @@ const NutritionPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => 
   return (
     <div className="flex flex-col min-h-full px-5">
       {/* ─── Header ─── */}
-      <div className="flex items-center justify-between pt-6 pb-1">
+      <div className="flex items-center justify-between safe-area-top pt-3 pb-1">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Nutrition</h1>
           <p className="text-xs text-muted-foreground">{dateLabel}</p>

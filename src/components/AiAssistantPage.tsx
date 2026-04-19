@@ -553,7 +553,7 @@ const AiAssistantPage = ({ onBack, onOpenMore }: { onBack?: () => void; onOpenMo
 
   return (
     <div className="flex flex-col h-[calc(100svh-5rem)]">
-      <header className="px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 border-b border-border bg-card/80 backdrop-blur-sm flex-shrink-0">
+      <header className="px-4 safe-area-top pt-3 pb-3 border-b border-border bg-card/80 backdrop-blur-sm flex-shrink-0">
         <div className="flex items-center gap-3">
           {onBack && (
             <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors -ml-1">
@@ -615,7 +615,7 @@ const AiAssistantPage = ({ onBack, onOpenMore }: { onBack?: () => void; onOpenMo
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
               className="fixed right-0 top-0 bottom-0 z-50 w-72 bg-card border-l border-border shadow-xl flex flex-col"
             >
-              <div className="px-4 pt-14 pb-3 border-b border-border flex items-center justify-between">
+              <div className="px-4 safe-area-top pt-3 pb-3 border-b border-border flex items-center justify-between">
                 <h2 className="text-sm font-bold">Past Conversations</h2>
                 <button onClick={() => setShowHistory(false)} className="text-muted-foreground hover:text-foreground">
                   <X size={18} />

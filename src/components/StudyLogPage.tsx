@@ -288,7 +288,7 @@ const StudyLogPage = ({ onBack, onOpenMore }: StudyLogPageProps) => {
   return (
     <div className="flex flex-col min-h-full pb-4" style={{ background: "#F4F3F0" }}>
       {/* Header */}
-      <div className="px-4 pt-6 pb-2 flex items-center justify-between">
+      <div className="px-4 safe-area-top pt-3 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#F4F3F0", border: "0.5px solid rgba(0,0,0,0.07)" }}>
             <ChevronLeft size={18} color="#888" />

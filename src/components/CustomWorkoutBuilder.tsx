@@ -258,7 +258,7 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate, recentWorkou
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-2 flex-shrink-0">
+          <div className="flex items-center justify-between px-4 safe-area-top pt-3 pb-2 flex-shrink-0">
             <h2 className="text-lg font-bold tracking-display">{headerTitle}</h2>
             <button onClick={handleClose} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
               <X size={16} />
