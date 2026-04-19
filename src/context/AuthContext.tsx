@@ -22,26 +22,22 @@ interface PartnerProfile {
   email: string | null;
 }
 
-export const SHAREABLE_PAGES = ["calendar", "workout", "nutrition", "habits", "sobriety", "shopping", "study"] as const;
+export const SHAREABLE_PAGES = ["calendar", "workout", "habits", "sobriety", "study"] as const;
 export type ShareablePage = typeof SHAREABLE_PAGES[number];
 
 export const PAGE_LABELS: Record<ShareablePage, string> = {
   calendar: "Calendar",
   workout: "Workout",
-  nutrition: "Nutrition",
   habits: "Routines",
   sobriety: "Sobriety",
-  shopping: "Shopping",
   study: "Study",
 };
 
 export const PAGE_ICONS: Record<ShareablePage, string> = {
   calendar: "📅",
   workout: "💪",
-  nutrition: "🍎",
   habits: "🔥",
   sobriety: "🏆",
-  shopping: "🛒",
   study: "📖",
 };
 
