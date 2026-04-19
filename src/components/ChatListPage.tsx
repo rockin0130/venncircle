@@ -340,7 +340,7 @@ const ChatListPage = ({
   return (
     <div className="flex flex-col h-[calc(100svh-5rem)]" style={{ backgroundColor: "#F4F3F0" }}>
       {/* Header */}
-      <header className="px-5 pt-12 pb-2 flex items-center justify-between shrink-0">
+      <header className="px-5 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-2 flex items-center justify-between shrink-0">
         <h1 className="text-xl font-bold tracking-tight text-foreground">Chats</h1>
         <div className="flex items-center gap-1.5">
           <button

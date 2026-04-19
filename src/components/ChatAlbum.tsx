@@ -101,7 +101,7 @@ const ChatAlbum = ({
 
   return (
     <div className="flex flex-col h-[calc(100svh-5rem)]" style={{ backgroundColor: "#F4F3F0" }}>
-      <header className="px-4 pt-12 pb-3 bg-white shrink-0" style={{ borderBottom: "0.5px solid rgba(0,0,0,0.07)" }}>
+      <header className="px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 bg-white shrink-0" style={{ borderBottom: "0.5px solid rgba(0,0,0,0.07)" }}>
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground -ml-1">
             <ArrowLeft size={20} />
