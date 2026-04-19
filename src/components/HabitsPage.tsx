@@ -77,6 +77,7 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [viewingPartnerHabit, setViewingPartnerHabit] = useState<{ habit: Habit; ownerName: string } | null>(null);
   const [duplicateConfirm, setDuplicateConfirm] = useState<{ existingName: string } | null>(null);
+  const [routinePhotoPrompt, setRoutinePhotoPrompt] = useState<RoutineForPhoto | null>(null);
 
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set([EVERYONE_SENTINEL]));
 
