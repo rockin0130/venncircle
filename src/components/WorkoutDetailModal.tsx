@@ -647,6 +647,7 @@ function OverviewContent({
   onClose, onRemove, onMoveToTomorrow, onMoveToDate,
   onEditExercise, onDeleteExercise, onAddExercises, onSelectExercise,
   enterLogMode, onCopyWorkout,
+  editMode, reorderExercise,
 }: any) {
   const [editingDuration, setEditingDuration] = useState(false);
   const [durationText, setDurationText] = useState("");
