@@ -140,6 +140,10 @@ export default function WorkoutDetailModal({
   readOnly,
   progress,
   onCopyWorkout,
+  fullscreen,
+  onUpdateTitle,
+  onUpdateEmoji,
+  onReorderExercises,
 }: WorkoutDetailModalProps) {
   const { user } = useAuth();
   const [mode, setMode] = useState<ModalMode>("overview");
