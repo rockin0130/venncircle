@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Image, Activity, Smile, Loader2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { pickFromGallery } from "@/integrations/camera";
 
 interface GroupFeedComposeProps {
   groupId: string;
@@ -16,19 +17,24 @@ const GroupFeedCompose = ({ groupId, userId, userDisplayName, onPostCreated }: G
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [posting, setPosting] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const composeRef = useRef<HTMLDivElement>(null);
 
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    const newFiles = files.slice(0, 3 - photos.length);
-    setPhotos(prev => [...prev, ...newFiles]);
-    newFiles.forEach(f => {
+  const appendPhotoFiles = (newFiles: File[]) => {
+    if (newFiles.length === 0) return;
+    const slice = newFiles.slice(0, 3 - photos.length);
+    setPhotos((prev) => [...prev, ...slice]);
+    slice.forEach((f) => {
       const reader = new FileReader();
-      reader.onload = (ev) => setPhotoPreviews(prev => [...prev, ev.target?.result as string]);
+      reader.onload = (ev) =>
+        setPhotoPreviews((prev) => [...prev, ev.target?.result as string]);
       reader.readAsDataURL(f);
     });
+  };
+
+  const handleAddPhoto = async () => {
+    if (photos.length >= 3) return;
+    const file = await pickFromGallery();
+    if (file) appendPhotoFiles([file]);
   };
 
   const removePhoto = (idx: number) => {
@@ -119,7 +125,11 @@ const GroupFeedCompose = ({ groupId, userId, userDisplayName, onPostCreated }: G
       {expanded && (
         <div className="flex items-center justify-between mt-2.5 pl-12">
           <div className="flex items-center gap-4">
-            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+            <button
+              type="button"
+              onClick={() => void handleAddPhoto()}
+              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
               <Image size={16} /><span className="text-xs font-medium">Photo</span>
             </button>
             <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
@@ -136,7 +146,6 @@ const GroupFeedCompose = ({ groupId, userId, userDisplayName, onPostCreated }: G
           )}
         </div>
       )}
-      <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoSelect} />
     </div>
   );
 };

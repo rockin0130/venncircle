@@ -891,7 +891,7 @@ const SobrietyPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
   const PERSONAL_GROUP = { _personal: true, id: "__personal__", name: "Mine", type: "personal", emoji: "👤", invite_code: "", created_by: "", shared_pages: [], members: [] } as any;
 
   return (
-    <div className="px-3 pb-8 pt-3">
+    <div className="px-3 pb-8 safe-area-top pt-3">
       <div className="rounded-[30px] border border-[hsl(var(--sobriety-outline))] bg-[hsl(var(--sobriety-shell))] p-4 shadow-card">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-[2rem] font-semibold tracking-[-0.04em] text-foreground">Sobriety</h1>
