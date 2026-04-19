@@ -623,10 +623,6 @@ const WorkoutsPage = ({
   const [showCustomBuilder, setShowCustomBuilder] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ filter: "all" | "week" | "month" | "date" | "tomorrow"; message: string } | null>(null);
   const [exerciseDeleteConfirm, setExerciseDeleteConfirm] = useState<{ workoutId: string; index: number; exerciseName: string } | null>(null);
-  const [editingWorkout, setEditingWorkout] = useState<{ workoutId: string; exerciseIndex: number } | null>(null);
-  const [editExName, setEditExName] = useState("");
-  const [editExSets, setEditExSets] = useState("");
-  const [editExReps, setEditExReps] = useState("");
   const [loggingWorkout, setLoggingWorkout] = useState<Workout | null>(null);
   const [photoPromptWorkout, setPhotoPromptWorkout] = useState<Workout | null>(null);
   const [feedShareWorkout, setFeedShareWorkout] = useState<Workout | null>(null);
@@ -970,21 +966,11 @@ const WorkoutsPage = ({
   };
 
   const startEditExercise = (workoutId: string, index: number, ex: { name: string; sets: number; reps: string }) => {
-    setEditingWorkout({ workoutId, exerciseIndex: index });
-    setEditExName(ex.name);
-    setEditExSets(String(ex.sets));
-    setEditExReps(ex.reps);
-  };
-
-  const saveExerciseEdit = () => {
-    if (!editingWorkout) return;
-    const workout = workouts.find((w) => w.id === editingWorkout.workoutId);
+    const workout = workouts.find((w) => w.id === workoutId);
     if (!workout?.exercises) return;
     const updated = [...workout.exercises];
-    updated[editingWorkout.exerciseIndex] = { name: editExName, sets: parseInt(editExSets) || 1, reps: editExReps };
-    updateWorkout(editingWorkout.workoutId, { exercises: updated });
-    setEditingWorkout(null);
-    toast.success("Exercise updated");
+    updated[index] = ex;
+    updateWorkout(workoutId, { exercises: updated });
   };
 
   const deleteExercise = (workoutId: string, index: number) => {
@@ -1082,34 +1068,6 @@ const WorkoutsPage = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Exercise Edit Dialog */}
-      <Dialog open={!!editingWorkout} onOpenChange={(open) => { if (!open) setEditingWorkout(null); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Pencil size={16} /> Edit Exercise</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Exercise Name</label>
-              <input value={editExName} onChange={(e) => setEditExName(e.target.value)} className="w-full bg-secondary rounded-lg px-3 py-2 text-sm outline-none mt-1 border border-border" />
-            </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="text-xs font-medium text-muted-foreground">Sets</label>
-                <input type="number" value={editExSets} onChange={(e) => setEditExSets(e.target.value)} className="w-full bg-secondary rounded-lg px-3 py-2 text-sm outline-none mt-1 border border-border" />
-              </div>
-              <div className="flex-1">
-                <label className="text-xs font-medium text-muted-foreground">Reps</label>
-                <input value={editExReps} onChange={(e) => setEditExReps(e.target.value)} className="w-full bg-secondary rounded-lg px-3 py-2 text-sm outline-none mt-1 border border-border" />
-              </div>
-            </div>
-            <button onClick={saveExerciseEdit} disabled={!editExName.trim()} className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
-              Save Changes
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <>
 
