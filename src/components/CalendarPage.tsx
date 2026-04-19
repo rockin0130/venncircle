@@ -1310,7 +1310,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
       {/* ── Search Modal ────────────────────────────────── */}
       {showSearch && (
         <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm">
-          <div className="px-4 pt-10">
+          <div className="px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
             <div className="flex items-center gap-2 mb-4">
               <div className="flex-1 flex items-center bg-secondary rounded-xl px-3 py-2 gap-2">
                 <Search size={16} className="text-muted-foreground flex-shrink-0" />

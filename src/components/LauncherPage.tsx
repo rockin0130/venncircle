@@ -395,7 +395,7 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
   };
 
   return (
-    <div className="px-5 flex flex-col min-h-[calc(100svh-1rem)]">
+    <div className="px-5 flex flex-col min-h-[calc(100svh-1rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
       {/* Hidden file input for cover uploads */}
       <input
         ref={fileInputRef}
@@ -406,7 +406,7 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
       />
 
       {/* Header */}
-      <header className="pt-14 pb-2 flex items-start justify-between gap-3">
+      <header className="pt-[calc(env(safe-area-inset-top,0px)+1.25rem)] pb-2 flex items-start justify-between gap-3">
         <motion.h1
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

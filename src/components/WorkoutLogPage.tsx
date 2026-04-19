@@ -212,7 +212,7 @@ const WorkoutLogPage = ({ onBack, onRecordWorkout, workoutsForLog }: Props) => {
   const DAY_ABBRS = ["M", "T", "W", "T", "F", "S", "S"];
 
   return (
-    <div className="px-5 pb-28 pt-12">
+    <div className="px-5 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
       {/* Header */}
       <header className="flex items-center gap-3 mb-6">
         <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">

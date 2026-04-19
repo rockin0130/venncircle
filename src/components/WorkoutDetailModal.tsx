@@ -595,7 +595,10 @@ export default function WorkoutDetailModal({
           transition={{ duration: 0.2, ease: "easeOut" }}
           className="fixed inset-0 z-[80] bg-background flex flex-col"
         >
-          <div className="flex-shrink-0 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] border-b border-border bg-card">
+          <div
+            className="flex-shrink-0 border-b border-border bg-card"
+            style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
+          >
             {HeaderContent}
           </div>
           {BodyContent}

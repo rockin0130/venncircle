@@ -1219,7 +1219,7 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
             className="absolute inset-0 z-[70] bg-background flex flex-col"
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
+            <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 border-b border-border flex-shrink-0">
               <button onClick={() => setShowTzPicker(false)} className="text-sm font-medium text-primary">
                 Cancel
               </button>

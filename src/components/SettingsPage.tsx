@@ -210,7 +210,7 @@ const SettingsPage = () => {
 
   return (
     <div className="px-5">
-      <header className="pt-12 pb-6">
+      <header className="pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-6">
         <h1 className="text-[1.75rem] font-bold tracking-display">Settings</h1>
       </header>
 

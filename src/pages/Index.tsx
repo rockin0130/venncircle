@@ -5,7 +5,6 @@ import MorePage from "@/components/MorePage";
 import BottomNav, { type Tab, loadNavPages, saveNavPages, FIXED_NAV_PAGES, MAX_NAV_SLOTS } from "@/components/BottomNav";
 import HomePage from "@/components/HomePage";
 import WorkoutsPage from "@/components/WorkoutsPage";
-import NutritionPage from "@/components/NutritionPage";
 import HabitsPage from "@/components/HabitsPage";
 import CalendarPage from "@/components/CalendarPage";
 import ChatListPage from "@/components/ChatListPage";
@@ -14,7 +13,6 @@ import AiAssistantPage from "@/components/AiAssistantPage";
 import SobrietyPage from "@/components/SobrietyPage";
 
 import SettingsPage from "@/components/SettingsPage";
-import ShoppingListPage from "@/components/ShoppingListPage";
 import StudyPage from "@/components/StudyPage";
 import TodoPage from "@/components/TodoPage";
 
@@ -114,11 +112,9 @@ const Index = () => {
     // Feature gating: if current activeGroup doesn't support this feature, reset to null
     const TAB_TO_PAGE_KEY: Record<string, string> = {
       workout: "workout",
-      nutrition: "nutrition",
       habits: "habits",
       sobriety: "sobriety",
       calendar: "calendar",
-      shopping: "shopping",
       study: "study",
     };
     const pageKey = TAB_TO_PAGE_KEY[tab];
@@ -162,23 +158,19 @@ const Index = () => {
   // Map tab names to ShareablePage keys for feature gating
   const TAB_TO_PAGE: Record<string, string> = {
     workout: "workout",
-    nutrition: "nutrition",
     habits: "habits",
     sobriety: "sobriety",
-    
+
     calendar: "calendar",
-    shopping: "shopping",
     study: "study",
   };
 
   const handleNavigateToFeature = (feature: string, groupId?: string) => {
     const tabMap: Record<string, Tab> = {
       workout: "workout",
-      nutrition: "nutrition",
       habits: "habits",
       sobriety: "sobriety",
       calendar: "calendar",
-      shopping: "shopping",
       study: "study",
       todo: "todo",
     };
@@ -242,11 +234,9 @@ const Index = () => {
     ),
     friends: <FriendsPage onBack={() => setActiveTab("profile")} />,
     workout: <WorkoutsPage onOpenMore={() => setMoreOpen(true)} isActive={activeTab === "workout"} navigatedGroupId={workoutNavigatedGroupId} />,
-    nutrition: <NutritionPage onOpenMore={() => setMoreOpen(true)} />,
     habits: <HabitsPage onOpenMore={() => setMoreOpen(true)} />,
     sobriety: <SobrietyPage onOpenMore={() => setMoreOpen(true)} />,
-    
-    shopping: <ShoppingListPage onOpenMore={() => setMoreOpen(true)} />,
+
     calendar: <CalendarPage onOpenMore={() => setMoreOpen(true)} />,
     study: <StudyPage onOpenMore={() => setMoreOpen(true)} />,
     todo: <TodoPage onOpenMore={() => setMoreOpen(true)} />,

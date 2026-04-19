@@ -143,7 +143,7 @@ const GroupChallengePage = ({ groupId, groupName, enabledPages, members, userId,
   return (
     <div className="flex flex-col h-full" style={{ background: "#F4F3F0" }}>
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-12 pb-3">
+      <div className="flex items-center gap-3 px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3">
         <button onClick={onBack} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5">
           <ArrowLeft size={18} className="text-[#1a1a1a]" />
         </button>
