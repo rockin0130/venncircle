@@ -388,13 +388,14 @@ const ChatPage = ({
     return <span className="text-[13px] leading-relaxed">{msg.content}</span>;
   };
 
+  const onlineUserIds = usePresence(`group:${group.id}`);
+  const onlineMemberCount = group.members.filter((m) => m.status === "active" && (m.user_id === user?.id || onlineUserIds.has(m.user_id))).length;
+
   if (showAlbum) {
     return <ChatAlbum groupId={group.id} onBack={() => setShowAlbum(false)} />;
   }
 
   const coverUrl = group.cover_image_url;
-  const onlineUserIds = usePresence(`group:${group.id}`);
-  const onlineMemberCount = group.members.filter((m) => m.status === "active" && (m.user_id === user?.id || onlineUserIds.has(m.user_id))).length;
 
   return (
     <div className="flex flex-col h-[calc(100svh-5rem)]" style={{ backgroundColor: "#F4F3F0" }}>
