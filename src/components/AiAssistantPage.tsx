@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Send, Mic, MicOff, Sparkles, Loader2, ArrowLeft, CheckCircle2, XCircle, Check, Image as ImageIcon, Camera, X, Menu, Plus, MoreHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { pickFromGallery, takePhoto } from "@/integrations/camera";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
 import { toast } from "sonner";
@@ -85,8 +86,6 @@ const AiAssistantPage = ({ onBack, onOpenMore }: { onBack?: () => void; onOpenMo
   const [voiceActive, setVoiceActive] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Conversation threading state
   const [currentConversation, setCurrentConversation] = useState<AiConversation | null>(null);
@@ -527,9 +526,7 @@ const AiAssistantPage = ({ onBack, onOpenMore }: { onBack?: () => void; onOpenMo
     }
   };
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const applyPickedImage = (file: File) => {
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file");
       return;
@@ -848,14 +845,26 @@ const AiAssistantPage = ({ onBack, onOpenMore }: { onBack?: () => void; onOpenMo
                     className="absolute bottom-12 left-0 z-40 bg-card border border-border rounded-xl shadow-lg overflow-hidden w-48"
                   >
                     <button
-                      onClick={() => cameraInputRef.current?.click()}
+                      type="button"
+                      onClick={() => {
+                        void (async () => {
+                          const file = await takePhoto();
+                          if (file) applyPickedImage(file);
+                        })();
+                      }}
                       className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary transition-colors"
                     >
                       <Camera size={16} className="text-primary" />
                       Take Photo
                     </button>
                     <button
-                      onClick={() => fileInputRef.current?.click()}
+                      type="button"
+                      onClick={() => {
+                        void (async () => {
+                          const file = await pickFromGallery();
+                          if (file) applyPickedImage(file);
+                        })();
+                      }}
                       className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary transition-colors border-t border-border/50"
                     >
                       <ImageIcon size={16} className="text-primary" />
@@ -866,23 +875,6 @@ const AiAssistantPage = ({ onBack, onOpenMore }: { onBack?: () => void; onOpenMo
               )}
             </AnimatePresence>
           </div>
-
-          {/* Hidden file inputs */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleImageSelect}
-          />
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handleImageSelect}
-          />
 
           {speechSupported && (
             <button

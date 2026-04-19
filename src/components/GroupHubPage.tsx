@@ -9,6 +9,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { pickFromGallery } from "@/integrations/camera";
+import { Capacitor } from "@capacitor/core";
 import GroupFeedCompose from "@/components/GroupFeedCompose";
 import GroupFeedPost from "@/components/GroupFeedPost";
 import LeaveGroupFlow from "@/components/LeaveGroupFlow";
@@ -253,6 +255,15 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
     e.target.value = "";
   };
 
+  const openCoverPicker = async () => {
+    if (Capacitor.isNativePlatform()) {
+      const file = await pickFromGallery();
+      if (file) void handleCoverUpload(file);
+      return;
+    }
+    coverInputRef.current?.click();
+  };
+
   if (showChallengePage) {
     return (
       <GroupChallengePage
@@ -281,7 +292,9 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
         ) : (
           <div
             className={`w-full h-full bg-gradient-to-br ${COVER_GRADIENTS[coverGradientIdx]} flex flex-col items-center justify-center gap-1 cursor-pointer`}
-            onClick={() => isOwner && coverInputRef.current?.click()}
+            onClick={() => {
+              if (isOwner) void openCoverPicker();
+            }}
           >
             <Camera size={18} className="text-muted-foreground/50" />
             <span className="text-[10px] text-muted-foreground/50 font-medium">Add cover photo</span>
@@ -300,7 +313,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
         {/* Edit cover pill — top right, admin only */}
         {isOwner && coverUrl && (
           <button
-            onClick={() => coverInputRef.current?.click()}
+            onClick={() => void openCoverPicker()}
             className="absolute top-10 right-3 px-2.5 py-1 rounded-full text-[10px] font-medium text-white z-10 flex items-center gap-1"
             style={{ background: "rgba(255,255,255,0.2)", backdropFilter: "blur(8px)" }}
           >

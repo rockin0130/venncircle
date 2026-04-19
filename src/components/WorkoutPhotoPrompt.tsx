@@ -1,8 +1,9 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Camera, X, RotateCcw, Send, Loader2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
+import { takePhoto } from "@/integrations/camera";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { Workout } from "@/context/AppContext";
@@ -41,8 +42,6 @@ const WorkoutPhotoPrompt = ({ open, workout, onClose, onPhotoSent }: Props) => {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [dontAskToday, setDontAskToday] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const reset = () => {
     setStep("ask");
     setPhotoBlob(null);
@@ -56,25 +55,19 @@ const WorkoutPhotoPrompt = ({ open, workout, onClose, onPhotoSent }: Props) => {
     onClose();
   };
 
-  const openCamera = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const openCamera = async () => {
+    const file = await takePhoto();
     if (!file) return;
     setPhotoBlob(file);
     setPhotoPreview(URL.createObjectURL(file));
     setStep("preview");
-    // Reset the input so the same file can be re-selected
-    e.target.value = "";
   };
 
   const handleRetake = () => {
     if (photoPreview) URL.revokeObjectURL(photoPreview);
     setPhotoBlob(null);
     setPhotoPreview(null);
-    openCamera();
+    void openCamera();
   };
 
   const handleSend = async () => {
@@ -129,16 +122,6 @@ const WorkoutPhotoPrompt = ({ open, workout, onClose, onPhotoSent }: Props) => {
 
   return (
     <>
-      {/* Hidden file input for camera capture */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleFileCapture}
-      />
-
       <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
         <DialogContent className="max-w-sm p-0 overflow-hidden rounded-2xl">
           {step === "ask" && (
@@ -167,7 +150,11 @@ const WorkoutPhotoPrompt = ({ open, workout, onClose, onPhotoSent }: Props) => {
                   Not now
                 </button>
                 <button
-                  onClick={() => { if (dontAskToday) suppressForToday(); openCamera(); }}
+                  type="button"
+                  onClick={() => {
+                    if (dontAskToday) suppressForToday();
+                    void openCamera();
+                  }}
                   className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
                 >
                   <Camera size={16} /> Take Photo

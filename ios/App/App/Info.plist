@@ -30,6 +30,10 @@
 	<string>Access your health data to sync workouts</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Save workout data to Apple Health</string>
+	<key>NSCameraUsageDescription</key>
+	<string>VennCircle needs camera access to take photos</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>VennCircle needs photo library access to share photos</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

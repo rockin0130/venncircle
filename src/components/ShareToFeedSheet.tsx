@@ -1,8 +1,9 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { X, Camera, Image as ImageIcon, Loader2 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { pickFromGallery } from "@/integrations/camera";
 
 interface ShareToFeedSheetProps {
   open: boolean;
@@ -32,19 +33,23 @@ const ShareToFeedSheet = ({
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [posting, setPosting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    const newFiles = files.slice(0, 3 - photos.length);
-    setPhotos((prev) => [...prev, ...newFiles]);
-    newFiles.forEach((f) => {
+  const appendPhotoFiles = (newFiles: File[]) => {
+    if (newFiles.length === 0) return;
+    const slice = newFiles.slice(0, 3 - photos.length);
+    setPhotos((prev) => [...prev, ...slice]);
+    slice.forEach((f) => {
       const reader = new FileReader();
       reader.onload = (ev) =>
         setPhotoPreviews((prev) => [...prev, ev.target?.result as string]);
       reader.readAsDataURL(f);
     });
+  };
+
+  const handleAddPhoto = async () => {
+    if (photos.length >= 3) return;
+    const file = await pickFromGallery();
+    if (file) appendPhotoFiles([file]);
   };
 
   const removePhoto = (idx: number) => {
@@ -188,21 +193,14 @@ const ShareToFeedSheet = ({
         {/* Add photo button */}
         {photos.length < 3 && (
           <button
-            onClick={() => fileInputRef.current?.click()}
+            type="button"
+            onClick={() => void handleAddPhoto()}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
           >
             <Camera size={16} />
             <span className="font-medium">Add a photo</span>
           </button>
         )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={handlePhotoSelect}
-        />
 
         {/* Actions */}
         <div className="flex gap-3">

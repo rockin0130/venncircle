@@ -6,6 +6,8 @@ import FriendRow from "@/components/FriendRow";
 import { Group, useAuth, PAGE_LABELS, PAGE_ICONS, ShareablePage, SHAREABLE_PAGES } from "@/context/AuthContext";
 import { useFriendships } from "@/hooks/useFriendships";
 import { supabase } from "@/integrations/supabase/client";
+import { pickFromGallery } from "@/integrations/camera";
+import { Capacitor } from "@capacitor/core";
 import { toast } from "@/hooks/use-toast";
 import GroupFeedPost from "@/components/GroupFeedPost";
 
@@ -323,9 +325,15 @@ const LauncherPage = ({ onEnterGroup, onCreateGroup, onOpenSettings }: LauncherP
     }
   };
 
-  const triggerFileInput = (groupId: string, e: React.MouseEvent) => {
+  const triggerFileInput = async (groupId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     pendingGroupIdRef.current = groupId;
+    if (Capacitor.isNativePlatform()) {
+      const file = await pickFromGallery();
+      if (file && pendingGroupIdRef.current === groupId) void handleCoverUpload(groupId, file);
+      pendingGroupIdRef.current = null;
+      return;
+    }
     fileInputRef.current?.click();
   };
 
