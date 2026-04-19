@@ -152,11 +152,11 @@ const AddItemModal = ({ open, onClose }: AddItemModalProps) => {
           exit={{ y: "100%" }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
           className="w-full max-w-md bg-card rounded-t-2xl border-t border-border flex flex-col"
-          style={{ maxHeight: "calc(100vh - 2rem)" }}
+          style={{ maxHeight: "calc(100dvh - env(safe-area-inset-top, 0px) - 1rem)" }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Fixed header */}
-          <div className="flex items-center justify-between p-5 pb-3 flex-shrink-0">
+          <div className="flex items-center justify-between px-5 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 flex-shrink-0">
             <h2 className="text-lg font-bold tracking-display">
               {step === "choose" ? "Add New" : step === "calendar" ? (isTodoMode ? "New To Do" : "Schedule Event") : "New Habit"}
             </h2>

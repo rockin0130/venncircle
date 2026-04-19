@@ -672,7 +672,7 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
               style={{ width: 280, height: 280, border: "2px solid rgba(255,255,255,0.5)" }}
             />
           </div>
-          <div className="flex items-center justify-between px-6 pb-10 pt-4">
+          <div className="flex items-center justify-between px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] pt-4">
             <button
               onClick={() => { setShowCropEditor(false); setSelectedImage(null); setSelectedFile(null); }}
               style={{ fontSize: 16, fontWeight: 500, color: "#fff", padding: "10px 28px", borderRadius: 12, background: "rgba(255,255,255,0.15)" }}

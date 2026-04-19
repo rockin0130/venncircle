@@ -82,7 +82,7 @@ const ShoppingDestinationSheet = ({ open, groupName, ingredientCount, shoppingGr
               </button>
             </div>
 
-            <div className="flex-shrink-0 px-5 pb-6 pt-3 flex gap-2">
+            <div className="flex-shrink-0 px-5 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] pt-3 flex gap-2">
               <button onClick={onDismiss} className="flex-1 py-2.5 rounded-xl bg-secondary text-foreground text-sm font-semibold">
                 Cancel
               </button>

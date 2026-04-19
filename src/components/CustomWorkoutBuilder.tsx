@@ -254,11 +254,11 @@ const CustomWorkoutBuilder = ({ open, onClose, onAdd, selectedDate, recentWorkou
           exit={{ y: "100%" }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
           className="w-full max-w-md bg-card rounded-t-2xl border-t border-border flex flex-col"
-          style={{ maxHeight: "calc(100vh - 2rem)" }}
+          style={{ maxHeight: "calc(100dvh - env(safe-area-inset-top, 0px) - 1rem)" }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 pb-2 flex-shrink-0">
+          <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-2 flex-shrink-0">
             <h2 className="text-lg font-bold tracking-display">{headerTitle}</h2>
             <button onClick={handleClose} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
               <X size={16} />
