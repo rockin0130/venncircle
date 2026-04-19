@@ -287,7 +287,7 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
   return (
     <div className="px-3 pb-28" style={{ background: "#F4F3F0" }}>
       {/* ─── Header ─── */}
-      <header className="pt-12 pb-4 flex items-center justify-between">
+      <header className="pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-4 flex items-center justify-between">
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", fontFamily: "'DM Sans', sans-serif" }}>
           Profile
         </h1>
@@ -632,7 +632,7 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
       {/* Crop / position editor */}
       {showCropEditor && selectedImage && (
         <div className="fixed inset-0 z-[10000] flex flex-col" style={{ background: "#000" }}>
-          <div className="flex items-center justify-between px-4 pt-12 pb-3">
+          <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3">
             <p style={{ fontSize: 17, fontWeight: 600, color: "#fff" }}>Move and Scale</p>
             <button onClick={() => { setShowCropEditor(false); setSelectedImage(null); setSelectedFile(null); }}>
               <X size={22} color="#fff" />
