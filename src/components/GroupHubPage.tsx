@@ -13,6 +13,7 @@ import GroupFeedCompose from "@/components/GroupFeedCompose";
 import GroupFeedPost from "@/components/GroupFeedPost";
 import LeaveGroupFlow from "@/components/LeaveGroupFlow";
 import { useFriendships } from "@/hooks/useFriendships";
+import { usePresence } from "@/hooks/usePresence";
 
 interface GroupHubPageProps {
   group: Group;
@@ -89,6 +90,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
 
   const currentGroup = groups.find((g) => g.id === group.id) || group;
   const currentActiveMembers = currentGroup.members.filter((m) => m.status === "active");
+  const onlineUserIds = usePresence(`group:${currentGroup.id}`);
   const myMember = currentActiveMembers.find((m) => m.user_id === user?.id);
   const isAdmin = myMember?.role === "admin";
   const isOwner = user?.id === group.created_by;
@@ -334,6 +336,7 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
             {currentActiveMembers.map((m, i) => {
               const isMe = m.user_id === user?.id;
               const name = isMe ? "Mine" : (m.display_name || "Member").split(" ")[0];
+              const isOnline = isMe || onlineUserIds.has(m.user_id);
               return (
                 <button key={m.user_id} onClick={() => handleMemberTap(m)} className="flex flex-col items-center gap-1 shrink-0">
                   <div className="relative">
@@ -342,7 +345,9 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
                         {(m.display_name || "?")[0].toUpperCase()}
                       </div>
                     </div>
-                    <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[hsl(142,70%,45%)] border-2 border-background" />
+                    {isOnline && (
+                      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[hsl(142,70%,45%)] border-2 border-background" />
+                    )}
                   </div>
                   <span className="text-[11px] text-muted-foreground font-medium truncate max-w-[56px]">{name}</span>
                 </button>

@@ -2,7 +2,7 @@ import { Home, Compass, MessageCircle, User } from "lucide-react";
 import VennIcon from "@/components/VennIcon";
 
 export type Tab =
-  | "home" | "shared-interests" | "ai" | "chat" | "profile"
+  | "home" | "shared-interests" | "ai" | "chat" | "profile" | "friends"
   | "workout" | "habits" | "sobriety" | "nutrition"
   | "calendar" | "shopping" | "study" | "todo" | "more" | "settings";
 

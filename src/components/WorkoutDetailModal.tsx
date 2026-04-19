@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { X, Clock, Flame, Footprints, ArrowRight, CalendarDays, Trash2, Dumbbell, Target, Pencil, Plus, Check, ChevronUp, ChevronDown, ArrowLeft, Save } from "lucide-react";
+import { X, Clock, Flame, Footprints, ArrowRight, CalendarDays, Trash2, Dumbbell, Target, Pencil, Plus, Check, ChevronUp, ChevronDown, ArrowLeft, Save, ArrowUp, ArrowDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Calendar } from "@/components/ui/calendar";
 import { isCardioWorkout, Workout } from "@/context/AppContext";
@@ -31,6 +31,14 @@ interface WorkoutDetailModalProps {
   readOnly?: boolean;
   progress?: number;
   onCopyWorkout?: (workout: Workout, scheduledDate: string, groupIds: (string | null)[]) => void;
+  /** Render as a full-screen page instead of a bottom sheet. */
+  fullscreen?: boolean;
+  /** Update the workout title (used in fullscreen edit mode). */
+  onUpdateTitle?: (id: string, title: string) => void;
+  /** Update the workout emoji (used in fullscreen edit mode). */
+  onUpdateEmoji?: (id: string, emoji: string) => void;
+  /** Reorder exercises within the workout. */
+  onReorderExercises?: (workoutId: string, exercises: { name: string; sets: number; reps: string }[]) => void;
 }
 
 const DISTANCE_ACTIVITIES = ["running", "cycling", "walking", "swimming"];
@@ -132,6 +140,10 @@ export default function WorkoutDetailModal({
   readOnly,
   progress,
   onCopyWorkout,
+  fullscreen,
+  onUpdateTitle,
+  onUpdateEmoji,
+  onReorderExercises,
 }: WorkoutDetailModalProps) {
   const { user } = useAuth();
   const [mode, setMode] = useState<ModalMode>("overview");
@@ -145,6 +157,10 @@ export default function WorkoutDetailModal({
   const [distUnit, setDistUnit] = useState(workout.distanceUnit || "km");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showAddLibrary, setShowAddLibrary] = useState(false);
+  // Edit mode (fullscreen only): edit title + emoji + reorder exercises
+  const [editMode, setEditMode] = useState(false);
+  const [titleInput, setTitleInput] = useState(workout.title);
+  const [emojiInput, setEmojiInput] = useState(workout.emoji);
 
   // Log Weights state
   const [logs, setLogs] = useState<ExerciseLog[]>([]);
@@ -173,8 +189,32 @@ export default function WorkoutDetailModal({
       setMode("overview");
       setLogsLoaded(false);
       setCalOverride(null);
+      setEditMode(false);
+      setTitleInput(workout.title);
+      setEmojiInput(workout.emoji);
     }
-  }, [open, workout.id]);
+  }, [open, workout.id, workout.title, workout.emoji]);
+
+  // Move an exercise up or down by one slot.
+  const reorderExercise = (index: number, direction: -1 | 1) => {
+    if (!onReorderExercises || readOnly) return;
+    const list = [...(workout.exercises || [])];
+    const target = index + direction;
+    if (target < 0 || target >= list.length) return;
+    [list[index], list[target]] = [list[target], list[index]];
+    onReorderExercises(workout.id, list);
+  };
+
+  // Save title/emoji changes when leaving edit mode.
+  const saveEditMode = () => {
+    if (titleInput.trim() && titleInput !== workout.title && onUpdateTitle) {
+      onUpdateTitle(workout.id, titleInput.trim());
+    }
+    if (emojiInput && emojiInput !== workout.emoji && onUpdateEmoji) {
+      onUpdateEmoji(workout.id, emojiInput);
+    }
+    setEditMode(false);
+  };
 
   // --- Log Weights data loading ---
   const exercises = workout.exercises || [];
@@ -375,6 +415,196 @@ export default function WorkoutDetailModal({
 
   if (!open) return null;
 
+  // ===== Shared header =====
+  const HeaderContent = (
+    <div className="flex items-center justify-between px-5 pb-3">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {(mode === "log" || (fullscreen && editMode)) && (
+          <button
+            onClick={() => (mode === "log" ? setMode("overview") : saveEditMode())}
+            className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center mr-1 flex-shrink-0"
+            aria-label="Back"
+          >
+            <ArrowLeft size={16} />
+          </button>
+        )}
+        {fullscreen && editMode && !readOnly ? (
+          <>
+            <input
+              value={emojiInput}
+              onChange={(e) => setEmojiInput(e.target.value.slice(0, 4))}
+              maxLength={4}
+              className="text-3xl w-14 text-center bg-secondary rounded-lg outline-none border border-border focus:border-primary"
+              aria-label="Workout emoji"
+            />
+            <input
+              value={titleInput}
+              onChange={(e) => setTitleInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && saveEditMode()}
+              autoFocus
+              className="flex-1 min-w-0 text-lg font-bold bg-transparent outline-none border-b border-primary py-1"
+              aria-label="Workout title"
+            />
+          </>
+        ) : (
+          <>
+            <span className="text-3xl flex-shrink-0">{workout.emoji}</span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold truncate">{workout.title}</h2>
+              <div className="flex items-center gap-2">
+                {workout.tag && (
+                  <span className="text-[11px] font-semibold text-tag-work-text bg-tag-work px-2 py-0.5 rounded-md">{workout.tag}</span>
+                )}
+                <GroupBadge groupId={workout.groupId} />
+                {mode === "log" && (
+                  <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md">Log Mode</span>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {fullscreen && !readOnly && mode === "overview" && !editMode && (
+          <button
+            onClick={() => setEditMode(true)}
+            className="h-8 px-3 rounded-full bg-secondary flex items-center gap-1 text-xs font-semibold hover:bg-accent transition-colors"
+            aria-label="Edit workout"
+          >
+            <Pencil size={12} /> Edit
+          </button>
+        )}
+        {fullscreen && editMode && !readOnly && (
+          <button
+            onClick={saveEditMode}
+            className="h-8 px-3 rounded-full bg-primary text-primary-foreground flex items-center gap-1 text-xs font-semibold"
+          >
+            <Check size={14} /> Done
+          </button>
+        )}
+        <button onClick={onClose} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center" aria-label="Close">
+          {fullscreen ? <ArrowLeft size={16} /> : <X size={16} />}
+        </button>
+      </div>
+    </div>
+  );
+
+  // ===== Shared body =====
+  const BodyContent = (
+    <div className={cn(
+      "overflow-y-auto flex-1 px-5",
+      fullscreen ? "pb-[calc(2rem+env(safe-area-inset-bottom,0px))]" : "pb-[calc(1rem+env(safe-area-inset-bottom,0px))]"
+    )}>
+      {mode === "overview" ? (
+        <OverviewContent
+          workout={workout}
+          showDist={showDist}
+          hasExercises={!!hasExercises}
+          readOnly={readOnly}
+          durationMinutes={durationMinutes}
+          stepDuration={stepDuration}
+          onSaveDurationMinutes={(mins: number) => { setDurationMinutes(mins); onUpdateDuration(workout.id, formatMinutes(mins)); }}
+          editingCal={editingCal}
+          setEditingCal={setEditingCal}
+          calInput={calInput}
+          setCalInput={setCalInput}
+          saveCal={saveCal}
+          editingDist={editingDist}
+          setEditingDist={setEditingDist}
+          distInput={distInput}
+          setDistInput={setDistInput}
+          distUnit={distUnit}
+          toggleDistUnit={toggleDistUnit}
+          saveDist={saveDist}
+          showDatePicker={showDatePicker}
+          setShowDatePicker={setShowDatePicker}
+          showAddLibrary={showAddLibrary}
+          setShowAddLibrary={setShowAddLibrary}
+          onClose={onClose}
+          onRemove={onRemove}
+          onMoveToTomorrow={onMoveToTomorrow}
+          onMoveToDate={onMoveToDate}
+          onEditExercise={onEditExercise}
+          onDeleteExercise={onDeleteExercise}
+          onAddExercises={onAddExercises}
+          onSelectExercise={onSelectExercise}
+          enterLogMode={enterLogMode}
+          onCopyWorkout={onCopyWorkout}
+          editMode={fullscreen && editMode}
+          reorderExercise={reorderExercise}
+        />
+      ) : (
+        <LogWeightsContent
+          workout={workout}
+          exercises={exercises}
+          logs={logs}
+          logsLoaded={logsLoaded}
+          weightUnit={weightUnit}
+          toggleWeightUnit={toggleWeightUnit}
+          expandedExercise={expandedExercise}
+          setExpandedExercise={setExpandedExercise}
+          logProgress={logProgress}
+          estimatedCal={estimatedCal}
+          calOverride={calOverride}
+          setCalOverride={setCalOverride}
+          lastWeights={lastWeights}
+          readOnly={readOnly}
+          updateLog={updateLog}
+          getExerciseLogs={getExerciseLogs}
+          getExerciseCompletion={getExerciseCompletion}
+          saveLogs={saveLogs}
+          logSaving={logSaving}
+          setHistoryExercise={setHistoryExercise}
+        />
+      )}
+    </div>
+  );
+
+  const SheetsContent = (
+    <>
+      {showAddLibrary && (
+        <ExerciseLibrarySheet
+          open={showAddLibrary}
+          onClose={() => setShowAddLibrary(false)}
+          onSelectMultiple={(names) => {
+            const newExercises = names.map(name => ({ name, sets: 3, reps: "10" }));
+            onAddExercises(workout.id, newExercises);
+            setShowAddLibrary(false);
+          }}
+          excludeNames={workout.exercises?.map(e => e.name) || []}
+        />
+      )}
+      <ExerciseHistorySheet
+        open={!!historyExercise}
+        onClose={() => setHistoryExercise(null)}
+        exerciseName={historyExercise ? normalizeExerciseName(historyExercise) : ""}
+      />
+    </>
+  );
+
+  // ===== Fullscreen page render =====
+  if (fullscreen) {
+    return (
+      <AnimatePresence>
+        <motion.div
+          key="workout-fullscreen"
+          initial={{ opacity: 0, x: 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 24 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="fixed inset-0 z-[80] bg-background flex flex-col"
+        >
+          <div className="flex-shrink-0 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] border-b border-border bg-card">
+            {HeaderContent}
+          </div>
+          {BodyContent}
+          {SheetsContent}
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
+  // ===== Bottom-sheet render (legacy) =====
   return (
     <AnimatePresence>
       {open && (
@@ -394,121 +624,12 @@ export default function WorkoutDetailModal({
             style={{ maxHeight: "85vh" }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Handle bar */}
             <div className="flex justify-center pt-2 pb-1">
               <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
             </div>
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 pb-3">
-              <div className="flex items-center gap-3">
-                {mode === "log" && (
-                  <button onClick={() => setMode("overview")} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center mr-1">
-                    <ArrowLeft size={16} />
-                  </button>
-                )}
-                <span className="text-3xl">{workout.emoji}</span>
-                <div>
-                  <h2 className="text-lg font-bold">{workout.title}</h2>
-                  <div className="flex items-center gap-2">
-                    {workout.tag && (
-                      <span className="text-[11px] font-semibold text-tag-work-text bg-tag-work px-2 py-0.5 rounded-md">{workout.tag}</span>
-                    )}
-                    <GroupBadge groupId={workout.groupId} />
-                    {mode === "log" && (
-                      <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md">Log Mode</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <button onClick={onClose} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto flex-1 px-5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
-              {mode === "overview" ? (
-                <OverviewContent
-                  workout={workout}
-                  showDist={showDist}
-                  hasExercises={!!hasExercises}
-                  readOnly={readOnly}
-                  durationMinutes={durationMinutes}
-                  stepDuration={stepDuration}
-                  onSaveDurationMinutes={(mins: number) => { setDurationMinutes(mins); onUpdateDuration(workout.id, formatMinutes(mins)); }}
-                  editingCal={editingCal}
-                  setEditingCal={setEditingCal}
-                  calInput={calInput}
-                  setCalInput={setCalInput}
-                  saveCal={saveCal}
-                  editingDist={editingDist}
-                  setEditingDist={setEditingDist}
-                  distInput={distInput}
-                  setDistInput={setDistInput}
-                  distUnit={distUnit}
-                  toggleDistUnit={toggleDistUnit}
-                  saveDist={saveDist}
-                  showDatePicker={showDatePicker}
-                  setShowDatePicker={setShowDatePicker}
-                  showAddLibrary={showAddLibrary}
-                  setShowAddLibrary={setShowAddLibrary}
-                  onClose={onClose}
-                  onRemove={onRemove}
-                  onMoveToTomorrow={onMoveToTomorrow}
-                  onMoveToDate={onMoveToDate}
-                  onEditExercise={onEditExercise}
-                  onDeleteExercise={onDeleteExercise}
-                  onAddExercises={onAddExercises}
-                  onSelectExercise={onSelectExercise}
-                  enterLogMode={enterLogMode}
-                  onCopyWorkout={onCopyWorkout}
-                />
-              ) : (
-                <LogWeightsContent
-                  workout={workout}
-                  exercises={exercises}
-                  logs={logs}
-                  logsLoaded={logsLoaded}
-                  weightUnit={weightUnit}
-                  toggleWeightUnit={toggleWeightUnit}
-                  expandedExercise={expandedExercise}
-                  setExpandedExercise={setExpandedExercise}
-                  logProgress={logProgress}
-                  estimatedCal={estimatedCal}
-                  calOverride={calOverride}
-                  setCalOverride={setCalOverride}
-                  lastWeights={lastWeights}
-                  readOnly={readOnly}
-                  updateLog={updateLog}
-                  getExerciseLogs={getExerciseLogs}
-                  getExerciseCompletion={getExerciseCompletion}
-                  saveLogs={saveLogs}
-                  logSaving={logSaving}
-                  setHistoryExercise={setHistoryExercise}
-                />
-              )}
-            </div>
-
-            {/* Exercise Library */}
-            {showAddLibrary && (
-              <ExerciseLibrarySheet
-                open={showAddLibrary}
-                onClose={() => setShowAddLibrary(false)}
-                onSelectMultiple={(names) => {
-                  const newExercises = names.map(name => ({ name, sets: 3, reps: "10" }));
-                  onAddExercises(workout.id, newExercises);
-                  setShowAddLibrary(false);
-                }}
-                excludeNames={workout.exercises?.map(e => e.name) || []}
-              />
-            )}
-
-            {/* Exercise History Sheet */}
-            <ExerciseHistorySheet
-              open={!!historyExercise}
-              onClose={() => setHistoryExercise(null)}
-              exerciseName={historyExercise ? normalizeExerciseName(historyExercise) : ""}
-            />
+            {HeaderContent}
+            {BodyContent}
+            {SheetsContent}
           </motion.div>
         </motion.div>
       )}
@@ -526,6 +647,7 @@ function OverviewContent({
   onClose, onRemove, onMoveToTomorrow, onMoveToDate,
   onEditExercise, onDeleteExercise, onAddExercises, onSelectExercise,
   enterLogMode, onCopyWorkout,
+  editMode, reorderExercise,
 }: any) {
   const [editingDuration, setEditingDuration] = useState(false);
   const [durationText, setDurationText] = useState("");
@@ -729,7 +851,27 @@ function OverviewContent({
                   </div>
                 </button>
                 {!readOnly && (
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 items-center">
+                    {editMode && reorderExercise && (
+                      <>
+                        <button
+                          onClick={() => reorderExercise(i, -1)}
+                          disabled={i === 0}
+                          className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                          aria-label="Move exercise up"
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button
+                          onClick={() => reorderExercise(i, 1)}
+                          disabled={i === workout.exercises!.length - 1}
+                          className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                          aria-label="Move exercise down"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={() => onEditExercise(workout.id, i, ex)}
                       className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"

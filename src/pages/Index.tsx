@@ -24,6 +24,7 @@ import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
 import SharedInterestsPage from "@/components/SharedInterestsPage";
 import GroupHubPage from "@/components/GroupHubPage";
 import ProfilePage from "@/components/ProfilePage";
+import FriendsPage from "@/components/FriendsPage";
 import AppDrawer from "@/components/AppDrawer";
 import DrawerMenuButton from "@/components/DrawerMenuButton";
 import FloatingAiBar from "@/components/FloatingAiBar";
@@ -239,6 +240,7 @@ const Index = () => {
         onOpenMore={() => setMoreOpen(true)}
       />
     ),
+    friends: <FriendsPage onBack={() => setActiveTab("profile")} />,
     workout: <WorkoutsPage onOpenMore={() => setMoreOpen(true)} isActive={activeTab === "workout"} navigatedGroupId={workoutNavigatedGroupId} />,
     nutrition: <NutritionPage onOpenMore={() => setMoreOpen(true)} />,
     habits: <HabitsPage onOpenMore={() => setMoreOpen(true)} />,

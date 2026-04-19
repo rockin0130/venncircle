@@ -13,7 +13,7 @@ import TaskActionMenu from "@/components/TaskActionMenu";
 import AddItemModal from "@/components/AddItemModal";
 import CongratsPopup from "@/components/CongratsPopup";
 import HomeSectionCustomizer, { loadSectionPrefs, saveSectionPrefs, buildAllSections } from "@/components/HomeSectionCustomizer";
-import { HomeWaterWidget, HomeWorkoutWidget, HomeSobrietyWidget, HomeHabitSectionWidget, HomeNutritionWidget, HomeShoppingWidget, HomeStudyWidget } from "@/components/HomeWidgets";
+import { HomeWaterWidget, HomeWorkoutWidget, HomeSobrietyWidget, HomeHabitSectionWidget, HomeStudyWidget } from "@/components/HomeWidgets";
 import HomeScheduledSection from "@/components/HomeScheduledSection";
 import type { HabitSectionMeta } from "@/lib/habitSections";
 import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
@@ -55,18 +55,6 @@ const QUICK_ACCESS_FEATURES = [
       <circle cx="12" cy="8" r="6" />
       <path d="M9 14l-2 8" /><path d="M15 14l2 8" />
       <path d="M8 22h8" />
-    </svg>
-  )},
-  { id: "shopping", label: "Shopping", page: "shopping", icon: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
-      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-    </svg>
-  )},
-  { id: "nutrition", label: "Nutrition", page: "nutrition", icon: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2c-3 0-6 3-6 8s3 12 6 12 6-7 6-12-3-8-6-8z" />
-      <path d="M12 2c0 0 2-1 3 0s1 3 0 4" />
     </svg>
   )},
   { id: "study", label: "Study", page: "study", icon: (
@@ -965,11 +953,8 @@ const HomePage = ({ onBackToLauncher, onOpenSettings, onNavigate }: { onBackToLa
               case "water":
                 return null;
 
-              case "nutrition":
               case "workout":
               case "sobriety":
-              
-              case "shopping":
                 return null;
 
               case "study":
