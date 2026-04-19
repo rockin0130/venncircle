@@ -163,7 +163,7 @@ const ChatAlbum = ({
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            <div className="flex items-center justify-between px-4 pt-12 pb-3 shrink-0">
+            <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 shrink-0">
               <button onClick={() => setViewerIndex(null)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white">
                 <X size={22} />
               </button>

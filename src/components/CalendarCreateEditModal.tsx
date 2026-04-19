@@ -692,7 +692,7 @@ const CalendarCreateEditModal = ({ open, onClose, editItem, defaultDate, context
         className="absolute inset-0 z-[60] bg-background flex flex-col"
       >
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
+        <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 border-b border-border flex-shrink-0">
           <button onClick={handleClose} className="text-sm font-medium text-primary">
             Cancel
           </button>

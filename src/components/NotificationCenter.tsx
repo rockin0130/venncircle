@@ -136,9 +136,9 @@ const NotificationCenter = ({ open, onClose }: Props) => {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute top-0 left-0 right-0 max-w-md mx-auto bg-card border-b border-border shadow-lg max-h-[80vh] overflow-y-auto scroll-smooth-touch rounded-b-2xl"
+          className="absolute top-0 left-0 right-0 max-w-md mx-auto bg-card border-b border-border shadow-lg max-h-[80vh] overflow-y-auto scroll-smooth-touch rounded-b-2xl pt-[env(safe-area-inset-top,0px)]"
         >
-          <div className="sticky top-0 bg-card/95 backdrop-blur-sm border-b border-border/50 px-5 py-4 flex items-center justify-between">
+          <div className="sticky top-[env(safe-area-inset-top,0px)] bg-card/95 backdrop-blur-sm border-b border-border/50 px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bell size={18} className="text-foreground" />
               <h2 className="text-lg font-bold" style={{ fontFamily: "'Georgia', serif", color: "hsl(25, 30%, 30%)" }}>
