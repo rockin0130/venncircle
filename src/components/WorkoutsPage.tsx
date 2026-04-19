@@ -1332,6 +1332,7 @@ const WorkoutsPage = ({
                             onCopyWorkout={handleCopyWorkout}
                             accentBorder={colColor.border}
                             compact
+                            onOpenDetail={setSelectedWorkout}
                           />
                         );
                       })
@@ -1381,6 +1382,7 @@ const WorkoutsPage = ({
                       readOnly={(!!w.ownerUserId && w.ownerUserId !== user?.id) || w.id.startsWith("hk-")}
                       progress={workoutProgress[w.id]?.progress}
                       onCopyWorkout={handleCopyWorkout}
+                      onOpenDetail={setSelectedWorkout}
                     />
                   ))}
                 </div>
