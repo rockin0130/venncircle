@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { X, Clock, Flame, Footprints, ArrowRight, CalendarDays, Trash2, Dumbbell, Target, Pencil, Plus, Check, ChevronUp, ChevronDown, ArrowLeft, Save } from "lucide-react";
+import { X, Clock, Flame, Footprints, ArrowRight, CalendarDays, Trash2, Dumbbell, Target, Pencil, Plus, Check, ChevronUp, ChevronDown, ArrowLeft, Save, ArrowUp, ArrowDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Calendar } from "@/components/ui/calendar";
 import { isCardioWorkout, Workout } from "@/context/AppContext";
