@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Sun, CloudSun, Moon, Clock, Check, CalendarDays, ChevronRight, Droplets, Dumbbell } from "lucide-react";
 import { useAuth, GroupMember } from "@/context/AuthContext";
-import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent, Workout } from "@/context/AppContext";
-import WorkoutDetailModal from "@/components/WorkoutDetailModal";
+import { useAppContext, Task, ScheduledEvent, GoogleCalendarEvent } from "@/context/AppContext";
 import { formatTime } from "@/lib/formatTime";
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
@@ -219,8 +218,7 @@ const HomeScheduledSection = ({
   showWater = false,
 }: Props) => {
   const { groups, activeGroup, user, profile } = useAuth();
-  const { filteredHabits, toggleHabit, getHabitStreak, getWorkoutsForDate, toggleWorkout, removeWorkout, updateWorkout, rescheduleWorkout } = useAppContext();
-  const [detailWorkout, setDetailWorkout] = useState<Workout | null>(null);
+  const { filteredHabits, toggleHabit, getHabitStreak, getWorkoutsForDate } = useAppContext();
 
   // Build a unified FilterUser list from all groups (same approach as Calendar's useCalendarFilterUsers in "All" mode)
   const allFilterUsers = useMemo<FilterUser[]>(() => {
@@ -569,7 +567,7 @@ const HomeScheduledSection = ({
                     return (
                       <button
                         key={workout.id}
-                        onClick={() => setDetailWorkout(workout)}
+                        onClick={() => onNavigate?.("workout")}
                         className={cn(
                           "w-full text-left rounded-xl bg-card border active:scale-[0.99] transition-all",
                           workout.done && "opacity-45"
