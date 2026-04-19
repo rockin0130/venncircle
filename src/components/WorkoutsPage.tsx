@@ -1713,7 +1713,7 @@ const WorkoutCard = ({
         )}
       </motion.div>
 
-      {/* Detail Modal */}
+      {/* Detail Page (full-screen) */}
       <WorkoutDetailModal
         workout={workout}
         open={showDetail}
@@ -1734,6 +1734,10 @@ const WorkoutCard = ({
         readOnly={readOnly}
         progress={progress}
         onCopyWorkout={onCopyWorkout}
+        fullscreen
+        onUpdateTitle={(id, title) => onUpdateWorkout(id, { title })}
+        onUpdateEmoji={(id, emoji) => onUpdateWorkout(id, { emoji })}
+        onReorderExercises={(id, exercises) => onUpdateWorkout(id, { exercises })}
       />
     </>
   );
