@@ -17,11 +17,8 @@ export const FIXED_SECTIONS: HomeSection[] = [
   { id: "scheduled", label: "Scheduled", icon: "🕐", locked: true },
   { id: "todo", label: "To Do List", icon: "✅", locked: true },
   { id: "water", label: "Water Intake", icon: "💧" },
-  { id: "nutrition", label: "Nutrition", icon: "🍎" },
   { id: "workout", label: "Today's Workout", icon: "💪" },
   { id: "sobriety", label: "Sobriety Tracker", icon: "🏆" },
-  
-  { id: "shopping", label: "Shopping List", icon: "🛒" },
   { id: "study", label: "Study", icon: "📖" },
 ];
 
