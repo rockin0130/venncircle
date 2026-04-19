@@ -1428,6 +1428,51 @@ const WorkoutsPage = ({
         );
       })()}
     </>
+
+      {selectedWorkout && (() => {
+        const w = workouts.find(wk => wk.id === selectedWorkout.id) || selectedWorkout;
+        return (
+          <WorkoutDetailModal
+            workout={w}
+            open={!!selectedWorkout}
+            onClose={() => setSelectedWorkout(null)}
+            onRemove={(id) => { removeWorkout(id); setSelectedWorkout(null); }}
+            onMoveToTomorrow={() => {
+              const base = w.scheduledDate || new Date().toISOString().slice(0, 10);
+              const d = new Date(base + "T00:00:00");
+              d.setDate(d.getDate() + 1);
+              handleReschedule(w.id, d.toISOString().slice(0, 10));
+            }}
+            onMoveToDate={(date) => {
+              const fmt = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+              handleReschedule(w.id, fmt);
+            }}
+            onUpdateCalories={(id, cal) => updateWorkout(id, { cal })}
+            onUpdateDuration={(id, duration) => updateWorkout(id, { duration })}
+            onUpdateDistance={(id, distance, unit) => updateWorkout(id, { distance, distanceUnit: unit })}
+            onEditExercise={startEditExercise}
+            onDeleteExercise={deleteExercise}
+            onAddExercises={(id, newExercises) => {
+              const existing = workouts.find(wk => wk.id === id);
+              if (!existing) return;
+              const updated = [...(existing.exercises || []), ...newExercises];
+              updateWorkout(id, { exercises: updated });
+              toast.success(`Added ${newExercises.length} exercise${newExercises.length > 1 ? "s" : ""}`);
+            }}
+            onLogWorkout={setLoggingWorkout}
+            onSelectExercise={setSelectedExercise}
+            onProgressUpdate={handleProgressUpdate}
+            onCaloriesSaved={handleCaloriesSaved}
+            readOnly={(!!w.ownerUserId && w.ownerUserId !== user?.id) || w.id.startsWith("hk-")}
+            progress={workoutProgress[w.id]?.progress}
+            onCopyWorkout={handleCopyWorkout}
+            fullscreen
+            onUpdateTitle={(id, title) => updateWorkout(id, { title })}
+            onUpdateEmoji={(id, emoji) => updateWorkout(id, { emoji })}
+            onReorderExercises={(id, exercises) => updateWorkout(id, { exercises })}
+          />
+        );
+      })()}
     </div>
   );
 };
