@@ -3,18 +3,15 @@ import VennIcon from "@/components/VennIcon";
 
 export type Tab =
   | "home" | "shared-interests" | "ai" | "chat" | "profile" | "friends"
-  | "workout" | "habits" | "sobriety" | "nutrition"
-  | "calendar" | "shopping" | "study" | "todo" | "more" | "settings";
+  | "workout" | "habits" | "sobriety"
+  | "calendar" | "study" | "todo" | "more" | "settings";
 
 // Keep these exports for backward compat with MorePage etc.
 export const ALL_PAGE_META: Record<string, { label: string; icon: typeof Home; desc: string }> = {
   calendar: { label: "Calendar", icon: Home, desc: "View and manage your schedule" },
   workout: { label: "Workout", icon: Home, desc: "Track workouts and exercise plans" },
   habits: { label: "Routines", icon: Home, desc: "Daily routine tracking and streaks" },
-  nutrition: { label: "Nutrition", icon: Home, desc: "Track protein, meals & AI suggestions" },
   sobriety: { label: "Sobriety", icon: Home, desc: "Track sobriety milestones" },
-  
-  shopping: { label: "Shopping", icon: Home, desc: "Shopping lists from meal plans" },
   study: { label: "Study", icon: Home, desc: "Track study sessions and focus time" },
 };
 

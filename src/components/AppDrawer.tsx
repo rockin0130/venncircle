@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Compass, MessageCircle, User, CalendarDays, Dumbbell, Apple, Heart, Clock, Sparkles, ShoppingCart, MoreHorizontal, Settings, PanelLeft } from "lucide-react";
+import { Home, Compass, MessageCircle, User, CalendarDays, Dumbbell, Heart, Clock, MoreHorizontal, Settings, PanelLeft } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { Tab } from "@/components/BottomNav";
 import type { NavStyle } from "@/hooks/useNavStyle";
@@ -24,11 +24,8 @@ const PRIMARY_ITEMS: { id: Tab | "settings"; label: string; icon: typeof Home }[
 const FEATURE_ITEMS: { id: Tab | "settings"; label: string; icon: typeof Home }[] = [
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "workout", label: "Workout", icon: Dumbbell },
-  { id: "nutrition", label: "Nutrition", icon: Apple },
   { id: "habits", label: "Routines", icon: Heart },
   { id: "sobriety", label: "Sobriety", icon: Clock },
-  
-  { id: "shopping", label: "Shopping List", icon: ShoppingCart },
 ];
 
 const BOTTOM_ITEMS: { id: Tab | "settings"; label: string; icon: typeof Home }[] = [
