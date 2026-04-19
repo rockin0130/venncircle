@@ -754,6 +754,7 @@ const HomeScheduledSection = ({
             updateWorkout(id, { exercises: exs });
           }}
           onLogWorkout={(w) => toggleWorkout(w.id)}
+          onSelectExercise={() => {}}
           fullscreen
           onUpdateTitle={(id, title) => updateWorkout(id, { title })}
           onUpdateEmoji={(id, emoji) => updateWorkout(id, { emoji })}
