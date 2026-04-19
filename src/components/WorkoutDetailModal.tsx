@@ -157,6 +157,10 @@ export default function WorkoutDetailModal({
   const [distUnit, setDistUnit] = useState(workout.distanceUnit || "km");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showAddLibrary, setShowAddLibrary] = useState(false);
+  // Edit mode (fullscreen only): edit title + emoji + reorder exercises
+  const [editMode, setEditMode] = useState(false);
+  const [titleInput, setTitleInput] = useState(workout.title);
+  const [emojiInput, setEmojiInput] = useState(workout.emoji);
 
   // Log Weights state
   const [logs, setLogs] = useState<ExerciseLog[]>([]);
