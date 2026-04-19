@@ -22,22 +22,28 @@ interface PartnerProfile {
   email: string | null;
 }
 
-export const SHAREABLE_PAGES = ["calendar", "workout", "habits", "sobriety", "study"] as const;
-export type ShareablePage = typeof SHAREABLE_PAGES[number];
+// Internal type still allows legacy "nutrition"/"shopping" values for backward compat with existing data,
+// but they are intentionally excluded from SHAREABLE_PAGES (the user-facing selectable list).
+export type ShareablePage = "calendar" | "workout" | "nutrition" | "habits" | "sobriety" | "shopping" | "study";
+export const SHAREABLE_PAGES: readonly ShareablePage[] = ["calendar", "workout", "habits", "sobriety", "study"];
 
 export const PAGE_LABELS: Record<ShareablePage, string> = {
   calendar: "Calendar",
   workout: "Workout",
+  nutrition: "Nutrition",
   habits: "Routines",
   sobriety: "Sobriety",
+  shopping: "Shopping",
   study: "Study",
 };
 
 export const PAGE_ICONS: Record<ShareablePage, string> = {
   calendar: "📅",
   workout: "💪",
+  nutrition: "🍎",
   habits: "🔥",
   sobriety: "🏆",
+  shopping: "🛒",
   study: "📖",
 };
 
