@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Apple, Plus, Sparkles, RefreshCw, ChevronLeft, ChevronRight, Check, X, Loader2, Settings, Calendar, Target, Camera, ArrowLeftRight, Pencil, Clock, Zap, Users, EyeOff, Bell, ClipboardList, MoreHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { takePhoto } from "@/integrations/camera";
 import { Group, useAuth, GroupMember } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
@@ -167,7 +168,6 @@ const NutritionPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => 
   const [goalShowCal, setGoalShowCal] = useState(false);
   const [goalEnabledTrackers, setGoalEnabledTrackers] = useState<TrackerKey[]>(["protein", "calories"]);
   const [cameraAnalyzing, setCameraAnalyzing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [addMealGroupIds, setAddMealGroupIds] = useState<string[]>([]);
   const [aiConfirmSelection, setAiConfirmSelection] = useState<{ suggestion: any; index: number } | null>(null);
@@ -854,9 +854,7 @@ const NutritionPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => 
     }
   };
 
-  const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const analyzeImageFromFile = async (file: File) => {
     setCameraAnalyzing(true);
     try {
       const reader = new FileReader();
@@ -882,7 +880,6 @@ const NutritionPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => 
       toast.error("Couldn't analyze the photo");
     } finally {
       setCameraAnalyzing(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -1378,9 +1375,6 @@ const NutritionPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => 
         )}
       </div>
 
-      {/* Hidden file input for camera */}
-      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCameraCapture} />
-
       {/* ───── AI Results Selection Modal ───── */}
       <AnimatePresence>
         {showAiResults && aiResults.length > 0 && (
@@ -1595,7 +1589,18 @@ const NutritionPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => 
                   ))}
                 </div>
                 <div className="flex gap-2 mb-4">
-                  <button onClick={() => fileInputRef.current?.click()} disabled={cameraAnalyzing} className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary border border-border hover:border-primary/30 transition-colors disabled:opacity-50">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void (async () => {
+                        if (cameraAnalyzing) return;
+                        const file = await takePhoto();
+                        if (file) await analyzeImageFromFile(file);
+                      })();
+                    }}
+                    disabled={cameraAnalyzing}
+                    className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary border border-border hover:border-primary/30 transition-colors disabled:opacity-50"
+                  >
                     {cameraAnalyzing ? <Loader2 size={18} className="animate-spin text-primary" /> : <Camera size={18} className="text-primary" />}
                     <div className="text-left"><p className="text-xs font-semibold">{cameraAnalyzing ? "Analyzing..." : "Photo"}</p><p className="text-[9px] text-muted-foreground">Snap food or label</p></div>
                   </button>

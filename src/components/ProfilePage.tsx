@@ -18,6 +18,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
 import { supabase } from "@/integrations/supabase/client";
+import { pickFromGallery, takePhoto } from "@/integrations/camera";
 import EditProfileModal from "@/components/EditProfileModal";
 import AddFriendModal from "@/components/AddFriendModal";
 import { useFriendships } from "@/hooks/useFriendships";
@@ -94,8 +95,6 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
   const [cropScale, setCropScale] = useState(1);
   const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
   const cropContainerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const pinchRef = useRef<{ dist0: number; scale0: number } | null>(null);
@@ -591,10 +590,6 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
       <EditProfileModal open={showEditProfile} onOpenChange={setShowEditProfile} />
       <AddFriendModal open={showAddFriend} onOpenChange={setShowAddFriend} />
 
-      {/* Hidden file inputs */}
-      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handlePhotoSelected(e.target.files[0]); e.target.value = ""; }} />
-      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handlePhotoSelected(e.target.files[0]); e.target.value = ""; }} />
-
       {/* Friends now has its own dedicated page (see FriendsPage). */}
 
       {/* Photo picker action sheet */}
@@ -606,14 +601,22 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
               <button
                 className="w-full py-4 text-center"
                 style={{ fontSize: 17, fontWeight: 400, color: "#007AFF", borderBottom: "0.5px solid rgba(0,0,0,0.1)" }}
-                onClick={() => { setShowPhotoSheet(false); cameraInputRef.current?.click(); }}
+                onClick={async () => {
+                  setShowPhotoSheet(false);
+                  const file = await takePhoto();
+                  if (file) handlePhotoSelected(file);
+                }}
               >
                 Take Photo
               </button>
               <button
                 className="w-full py-4 text-center"
                 style={{ fontSize: 17, fontWeight: 400, color: "#007AFF" }}
-                onClick={() => { setShowPhotoSheet(false); fileInputRef.current?.click(); }}
+                onClick={async () => {
+                  setShowPhotoSheet(false);
+                  const file = await pickFromGallery();
+                  if (file) handlePhotoSelected(file);
+                }}
               >
                 Choose from Library
               </button>

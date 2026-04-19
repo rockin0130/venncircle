@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { pickFromGallery } from "@/integrations/camera";
 import { toast } from "sonner";
 import { Loader2, Camera, Plus, AtSign, User, Check, X } from "lucide-react";
 
@@ -20,7 +21,6 @@ const Step2Profile = ({ userId, profile, onContinue }: Step2Props) => {
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">(
     profile?.username ? "available" : "idle"
   );
-  const fileRef = useRef<HTMLInputElement>(null);
   const checkTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const checkUsername = useCallback(async (value: string) => {
@@ -43,13 +43,6 @@ const Step2Profile = ({ userId, profile, onContinue }: Step2Props) => {
     }
     if (!USERNAME_REGEX.test(normalized)) { setUsernameStatus("invalid"); return; }
     checkTimeoutRef.current = setTimeout(() => checkUsername(normalized), 400);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setAvatarFile(file);
-    setAvatarUrl(URL.createObjectURL(file));
   };
 
   const handleSubmit = async () => {
@@ -112,7 +105,16 @@ const Step2Profile = ({ userId, profile, onContinue }: Step2Props) => {
         {/* Avatar */}
         <div className="flex justify-center mb-8">
           <button
-            onClick={() => fileRef.current?.click()}
+            type="button"
+            onClick={() => {
+              void (async () => {
+                const file = await pickFromGallery();
+                if (file) {
+                  setAvatarFile(file);
+                  setAvatarUrl(URL.createObjectURL(file));
+                }
+              })();
+            }}
             className="relative w-24 h-24 rounded-full flex items-center justify-center overflow-hidden"
             style={{
               border: "2px dashed #6C47FF",
@@ -131,7 +133,6 @@ const Step2Profile = ({ userId, profile, onContinue }: Step2Props) => {
               <Plus size={14} color="#fff" />
             </div>
           </button>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
         </div>
 
         {/* Name */}

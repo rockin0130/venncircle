@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Send, ArrowLeft, Mic, Square, Play, Pause, X, Plus, Camera, Image, Film, Images } from "lucide-react";
 import ChatAlbum from "@/components/ChatAlbum";
 import { supabase } from "@/integrations/supabase/client";
+import { takePhoto } from "@/integrations/camera";
 import { useAuth, Group } from "@/context/AuthContext";
 import { usePresence } from "@/hooks/usePresence";
 import { toast } from "sonner";
@@ -255,6 +256,18 @@ const ChatPage = ({
     if (file.size > maxSize) { toast.error(`File too large. Max ${type === "video" ? "50" : "10"}MB`); return; }
     await uploadAndSendMedia(file, type, file.type);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleTakePhoto = async () => {
+    const file = await takePhoto();
+    if (!file) return;
+    setShowAttachMenu(false);
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error("File too large. Max 10MB");
+      return;
+    }
+    await uploadAndSendMedia(file, "image", file.type);
   };
 
   // Audio playback
@@ -580,13 +593,16 @@ const ChatPage = ({
             style={{ borderTop: "0.5px solid rgba(0,0,0,0.07)" }}
           >
             <div className="flex gap-6 justify-center py-1">
-              <label className="flex flex-col items-center gap-1 cursor-pointer">
+              <button
+                type="button"
+                onClick={() => void handleTakePhoto()}
+                className="flex flex-col items-center gap-1 cursor-pointer"
+              >
                 <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(108,71,255,0.08)" }}>
                   <Camera size={20} style={{ color: "#6C47FF" }} />
                 </div>
                 <span className="text-[9px] font-medium text-muted-foreground">Camera</span>
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFileSelect(e, "image")} />
-              </label>
+              </button>
               <label className="flex flex-col items-center gap-1 cursor-pointer">
                 <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(108,71,255,0.08)" }}>
                   <Image size={20} style={{ color: "#6C47FF" }} />
