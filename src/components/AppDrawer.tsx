@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Compass, MessageCircle, User, CalendarDays, Dumbbell, Heart, Clock, MoreHorizontal, Settings } from "lucide-react";
+import { Home, Compass, MessageCircle, User, CalendarDays, Dumbbell, Heart, Clock, MoreHorizontal, Settings, PanelLeft } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { Tab } from "@/components/BottomNav";
 import type { NavStyle } from "@/hooks/useNavStyle";
