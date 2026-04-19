@@ -450,7 +450,7 @@ const WorkoutLogPage = ({ onBack, onRecordWorkout, workoutsForLog }: Props) => {
         </button>
       </div>
 
-      {/* Detail Modal */}
+      {/* Detail Page (full-screen, read-only) */}
       {detailWorkout && (
         <WorkoutDetailModal
           workout={detailWorkout}
@@ -468,6 +468,7 @@ const WorkoutLogPage = ({ onBack, onRecordWorkout, workoutsForLog }: Props) => {
           onLogWorkout={() => {}}
           onSelectExercise={() => {}}
           readOnly
+          fullscreen
         />
       )}
     </div>
