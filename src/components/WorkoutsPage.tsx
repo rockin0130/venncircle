@@ -624,6 +624,7 @@ const WorkoutsPage = ({
   const [deleteConfirm, setDeleteConfirm] = useState<{ filter: "all" | "week" | "month" | "date" | "tomorrow"; message: string } | null>(null);
   const [exerciseDeleteConfirm, setExerciseDeleteConfirm] = useState<{ workoutId: string; index: number; exerciseName: string } | null>(null);
   const [loggingWorkout, setLoggingWorkout] = useState<Workout | null>(null);
+  const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
   const [photoPromptWorkout, setPhotoPromptWorkout] = useState<Workout | null>(null);
   const [feedShareWorkout, setFeedShareWorkout] = useState<Workout | null>(null);
   const [showHistory, setShowHistory] = useState(false);
