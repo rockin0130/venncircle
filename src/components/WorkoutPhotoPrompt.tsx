@@ -97,7 +97,7 @@ const WorkoutPhotoPrompt = ({ open, workout, onClose, onPhotoSent }: Props) => {
       if (workout.cal && workout.cal > 0) stats.Calories = workout.cal;
       if (workout.duration) stats.Duration = workout.duration;
       if (typeof workout.distance === "number" && workout.distance > 0) {
-        stats.Distance = `${workout.distance} ${workout.distance_unit || "mi"}`;
+        stats.Distance = `${workout.distance} ${workout.distanceUnit || "mi"}`;
       }
 
       // Post to the group feed with workout info + photo
