@@ -1637,7 +1637,7 @@ const WorkoutCard = ({
               style={{
                 width: 38,
                 borderLeft: "0.5px solid rgba(0,0,0,0.06)",
-                background: workout.done ? "rgba(26,26,26,0.03)" : "rgba(0,0,0,0.015)",
+                background: "transparent",
               }}
             >
               <div
