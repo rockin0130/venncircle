@@ -299,7 +299,17 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
   const handleToggle = (id: string) => {
     const habit = habits.find((h) => h.id === id);
     if (habit && habit.ownerUserId && habit.ownerUserId !== user?.id) return;
+    const wasDone = !!habit?.done;
     toggleHabit(id);
+    if (habit && !wasDone && habit.groupId && !isRoutinePhotoPromptSuppressed()) {
+      const streak = getHabitStreak(habit.id) + 1;
+      setRoutinePhotoPrompt({
+        id: habit.id,
+        label: habit.label,
+        groupId: habit.groupId,
+        streak,
+      });
+    }
   };
 
   const sendNudge = async (habitLabel: string, habitId: string, targetUserId: string, targetName: string) => {
@@ -764,6 +774,14 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
         open={!!viewingPartnerHabit}
         onClose={() => setViewingPartnerHabit(null)}
       />
+
+      {routinePhotoPrompt && (
+        <RoutinePhotoPrompt
+          open={!!routinePhotoPrompt}
+          routine={routinePhotoPrompt}
+          onClose={() => setRoutinePhotoPrompt(null)}
+        />
+      )}
 
       {/* Duplicate habit confirmation */}
       <AlertDialog open={!!duplicateConfirm} onOpenChange={(open) => { if (!open) setDuplicateConfirm(null); }}>
