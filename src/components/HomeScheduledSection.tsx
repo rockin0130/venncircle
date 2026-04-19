@@ -219,7 +219,8 @@ const HomeScheduledSection = ({
   showWater = false,
 }: Props) => {
   const { groups, activeGroup, user, profile } = useAuth();
-  const { filteredHabits, toggleHabit, getHabitStreak, getWorkoutsForDate } = useAppContext();
+  const { filteredHabits, toggleHabit, getHabitStreak, getWorkoutsForDate, toggleWorkout, removeWorkout, updateWorkout, rescheduleWorkout } = useAppContext();
+  const [detailWorkout, setDetailWorkout] = useState<Workout | null>(null);
 
   // Build a unified FilterUser list from all groups (same approach as Calendar's useCalendarFilterUsers in "All" mode)
   const allFilterUsers = useMemo<FilterUser[]>(() => {
@@ -568,7 +569,7 @@ const HomeScheduledSection = ({
                     return (
                       <button
                         key={workout.id}
-                        onClick={() => onNavigate?.("workout")}
+                        onClick={() => setDetailWorkout(workout)}
                         className={cn(
                           "w-full text-left rounded-xl bg-card border active:scale-[0.99] transition-all",
                           workout.done && "opacity-45"
@@ -721,6 +722,44 @@ const HomeScheduledSection = ({
           );
         })}
       </div>
+
+      {detailWorkout && (
+        <WorkoutDetailModal
+          workout={detailWorkout}
+          open={!!detailWorkout}
+          onClose={() => setDetailWorkout(null)}
+          onRemove={(id) => { removeWorkout(id); setDetailWorkout(null); }}
+          onMoveToTomorrow={(id) => {
+            const base = detailWorkout.scheduledDate || new Date().toISOString().slice(0, 10);
+            const d = new Date(base + "T00:00:00");
+            d.setDate(d.getDate() + 1);
+            rescheduleWorkout(id, d.toISOString().slice(0, 10));
+          }}
+          onMoveToDate={(id, date) => rescheduleWorkout(id, date.toISOString().slice(0, 10))}
+          onUpdateCalories={(id, cal) => updateWorkout(id, { cal })}
+          onUpdateDuration={(id, duration) => updateWorkout(id, { duration })}
+          onUpdateDistance={(id, distance, unit) => updateWorkout(id, { distance, distanceUnit: unit })}
+          onEditExercise={(id, idx, ex) => {
+            const exs = [...(detailWorkout.exercises || [])];
+            exs[idx] = ex;
+            updateWorkout(id, { exercises: exs });
+          }}
+          onDeleteExercise={(id, idx) => {
+            const exs = [...(detailWorkout.exercises || [])];
+            exs.splice(idx, 1);
+            updateWorkout(id, { exercises: exs });
+          }}
+          onAddExercises={(id, newExs) => {
+            const exs = [...(detailWorkout.exercises || []), ...newExs];
+            updateWorkout(id, { exercises: exs });
+          }}
+          onLogWorkout={toggleWorkout}
+          fullscreen
+          onUpdateTitle={(id, title) => updateWorkout(id, { title })}
+          onUpdateEmoji={(id, emoji) => updateWorkout(id, { emoji })}
+          onReorderExercises={(id, exercises) => updateWorkout(id, { exercises })}
+        />
+      )}
     </section>
   );
 };
