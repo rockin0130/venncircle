@@ -720,45 +720,6 @@ const HomeScheduledSection = ({
           );
         })}
       </div>
-
-      {detailWorkout && (
-        <WorkoutDetailModal
-          workout={detailWorkout}
-          open={!!detailWorkout}
-          onClose={() => setDetailWorkout(null)}
-          onRemove={(id) => { removeWorkout(id); setDetailWorkout(null); }}
-          onMoveToTomorrow={() => {
-            const base = detailWorkout.scheduledDate || new Date().toISOString().slice(0, 10);
-            const d = new Date(base + "T00:00:00");
-            d.setDate(d.getDate() + 1);
-            rescheduleWorkout(detailWorkout.id, d.toISOString().slice(0, 10));
-          }}
-          onMoveToDate={(date) => rescheduleWorkout(detailWorkout.id, date.toISOString().slice(0, 10))}
-          onUpdateCalories={(id, cal) => updateWorkout(id, { cal })}
-          onUpdateDuration={(id, duration) => updateWorkout(id, { duration })}
-          onUpdateDistance={(id, distance, unit) => updateWorkout(id, { distance, distanceUnit: unit })}
-          onEditExercise={(id, idx, ex) => {
-            const exs = [...(detailWorkout.exercises || [])];
-            exs[idx] = ex;
-            updateWorkout(id, { exercises: exs });
-          }}
-          onDeleteExercise={(id, idx) => {
-            const exs = [...(detailWorkout.exercises || [])];
-            exs.splice(idx, 1);
-            updateWorkout(id, { exercises: exs });
-          }}
-          onAddExercises={(id, newExs) => {
-            const exs = [...(detailWorkout.exercises || []), ...newExs];
-            updateWorkout(id, { exercises: exs });
-          }}
-          onLogWorkout={(w) => toggleWorkout(w.id)}
-          onSelectExercise={() => {}}
-          fullscreen
-          onUpdateTitle={(id, title) => updateWorkout(id, { title })}
-          onUpdateEmoji={(id, emoji) => updateWorkout(id, { emoji })}
-          onReorderExercises={(id, exercises) => updateWorkout(id, { exercises })}
-        />
-      )}
     </section>
   );
 };
