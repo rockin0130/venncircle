@@ -624,6 +624,7 @@ const WorkoutsPage = ({
   const [deleteConfirm, setDeleteConfirm] = useState<{ filter: "all" | "week" | "month" | "date" | "tomorrow"; message: string } | null>(null);
   const [exerciseDeleteConfirm, setExerciseDeleteConfirm] = useState<{ workoutId: string; index: number; exerciseName: string } | null>(null);
   const [loggingWorkout, setLoggingWorkout] = useState<Workout | null>(null);
+  const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
   const [photoPromptWorkout, setPhotoPromptWorkout] = useState<Workout | null>(null);
   const [feedShareWorkout, setFeedShareWorkout] = useState<Workout | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -1331,6 +1332,7 @@ const WorkoutsPage = ({
                             onCopyWorkout={handleCopyWorkout}
                             accentBorder={colColor.border}
                             compact
+                            onOpenDetail={setSelectedWorkout}
                           />
                         );
                       })
@@ -1380,6 +1382,7 @@ const WorkoutsPage = ({
                       readOnly={(!!w.ownerUserId && w.ownerUserId !== user?.id) || w.id.startsWith("hk-")}
                       progress={workoutProgress[w.id]?.progress}
                       onCopyWorkout={handleCopyWorkout}
+                      onOpenDetail={setSelectedWorkout}
                     />
                   ))}
                 </div>
@@ -1425,6 +1428,51 @@ const WorkoutsPage = ({
         );
       })()}
     </>
+
+      {selectedWorkout && (() => {
+        const w = workouts.find(wk => wk.id === selectedWorkout.id) || selectedWorkout;
+        return (
+          <WorkoutDetailModal
+            workout={w}
+            open={!!selectedWorkout}
+            onClose={() => setSelectedWorkout(null)}
+            onRemove={(id) => { removeWorkout(id); setSelectedWorkout(null); }}
+            onMoveToTomorrow={() => {
+              const base = w.scheduledDate || new Date().toISOString().slice(0, 10);
+              const d = new Date(base + "T00:00:00");
+              d.setDate(d.getDate() + 1);
+              handleReschedule(w.id, d.toISOString().slice(0, 10));
+            }}
+            onMoveToDate={(date) => {
+              const fmt = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+              handleReschedule(w.id, fmt);
+            }}
+            onUpdateCalories={(id, cal) => updateWorkout(id, { cal })}
+            onUpdateDuration={(id, duration) => updateWorkout(id, { duration })}
+            onUpdateDistance={(id, distance, unit) => updateWorkout(id, { distance, distanceUnit: unit })}
+            onEditExercise={startEditExercise}
+            onDeleteExercise={deleteExercise}
+            onAddExercises={(id, newExercises) => {
+              const existing = workouts.find(wk => wk.id === id);
+              if (!existing) return;
+              const updated = [...(existing.exercises || []), ...newExercises];
+              updateWorkout(id, { exercises: updated });
+              toast.success(`Added ${newExercises.length} exercise${newExercises.length > 1 ? "s" : ""}`);
+            }}
+            onLogWorkout={setLoggingWorkout}
+            onSelectExercise={setSelectedExercise}
+            onProgressUpdate={handleProgressUpdate}
+            onCaloriesSaved={handleCaloriesSaved}
+            readOnly={(!!w.ownerUserId && w.ownerUserId !== user?.id) || w.id.startsWith("hk-")}
+            progress={workoutProgress[w.id]?.progress}
+            onCopyWorkout={handleCopyWorkout}
+            fullscreen
+            onUpdateTitle={(id, title) => updateWorkout(id, { title })}
+            onUpdateEmoji={(id, emoji) => updateWorkout(id, { emoji })}
+            onReorderExercises={(id, exercises) => updateWorkout(id, { exercises })}
+          />
+        );
+      })()}
     </div>
   );
 };
@@ -1450,6 +1498,7 @@ const WorkoutCard = ({
   onCopyWorkout,
   accentBorder,
   compact,
+  onOpenDetail,
 }: {
   workout: Workout;
   onToggle: (id: string) => void;
@@ -1470,8 +1519,8 @@ const WorkoutCard = ({
   onCopyWorkout?: (workout: Workout, scheduledDate: string) => void;
   accentBorder?: string;
   compact?: boolean;
+  onOpenDetail: (workout: Workout) => void;
 }) => {
-  const [showDetail, setShowDetail] = useState(false);
   const [cascadeConfirm, setCascadeConfirm] = useState<{ newDate: string; diffDays: number; followingCount: number } | null>(null);
 
   const isHealthKitEntry =
@@ -1563,7 +1612,7 @@ const WorkoutCard = ({
             </div>
 
             {/* Body */}
-            <div className="flex-1 min-w-0 cursor-pointer py-0.5" onClick={() => setShowDetail(true)}>
+            <div className="flex-1 min-w-0 cursor-pointer py-0.5" onClick={() => onOpenDetail(workout)}>
               <div className="flex items-center gap-1 min-w-0">
                 {isHealthKitEntry && (
                   <span className="text-[11px] shrink-0 leading-none" title="Apple Health">🍎</span>
@@ -1619,7 +1668,7 @@ const WorkoutCard = ({
           </div>
 
           {/* Card body */}
-          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowDetail(true)}>
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenDetail(workout)}>
             <div className="flex items-center gap-1.5 min-w-0">
               {isHealthKitEntry && (
                 <span className="text-[12px] shrink-0 leading-none" title="Apple Health">🍎</span>
@@ -1672,33 +1721,6 @@ const WorkoutCard = ({
         </div>
         )}
       </motion.div>
-
-      {/* Detail Page (full-screen) */}
-      <WorkoutDetailModal
-        workout={workout}
-        open={showDetail}
-        onClose={() => setShowDetail(false)}
-        onRemove={onRemove}
-        onMoveToTomorrow={handleMoveToTomorrow}
-        onMoveToDate={handleMoveToDate}
-        onUpdateCalories={(id, cal) => onUpdateWorkout(id, { cal })}
-        onUpdateDuration={(id, duration) => onUpdateWorkout(id, { duration })}
-        onUpdateDistance={(id, distance, unit) => onUpdateWorkout(id, { distance, distanceUnit: unit })}
-        onEditExercise={onEditExercise}
-        onDeleteExercise={onDeleteExercise}
-        onAddExercises={onAddExercises || (() => {})}
-        onLogWorkout={onLogWorkout}
-        onSelectExercise={onSelectExercise}
-        onProgressUpdate={onProgressUpdate}
-        onCaloriesSaved={onCaloriesSaved}
-        readOnly={readOnly}
-        progress={progress}
-        onCopyWorkout={onCopyWorkout}
-        fullscreen
-        onUpdateTitle={(id, title) => onUpdateWorkout(id, { title })}
-        onUpdateEmoji={(id, emoji) => onUpdateWorkout(id, { emoji })}
-        onReorderExercises={(id, exercises) => onUpdateWorkout(id, { exercises })}
-      />
     </>
   );
 };
