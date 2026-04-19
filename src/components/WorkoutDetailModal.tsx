@@ -189,8 +189,32 @@ export default function WorkoutDetailModal({
       setMode("overview");
       setLogsLoaded(false);
       setCalOverride(null);
+      setEditMode(false);
+      setTitleInput(workout.title);
+      setEmojiInput(workout.emoji);
     }
-  }, [open, workout.id]);
+  }, [open, workout.id, workout.title, workout.emoji]);
+
+  // Move an exercise up or down by one slot.
+  const reorderExercise = (index: number, direction: -1 | 1) => {
+    if (!onReorderExercises || readOnly) return;
+    const list = [...(workout.exercises || [])];
+    const target = index + direction;
+    if (target < 0 || target >= list.length) return;
+    [list[index], list[target]] = [list[target], list[index]];
+    onReorderExercises(workout.id, list);
+  };
+
+  // Save title/emoji changes when leaving edit mode.
+  const saveEditMode = () => {
+    if (titleInput.trim() && titleInput !== workout.title && onUpdateTitle) {
+      onUpdateTitle(workout.id, titleInput.trim());
+    }
+    if (emojiInput && emojiInput !== workout.emoji && onUpdateEmoji) {
+      onUpdateEmoji(workout.id, emojiInput);
+    }
+    setEditMode(false);
+  };
 
   // --- Log Weights data loading ---
   const exercises = workout.exercises || [];
