@@ -79,7 +79,7 @@ const WorkoutPhotoPrompt = ({ open, workout, onClose, onPhotoSent }: Props) => {
       const fileName = `${user.id}/${Date.now()}_workout.${ext}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("chat-media")
+        .from("feed-photos")
         .upload(fileName, photoBlob, {
           contentType: photoBlob.type,
           upsert: false,
@@ -88,29 +88,37 @@ const WorkoutPhotoPrompt = ({ open, workout, onClose, onPhotoSent }: Props) => {
       if (uploadError) throw uploadError;
 
       const { data: urlData } = supabase.storage
-        .from("chat-media")
+        .from("feed-photos")
         .getPublicUrl(fileName);
       const mediaUrl = urlData.publicUrl;
 
-      // Send to group chat
-      const { error: msgError } = await supabase.from("messages").insert({
-        group_id: workout.groupId,
-        user_id: user.id,
-        content: `💪 Completed: ${workout.emoji} ${workout.title}`,
-        metadata: {
-          type: "image",
-          mediaUrl,
-          mimeType: photoBlob.type,
-          workoutId: workout.id,
-        } as any,
-      });
+      // Build workout stats for the feed post
+      const stats: Record<string, string | number> = {};
+      if (workout.cal && workout.cal > 0) stats.Calories = workout.cal;
+      if (workout.duration) stats.Duration = workout.duration;
+      if (typeof workout.distance === "number" && workout.distance > 0) {
+        stats.Distance = `${workout.distance} ${workout.distance_unit || "mi"}`;
+      }
 
-      if (msgError) throw msgError;
+      // Post to the group feed with workout info + photo
+      const { error: postError } = await supabase
+        .from("group_feed_posts")
+        .insert({
+          group_id: workout.groupId,
+          user_id: user.id,
+          content: `💪 Completed: ${workout.emoji} ${workout.title}`,
+          post_type: "photo",
+          photos: [mediaUrl],
+          interest_tag: "workout",
+          stats: Object.keys(stats).length > 0 ? stats : null,
+        });
+
+      if (postError) throw postError;
 
       // Save photo URL on workout
       onPhotoSent(mediaUrl);
 
-      toast.success("Sent to group chat! 📸");
+      toast.success("Shared to group feed! 📸");
       handleClose();
     } catch (err: any) {
       console.error("Photo send error:", err);
