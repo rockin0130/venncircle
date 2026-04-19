@@ -851,7 +851,27 @@ function OverviewContent({
                   </div>
                 </button>
                 {!readOnly && (
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 items-center">
+                    {editMode && reorderExercise && (
+                      <>
+                        <button
+                          onClick={() => reorderExercise(i, -1)}
+                          disabled={i === 0}
+                          className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                          aria-label="Move exercise up"
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button
+                          onClick={() => reorderExercise(i, 1)}
+                          disabled={i === workout.exercises!.length - 1}
+                          className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                          aria-label="Move exercise down"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={() => onEditExercise(workout.id, i, ex)}
                       className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
