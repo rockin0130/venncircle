@@ -729,13 +729,13 @@ const HomeScheduledSection = ({
           open={!!detailWorkout}
           onClose={() => setDetailWorkout(null)}
           onRemove={(id) => { removeWorkout(id); setDetailWorkout(null); }}
-          onMoveToTomorrow={(id) => {
+          onMoveToTomorrow={() => {
             const base = detailWorkout.scheduledDate || new Date().toISOString().slice(0, 10);
             const d = new Date(base + "T00:00:00");
             d.setDate(d.getDate() + 1);
-            rescheduleWorkout(id, d.toISOString().slice(0, 10));
+            rescheduleWorkout(detailWorkout.id, d.toISOString().slice(0, 10));
           }}
-          onMoveToDate={(id, date) => rescheduleWorkout(id, date.toISOString().slice(0, 10))}
+          onMoveToDate={(date) => rescheduleWorkout(detailWorkout.id, date.toISOString().slice(0, 10))}
           onUpdateCalories={(id, cal) => updateWorkout(id, { cal })}
           onUpdateDuration={(id, duration) => updateWorkout(id, { duration })}
           onUpdateDistance={(id, distance, unit) => updateWorkout(id, { distance, distanceUnit: unit })}
@@ -753,7 +753,7 @@ const HomeScheduledSection = ({
             const exs = [...(detailWorkout.exercises || []), ...newExs];
             updateWorkout(id, { exercises: exs });
           }}
-          onLogWorkout={toggleWorkout}
+          onLogWorkout={(w) => toggleWorkout(w.id)}
           fullscreen
           onUpdateTitle={(id, title) => updateWorkout(id, { title })}
           onUpdateEmoji={(id, emoji) => updateWorkout(id, { emoji })}
