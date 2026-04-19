@@ -356,7 +356,7 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
     <div className="px-5">
 
       {/* ── Header ── */}
-      <header className="pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-4 flex items-start justify-between">
+      <header className="safe-area-top pt-3 pb-4 flex items-start justify-between">
         <div>
           <h1 className="text-[1.75rem] font-bold tracking-display">Routines</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Build a better routine</p>

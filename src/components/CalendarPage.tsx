@@ -1020,7 +1020,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
   return (
     <div className="px-4 pb-24">
       {/* ── Header ──────────────────────────────────────── */}
-      <header className="pt-10 pb-2">
+      <header className="safe-area-top pt-3 pb-2">
         <div className="flex items-center justify-between">
           {/* Left: Month Year */}
           {viewMode === "week" ? (
@@ -1310,7 +1310,7 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
       {/* ── Search Modal ────────────────────────────────── */}
       {showSearch && (
         <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm">
-          <div className="px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
+          <div className="px-4 safe-area-top pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
             <div className="flex items-center gap-2 mb-4">
               <div className="flex-1 flex items-center bg-secondary rounded-xl px-3 py-2 gap-2">
                 <Search size={16} className="text-muted-foreground flex-shrink-0" />

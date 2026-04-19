@@ -79,7 +79,7 @@ const StudyFullscreenTimer = ({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center safe-area-top"
       style={{ background: "#111" }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}

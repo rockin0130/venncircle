@@ -61,7 +61,7 @@ const AppDrawer = ({ open, onOpenChange, activeTab, onNavigate, navStyle, onNavS
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="w-72 p-0 flex flex-col bg-card">
-        <SheetHeader className="px-4 pt-6 pb-2">
+        <SheetHeader className="px-4 pt-3 pb-2">
           <SheetTitle className="text-lg font-bold text-foreground">Menu</SheetTitle>
         </SheetHeader>
 

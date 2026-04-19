@@ -121,7 +121,7 @@ const SharedInterestsPage = ({ onNavigateToFeature, onCreateGroup, onOpenGroupHu
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="px-5 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 flex-shrink-0 flex items-center justify-between">
+      <header className="px-5 safe-area-top pt-3 pb-3 flex-shrink-0 flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight text-foreground">Explore</h1>
         <div className="flex items-center gap-1.5">
           <button

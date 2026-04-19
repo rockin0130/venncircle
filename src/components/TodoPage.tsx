@@ -402,7 +402,7 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
   return (
     <div className="px-5 pb-8">
       {/* Header */}
-      <header className="pt-10 pb-4">
+      <header className="safe-area-top pt-3 pb-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: "'DM Sans', sans-serif" }}>To-Do</h1>
           <div className="flex items-center gap-2">

@@ -145,7 +145,7 @@ const NutritionLogPage = ({ onBack, onSelectDate }: Props) => {
   return (
     <div className="flex flex-col min-h-full px-5">
       {/* Header */}
-      <div className="flex items-center gap-3 pt-6 pb-4">
+      <div className="flex items-center gap-3 safe-area-top pt-3 pb-4">
         <button onClick={onBack} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
           <ChevronLeft size={18} />
         </button>

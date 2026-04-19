@@ -460,7 +460,7 @@ const CalendarsManager = ({ open, onClose }: Props) => {
         className="absolute inset-0 z-[60] bg-background flex flex-col"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 border-b border-border flex-shrink-0">
+        <div className="flex items-center justify-between px-4 safe-area-top pt-3 pb-3 border-b border-border flex-shrink-0">
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors">
             <X size={20} className="text-muted-foreground" />
           </button>
@@ -976,7 +976,7 @@ const CalendarsManager = ({ open, onClose }: Props) => {
               transition={{ type: "spring", damping: 28, stiffness: 300 }}
               className="absolute inset-0 z-[70] bg-background flex flex-col"
             >
-              <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 border-b border-border flex-shrink-0">
+              <div className="flex items-center justify-between px-4 safe-area-top pt-3 pb-3 border-b border-border flex-shrink-0">
                 <button onClick={() => setShowNewForm(false)} className="text-sm font-medium text-primary">
                   Cancel
                 </button>

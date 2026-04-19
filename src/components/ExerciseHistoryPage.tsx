@@ -110,7 +110,7 @@ const ExerciseDetail = ({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 pb-4 border-b border-border">
+      <div className="safe-area-top pt-3 flex items-center gap-3 pb-4 border-b border-border">
         <button
           onClick={onBack}
           className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
@@ -307,7 +307,7 @@ const ExerciseHistoryPage = ({ onBack }: { onBack: () => void }) => {
       className="h-full flex flex-col"
     >
       {/* Header */}
-      <div className="flex items-center gap-3 pb-3">
+      <div className="safe-area-top pt-3 flex items-center gap-3 pb-3">
         <button
           onClick={onBack}
           className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"

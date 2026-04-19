@@ -22,7 +22,7 @@ const MorePage = ({ onNavigate, onOpenSettings, navStyle, onNavStyleChange, week
 
   return (
     <div className="flex flex-col min-h-full">
-      <div className="px-5 pt-6 pb-4 flex items-center gap-2">
+      <div className="px-5 safe-area-top pt-3 pb-4 flex items-center gap-2">
         {showBackButton && (
           <button
             onClick={onBack}

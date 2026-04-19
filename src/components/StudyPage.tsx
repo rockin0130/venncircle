@@ -951,7 +951,7 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   return (
     <div className="flex flex-col min-h-full pb-4" style={{ background: "#F4F3F0" }}>
       {/* ── Header ── */}
-      <div className="px-4 pt-6 pb-2 flex items-center justify-between">
+      <div className="px-4 safe-area-top pt-3 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#FAF5FF" }}>
             <Clock size={18} color="#6C47FF" />

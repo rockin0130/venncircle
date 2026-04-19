@@ -48,7 +48,7 @@ const FriendsPage = ({ onBack }: FriendsPageProps) => {
   return (
     <div className="min-h-svh" style={{ background: "#F4F3F0" }}>
       {/* Header */}
-      <header className="pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 px-3 flex items-center gap-2 sticky top-0 z-10" style={{ background: "#F4F3F0" }}>
+      <header className="safe-area-top pt-3 pb-3 px-3 flex items-center gap-2 sticky top-0 z-10" style={{ background: "#F4F3F0" }}>
         <button
           onClick={onBack}
           className="w-9 h-9 rounded-full flex items-center justify-center"
