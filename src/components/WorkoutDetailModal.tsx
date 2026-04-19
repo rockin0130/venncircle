@@ -31,6 +31,14 @@ interface WorkoutDetailModalProps {
   readOnly?: boolean;
   progress?: number;
   onCopyWorkout?: (workout: Workout, scheduledDate: string, groupIds: (string | null)[]) => void;
+  /** Render as a full-screen page instead of a bottom sheet. */
+  fullscreen?: boolean;
+  /** Update the workout title (used in fullscreen edit mode). */
+  onUpdateTitle?: (id: string, title: string) => void;
+  /** Update the workout emoji (used in fullscreen edit mode). */
+  onUpdateEmoji?: (id: string, emoji: string) => void;
+  /** Reorder exercises within the workout. */
+  onReorderExercises?: (workoutId: string, exercises: { name: string; sets: number; reps: string }[]) => void;
 }
 
 const DISTANCE_ACTIVITIES = ["running", "cycling", "walking", "swimming"];
