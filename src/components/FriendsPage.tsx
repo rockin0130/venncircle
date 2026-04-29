@@ -21,7 +21,17 @@ function hashColor(str: string) {
 }
 
 const FriendsPage = ({ onBack }: FriendsPageProps) => {
-  const { activeFriends, pendingReceived, pendingSent, acceptFriendRequest, declineFriendRequest, cancelFriendRequest, removeFriend } = useFriendships();
+  const {
+    activeFriends,
+    pendingReceived,
+    pendingSent,
+    acceptFriendRequest,
+    declineFriendRequest,
+    cancelFriendRequest,
+    removeFriend,
+    searchUsers,
+    sendFriendRequest,
+  } = useFriendships();
   const { groups } = useAuth();
   const onlineIds = usePresence("global");
   const [showAddFriend, setShowAddFriend] = useState(false);
@@ -206,7 +216,12 @@ const FriendsPage = ({ onBack }: FriendsPageProps) => {
         )}
       </div>
 
-      <AddFriendModal open={showAddFriend} onOpenChange={setShowAddFriend} />
+      <AddFriendModal
+        open={showAddFriend}
+        onOpenChange={setShowAddFriend}
+        searchUsers={searchUsers}
+        onSendRequest={sendFriendRequest}
+      />
     </div>
   );
 };

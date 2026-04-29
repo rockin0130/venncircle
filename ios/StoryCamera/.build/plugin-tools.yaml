@@ -1,0 +1,47 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "PackageStructure": ["<PackageStructure>"]
+  "StoryCamera-arm64-apple-macosx26.0-debug.module": ["<StoryCamera-arm64-apple-macosx26.0-debug.module>"]
+  "main": ["<StoryCamera-arm64-apple-macosx26.0-debug.module>"]
+  "test": ["<StoryCamera-arm64-apple-macosx26.0-debug.module>"]
+default: "main"
+nodes:
+  "/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/Sources/StoryCamera/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/Sources/StoryCamera/StoryCameraPlugin.swift"]
+    outputs: ["/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/sources"]
+    description: "Write auxiliary file /Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/sources"
+
+  "/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Library/Developer/CommandLineTools/usr/bin/swiftc"]
+    outputs: ["/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+
+  "<StoryCamera-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/StoryCameraPlugin.swift.o","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/Modules/StoryCamera.swiftmodule"]
+    outputs: ["<StoryCamera-arm64-apple-macosx26.0-debug.module>"]
+
+  "C.StoryCamera-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/Sources/StoryCamera/StoryCameraPlugin.swift","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/sources"]
+    outputs: ["/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/StoryCameraPlugin.swift.o","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/Modules/StoryCamera.swiftmodule"]
+    description: "Compiling Swift Module 'StoryCamera' (1 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","StoryCamera","-emit-dependencies","-emit-module","-emit-module-path","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/Modules/StoryCamera.swiftmodule","-output-file-map","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/sources","-I","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx10.13","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j14","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/include/StoryCamera-Swift.h","-swift-version","5","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","storycamera"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/Sources/StoryCamera/","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/Package.swift","/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

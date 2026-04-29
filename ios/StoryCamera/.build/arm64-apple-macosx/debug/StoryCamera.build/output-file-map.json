@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/master.swiftdeps"
+  },
+  "/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/Sources/StoryCamera/StoryCameraPlugin.swift": {
+    "dependencies": "/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/StoryCameraPlugin.d",
+    "object": "/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/StoryCameraPlugin.swift.o",
+    "swiftmodule": "/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/StoryCameraPlugin~partial.swiftmodule",
+    "swift-dependencies": "/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/StoryCameraPlugin.swiftdeps",
+    "diagnostics": "/Users/leeseokin/Documents/GitHub/venncircle/ios/StoryCamera/.build/arm64-apple-macosx/debug/StoryCamera.build/StoryCameraPlugin.dia"
+  }
+}

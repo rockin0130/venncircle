@@ -76,7 +76,7 @@ const RoutinePhotoPrompt = ({ open, routine, onClose }: Props) => {
       const { error } = await supabase.from("group_feed_posts").insert({
         group_id: routine.groupId,
         user_id: user.id,
-        content: `✅ Completed routine: ${routine.label}`,
+        content: `✅ Completed: ${routine.label}`,
         post_type: "text",
         photos: [],
         interest_tag: "habits",
@@ -129,7 +129,7 @@ const RoutinePhotoPrompt = ({ open, routine, onClose }: Props) => {
       const { error: postError } = await supabase.from("group_feed_posts").insert({
         group_id: routine.groupId,
         user_id: user.id,
-        content: `✅ Completed routine: ${routine.label}`,
+        content: `✅ Completed: ${routine.label}`,
         post_type: "photo",
         photos: [mediaUrl],
         interest_tag: "habits",
@@ -158,7 +158,7 @@ const RoutinePhotoPrompt = ({ open, routine, onClose }: Props) => {
             <div>
               <h3 className="text-lg font-bold text-foreground">Nice work! 🎉</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Send a completion photo to the group?
+                Send a post-routine photo to the group?
               </p>
             </div>
             <label className="flex items-center gap-2 justify-center cursor-pointer select-none">
@@ -203,7 +203,7 @@ const RoutinePhotoPrompt = ({ open, routine, onClose }: Props) => {
             <div className="px-4 py-3 bg-card border-t border-border flex items-center gap-2">
               <span className="text-lg">✅</span>
               <span className="text-sm font-semibold text-foreground truncate">{routine.label}</span>
-              <span className="text-xs text-muted-foreground ml-auto">Completed</span>
+              <span className="text-xs text-muted-foreground ml-auto">✓ Completed</span>
             </div>
             <div className="flex gap-3 p-4 pt-2">
               <button

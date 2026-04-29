@@ -18,7 +18,7 @@ type Step = "friends" | "pages" | "name";
 
 const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: CreateGroupModalProps) => {
   const { createGroup, inviteToGroup, joinGroup } = useAuth();
-  const { activeFriends } = useFriendships();
+  const { activeFriends, searchUsers, sendFriendRequest } = useFriendships();
 
   const [step, setStep] = useState<Step>("friends");
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
@@ -411,7 +411,12 @@ const CreateGroupModal = ({ open, onOpenChange, defaultPage, onGroupCreated }: C
         </DialogContent>
       </Dialog>
 
-      <AddFriendModal open={addFriendOpen} onOpenChange={setAddFriendOpen} />
+      <AddFriendModal
+        open={addFriendOpen}
+        onOpenChange={setAddFriendOpen}
+        searchUsers={searchUsers}
+        onSendRequest={sendFriendRequest}
+      />
     </>
   );
 };

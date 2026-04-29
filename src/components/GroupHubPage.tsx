@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { ArrowLeft, Settings, ChevronRight, Plus, Trash2, LogOut, Pencil, X, Check, Loader2, MoreHorizontal, Heart, MessageCircle, Share2, Image, Activity, Smile, Camera, UserPlus, ShieldCheck, ShieldOff, Trophy } from "lucide-react";
 import { supabase as supabaseClient } from "@/integrations/supabase/client";
 import GroupChallengePage from "@/components/GroupChallengePage";
@@ -16,6 +16,8 @@ import GroupFeedPost from "@/components/GroupFeedPost";
 import LeaveGroupFlow from "@/components/LeaveGroupFlow";
 import { useFriendships } from "@/hooks/useFriendships";
 import { usePresence } from "@/hooks/usePresence";
+import StoryViewer from "@/components/StoryViewer";
+import { cn } from "@/lib/utils";
 
 interface GroupHubPageProps {
   group: Group;
@@ -89,6 +91,8 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   const [showChallengePage, setShowChallengePage] = useState(false);
   const [activeChallenge, setActiveChallenge] = useState<any>(null);
   const [challengeDetailOpen, setChallengeDetailOpen] = useState(false);
+  const [storyViewer, setStoryViewer] = useState<{ userId: string; name: string } | null>(null);
+  const [memberIdsWithStories, setMemberIdsWithStories] = useState<Set<string>>(() => new Set());
 
   const currentGroup = groups.find((g) => g.id === group.id) || group;
   const currentActiveMembers = currentGroup.members.filter((m) => m.status === "active");
@@ -153,12 +157,24 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   useEffect(() => {
     fetchPosts();
     fetchActiveChallenge();
+    void loadActiveStoryUserIds();
     const channel = supabase
       .channel(`feed-${currentGroup.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "group_feed_posts", filter: `group_id=eq.${currentGroup.id}` }, () => { fetchPosts(); })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [currentGroup.id]);
+    const storiesChannel = supabase
+      .channel(`stories-feed-${currentGroup.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "stories", filter: `group_id=eq.${currentGroup.id}` },
+        () => { void loadActiveStoryUserIds(); }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(storiesChannel);
+    };
+  }, [currentGroup.id, loadActiveStoryUserIds]);
 
   const handleNavigate = (page: ShareablePage) => { onNavigateToFeature(page, currentGroup.id); };
 
@@ -227,6 +243,15 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
   };
 
   const handleMemberTap = (member: any) => { setSelectedMember(member); setMemberSheetOpen(true); };
+
+  const loadActiveStoryUserIds = useCallback(async () => {
+    const { data } = await supabase
+      .from("stories")
+      .select("user_id")
+      .eq("group_id", currentGroup.id)
+      .gt("expires_at", new Date().toISOString());
+    setMemberIdsWithStories(new Set((data || []).map((r: { user_id: string }) => r.user_id)));
+  }, [currentGroup.id]);
 
   const handleCoverUpload = async (file: File) => {
     setUploadingCover(true);
@@ -350,10 +375,28 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
               const isMe = m.user_id === user?.id;
               const name = isMe ? "Mine" : (m.display_name || "Member").split(" ")[0];
               const isOnline = isMe || onlineUserIds.has(m.user_id);
+              const hasActiveStory = memberIdsWithStories.has(m.user_id);
               return (
-                <button key={m.user_id} onClick={() => handleMemberTap(m)} className="flex flex-col items-center gap-1 shrink-0">
+                <button
+                  key={m.user_id}
+                  onClick={() => {
+                    if (hasActiveStory) {
+                      setStoryViewer({ userId: m.user_id, name: m.display_name || "Member" });
+                    } else {
+                      handleMemberTap(m);
+                    }
+                  }}
+                  className="flex flex-col items-center gap-1 shrink-0"
+                >
                   <div className="relative">
-                    <div className="w-14 h-14 rounded-full p-[2px] border-2 border-muted-foreground/30">
+                    <div
+                      className={cn(
+                        "w-14 h-14 rounded-full p-[2px]",
+                        hasActiveStory
+                          ? "bg-gradient-to-tr from-orange-500 via-pink-500 to-violet-600"
+                          : "border-2 border-muted-foreground/30"
+                      )}
+                    >
                       <div className={`w-full h-full rounded-full ${MEMBER_COLORS[i % MEMBER_COLORS.length]} flex items-center justify-center text-sm font-bold text-white`}>
                         {(m.display_name || "?")[0].toUpperCase()}
                       </div>
@@ -542,10 +585,18 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
                 {currentActiveMembers.map((m) => {
                   const isMemberAdmin = m.role === "admin";
                   const isMe = m.user_id === user?.id;
+                  const hasActiveStory = memberIdsWithStories.has(m.user_id);
                   return (
                     <div key={m.user_id} className="flex items-center gap-2 p-2 rounded-lg bg-secondary/30 relative">
-                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
-                        {(m.display_name || "?")[0].toUpperCase()}
+                      <div
+                        className={cn(
+                          "rounded-full p-[2px] shrink-0",
+                          hasActiveStory ? "bg-gradient-to-tr from-orange-500 via-pink-500 to-violet-600" : ""
+                        )}
+                      >
+                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                          {(m.display_name || "?")[0].toUpperCase()}
+                        </div>
                       </div>
                       <span className="text-sm text-foreground flex-1">{m.display_name || "Member"}</span>
                       {isMemberAdmin && (
@@ -686,6 +737,15 @@ const GroupHubPage = ({ group, onBack, onNavigateToFeature }: GroupHubPageProps)
           challenge={activeChallenge}
           members={currentActiveMembers}
           userId={user?.id || ""}
+        />
+      )}
+
+      {storyViewer && (
+        <StoryViewer
+          groupId={currentGroup.id}
+          userId={storyViewer.userId}
+          authorName={storyViewer.name}
+          onClose={() => setStoryViewer(null)}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import MorePage from "@/components/MorePage";
@@ -7,6 +7,7 @@ import HomePage from "@/components/HomePage";
 import WorkoutsPage from "@/components/WorkoutsPage";
 import HabitsPage from "@/components/HabitsPage";
 import CalendarPage from "@/components/CalendarPage";
+import CameraScreen from "@/components/CameraScreen";
 import ChatListPage from "@/components/ChatListPage";
 import ChatPage from "@/components/ChatPage";
 import AiAssistantPage from "@/components/AiAssistantPage";
@@ -50,9 +51,45 @@ const Index = () => {
   const [createGroupCategory, setCreateGroupCategory] = useState<"home" | "interest" | undefined>(undefined);
   const [hubGroup, setHubGroup] = useState<Group | null>(null);
   const [workoutNavigatedGroupId, setWorkoutNavigatedGroupId] = useState<string | null>(null);
+  const [storyCameraOpen, setStoryCameraOpen] = useState(false);
+  const storySwipeTouchRef = useRef<{ x: number; y: number } | null>(null);
+
   const { navStyle, setNavStyle } = useNavStyle();
   const { weekStart, setWeekStart } = useWeekStart();
 
+  useEffect(() => {
+    if (loading || !user) return;
+    const p = profile as { onboarding_completed?: boolean; username?: string } | undefined;
+    if (!p?.onboarding_completed || !p?.username) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t) return;
+      storySwipeTouchRef.current = { x: t.clientX, y: t.clientY };
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      const start = storySwipeTouchRef.current;
+      const t = e.changedTouches[0];
+      if (!start || !t) {
+        storySwipeTouchRef.current = null;
+        return;
+      }
+      const dx = t.clientX - start.x;
+      const dy = t.clientY - start.y;
+      storySwipeTouchRef.current = null;
+      if (dx < -64 && Math.abs(dx) > Math.abs(dy)) {
+        setStoryCameraOpen(true);
+      }
+    };
+
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [loading, user, profile]);
 
   if (loading) {
     return (
@@ -85,6 +122,16 @@ const Index = () => {
         userId={user.id}
         initialName={profile.display_name || ""}
         onComplete={() => refreshProfile()}
+      />
+    );
+  }
+
+  if (storyCameraOpen) {
+    return (
+      <CameraScreen
+        userId={user.id}
+        groups={groups}
+        onClose={() => setStoryCameraOpen(false)}
       />
     );
   }
@@ -251,6 +298,17 @@ const Index = () => {
 
   return (
     <AppProvider>
+      <>
+      {/* TEMP: tap to verify CameraScreen without swipe gesture — remove when done */}
+      <button
+        type="button"
+        onClick={() => setStoryCameraOpen(true)}
+        className="fixed top-[max(0.5rem,env(safe-area-inset-top))] right-2 z-[150] px-2 py-1 text-[10px] font-semibold rounded-md bg-primary text-primary-foreground shadow-md opacity-90"
+        aria-label="Open story camera (test)"
+      >
+        Cam test
+      </button>
+
       <div className="flex flex-col w-full max-w-md mx-auto bg-background h-svh relative overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
@@ -272,7 +330,6 @@ const Index = () => {
             onTabChange={handleTabChange}
           />
         )}
-
 
         <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
           <SheetContent side="right" className="w-72 p-0 flex flex-col bg-card">
@@ -317,6 +374,8 @@ const Index = () => {
           defaultCategory={createGroupCategory}
         />
       </div>
+
+      </>
     </AppProvider>
   );
 };

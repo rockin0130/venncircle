@@ -1915,6 +1915,44 @@ export type Database = {
           },
         ]
       }
+      stories: {
+        Row: {
+          id: string
+          user_id: string
+          group_id: string
+          media_url: string
+          media_type: string
+          expires_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          group_id: string
+          media_url: string
+          media_type: string
+          expires_at: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          group_id?: string
+          media_url?: string
+          media_type?: string
+          expires_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stories_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

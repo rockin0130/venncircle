@@ -10,7 +10,7 @@ const SECTIONS = [
   { key: "morning", label: "Morning", icon: "🌅" },
   { key: "afternoon", label: "Afternoon", icon: "☀️" },
   { key: "evening", label: "Evening", icon: "🌙" },
-  { key: "other", label: "Other", icon: "📋" },
+  { key: "other", label: "Flexible", icon: "📋" },
 ];
 
 function computeStreakStats(completionDates: string[]) {

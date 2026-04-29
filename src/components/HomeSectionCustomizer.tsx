@@ -285,7 +285,7 @@ const HomeSectionCustomizer = ({
       { key: "morning", label: "Morning Routines", icon: "🌅" },
       { key: "afternoon", label: "Afternoon Routines", icon: "☀️" },
       { key: "evening", label: "Evening Routines", icon: "🌙" },
-      { key: "other", label: "Other Routines", icon: "📋" },
+      { key: "other", label: "Flexible Routines", icon: "📋" },
     ];
     for (const cat of categories) {
       items.push({ id: `habit:${cat.key}`, label: cat.label, icon: cat.icon });

@@ -26,12 +26,16 @@
 	<true/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Access your calendar to sync events</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>VennCircle needs calendar access to sync your events</string>
+	<key>NSCameraUsageDescription</key>
+	<string>VennCircle needs camera access to take photos</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>VennCircle needs microphone access to record story videos</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Access your health data to sync workouts</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Save workout data to Apple Health</string>
-	<key>NSCameraUsageDescription</key>
-	<string>VennCircle needs camera access to take photos</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>VennCircle needs photo library access to share photos</string>
 	<key>UILaunchStoryboardName</key>

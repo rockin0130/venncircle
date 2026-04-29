@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "capacitor:sync:after": "node scripts/merge-ios-package-class-list.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.0",

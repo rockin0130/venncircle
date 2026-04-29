@@ -72,11 +72,13 @@ const BottomNav = ({ activeTab, onTabChange }: BottomNavProps) => {
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              className={`flex flex-col items-center gap-0.5 min-w-0 flex-1 py-1.5 rounded-lg transition-colors ${
+              className={`flex flex-col items-center gap-0.5 min-w-0 flex-1 py-1.5 rounded-lg transition-colors relative ${
                 active ? "text-primary" : "text-muted-foreground"
               }`}
             >
-              <Icon size={20} strokeWidth={active ? 2.5 : 1.8} className="shrink-0" />
+              <span className="relative inline-flex shrink-0">
+                <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+              </span>
               <span className="text-[9px] font-medium truncate max-w-full">{item.label}</span>
             </button>
           );

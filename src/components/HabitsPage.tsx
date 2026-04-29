@@ -16,6 +16,7 @@ import { ModeToggleBar, GroupPillsRow, MemberSelectorPill } from "@/components/W
 import HabitContextSelector from "@/components/HabitContextSelector";
 import HabitEditModal from "@/components/HabitEditModal";
 import RoutinePhotoPrompt, { isRoutinePhotoPromptSuppressed, type RoutineForPhoto } from "@/components/RoutinePhotoPrompt";
+import WaterPhotoPrompt, { isWaterPhotoPromptSuppressed } from "@/components/WaterPhotoPrompt";
 import type { Habit } from "@/context/AppContext";
 
 // ── Fixed default sections ──
@@ -23,7 +24,7 @@ const DEFAULT_SECTIONS = [
   { key: "morning", label: "Morning", icon: "🌅" },
   { key: "afternoon", label: "Afternoon", icon: "☀️" },
   { key: "evening", label: "Evening", icon: "🌙" },
-  { key: "other", label: "Other", icon: "📋" },
+  { key: "other", label: "Flexible", icon: "📋" },
 ];
 
 const todayStr = () => {
@@ -78,6 +79,7 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
   const [viewingPartnerHabit, setViewingPartnerHabit] = useState<{ habit: Habit; ownerName: string } | null>(null);
   const [duplicateConfirm, setDuplicateConfirm] = useState<{ existingName: string } | null>(null);
   const [routinePhotoPrompt, setRoutinePhotoPrompt] = useState<RoutineForPhoto | null>(null);
+  const [waterPhotoPrompt, setWaterPhotoPrompt] = useState<{ groupId: string; totalMl: number } | null>(null);
 
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set([EVERYONE_SENTINEL]));
 
@@ -301,14 +303,30 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
     if (habit && habit.ownerUserId && habit.ownerUserId !== user?.id) return;
     const wasDone = !!habit?.done;
     toggleHabit(id);
-    if (habit && !wasDone && habit.groupId && !isRoutinePhotoPromptSuppressed()) {
-      const streak = getHabitStreak(habit.id) + 1;
-      setRoutinePhotoPrompt({
-        id: habit.id,
-        label: habit.label,
-        groupId: habit.groupId,
-        streak,
-      });
+    if (!habit || wasDone || isRoutinePhotoPromptSuppressed()) return;
+
+    const feedGroupId =
+      habit.groupId ??
+      (isGroupActive && activeGroup && !(activeGroup as any)._personal ? activeGroup.id : null);
+    if (!feedGroupId) return;
+    if (habit.sharedGroupIds?.length && !habit.sharedGroupIds.includes(feedGroupId)) return;
+
+    const streak = getHabitStreak(habit.id) + 1;
+    setRoutinePhotoPrompt({
+      id: habit.id,
+      label: habit.label,
+      groupId: feedGroupId,
+      streak,
+    });
+  };
+
+  const addWaterLiters = (liters: number) => {
+    const next = Math.min(waterIntake + liters, waterGoal + 1);
+    setWaterIntake(next);
+    const gid =
+      isGroupActive && activeGroup && !(activeGroup as any)._personal ? activeGroup.id : null;
+    if (gid && !isWaterPhotoPromptSuppressed()) {
+      setWaterPhotoPrompt({ groupId: gid, totalMl: Math.round(next * 1000) });
     }
   };
 
@@ -548,7 +566,7 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
               <DraggableWaterBar intake={waterIntake} goal={waterGoal} onIntakeChange={setWaterIntake} />
               <div className="flex gap-2 mt-1">
                 {[0.25, 0.5].map((amt) => (
-                  <button key={amt} onClick={() => setWaterIntake(Math.min(waterIntake + amt, waterGoal + 1))}
+                  <button key={amt} onClick={() => addWaterLiters(amt)}
                     className="flex-1 py-2 bg-primary/10 text-primary rounded-lg text-xs font-bold active:scale-[0.97] transition-transform"
                   >+{amt * 1000}ml</button>
                 ))}
@@ -780,6 +798,15 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
           open={!!routinePhotoPrompt}
           routine={routinePhotoPrompt}
           onClose={() => setRoutinePhotoPrompt(null)}
+        />
+      )}
+
+      {waterPhotoPrompt && (
+        <WaterPhotoPrompt
+          open={!!waterPhotoPrompt}
+          groupId={waterPhotoPrompt.groupId}
+          totalMlToday={waterPhotoPrompt.totalMl}
+          onClose={() => setWaterPhotoPrompt(null)}
         />
       )}
 

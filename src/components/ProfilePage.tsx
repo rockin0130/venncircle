@@ -83,7 +83,7 @@ const cardStyle = { background: "#fff", borderRadius: 16, border: "0.5px solid r
 const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProps) => {
   const { profile, user, groups, signOut, refreshProfile } = useAuth();
   const { habits, workouts, getHabitStreak } = useAppContext();
-  const { activeFriends } = useFriendships();
+  const { activeFriends, searchUsers, sendFriendRequest } = useFriendships();
 
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showAddFriend, setShowAddFriend] = useState(false);
@@ -588,7 +588,12 @@ const ProfilePage = ({ onNavigate, onOpenSettings, onOpenMore }: ProfilePageProp
 
       {/* ─── Modals ─── */}
       <EditProfileModal open={showEditProfile} onOpenChange={setShowEditProfile} />
-      <AddFriendModal open={showAddFriend} onOpenChange={setShowAddFriend} />
+      <AddFriendModal
+        open={showAddFriend}
+        onOpenChange={setShowAddFriend}
+        searchUsers={searchUsers}
+        onSendRequest={sendFriendRequest}
+      />
 
       {/* Friends now has its own dedicated page (see FriendsPage). */}
 
