@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { User, Bell, Shield, Palette, HelpCircle, LogOut, ChevronRight, Link2, Copy, Check, Unlink, Loader2, Calendar, ExternalLink, Users, DoorOpen, Trash2, ShieldCheck, AlertTriangle, Pencil, Activity } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
-import { requestCalendarPermission, getCalendarEvents, hasCalendarReadPermission } from "../integrations/appleCalendar";
-import { requestHealthKitReadPermission } from "../integrations/appleHealth";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -87,6 +85,7 @@ const SettingsPage = () => {
     let cancelled = false;
     (async () => {
       try {
+        const { hasCalendarReadPermission } = await import("@/integrations/appleCalendar");
         const ok = await hasCalendarReadPermission();
         if (!cancelled) setAppleCalendarConnected(ok);
       } catch {
@@ -101,6 +100,7 @@ const SettingsPage = () => {
   const handleConnectAppleCalendar = async () => {
     setAppleCalendarLoading(true);
     try {
+      const { requestCalendarPermission, getCalendarEvents } = await import("@/integrations/appleCalendar");
       const { result } = await requestCalendarPermission();
       if (result !== "granted") {
         toast.error("Calendar access was denied");
@@ -126,6 +126,7 @@ const SettingsPage = () => {
   const handleConnectAppleFitness = async () => {
     setAppleFitnessLoading(true);
     try {
+      const { requestHealthKitReadPermission } = await import("@/integrations/appleHealth");
       const granted = await requestHealthKitReadPermission();
       if (!granted) {
         toast.error("Health data access was denied");

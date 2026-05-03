@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight, Search, Flame, Target, Dumbbell, ArrowLeft, ChevronDown, ChevronUp, Plus, Heart, Footprints } from "lucide-react";
-import { useAppContext, Workout } from "@/context/AppContext";
+import { useAppContext } from "@/context/AppContext";
+import type { Workout } from "@/types/workoutModels";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import WorkoutDetailModal from "@/components/WorkoutDetailModal";

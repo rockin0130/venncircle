@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from "react";
 import { Sparkles, Loader2, Plus, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Workout } from "@/context/AppContext";
+import type { Workout } from "@/types/workoutModels";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import WorkoutContextSelector, { PERSONAL_ID } from "@/components/WorkoutContextSelector";

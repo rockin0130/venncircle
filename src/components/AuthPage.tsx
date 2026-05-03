@@ -67,7 +67,6 @@ const AuthPage = () => {
       } else {
         const { error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }));
         if (error) throw error;
-        toast.success("Welcome back!");
       }
     } catch (err: any) {
       const errorMessage =

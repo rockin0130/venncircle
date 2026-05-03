@@ -1,14 +1,15 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import GroupBadge from "@/components/GroupBadge";
-import { Plus, Flame, Check, Bell, Eye, EyeOff, MoreHorizontal } from "lucide-react";
+import { Plus, Flame, Check, Bell, Eye, EyeOff, MoreHorizontal, ChevronLeft, ChevronRight, Droplets } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { useAuth, GroupMember } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DraggableWaterBar from "@/components/DraggableWaterBar";
-import HabitDateViewer from "@/components/HabitDateViewer";
 import PartnerHabitDetailModal from "@/components/PartnerHabitDetailModal";
+import { SubPageBackButton } from "@/components/SubPageBackButton";
 
 import PageGroupSelector from "@/components/PageGroupSelector";
 import HabitUserFilter, { EVERYONE_SENTINEL } from "@/components/HabitUserFilter";
@@ -30,6 +31,11 @@ const DEFAULT_SECTIONS = [
 const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+const formatProgressViewDate = (dateStr: string) => {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 };
 
 const normalizeKey = (key: string) => key.toLowerCase().replace(/[\s_-]+/g, "").replace(/habits$/, "");
@@ -63,7 +69,11 @@ const USER_COLORS = [
 
 const getUserColor = (index: number) => USER_COLORS[index % USER_COLORS.length];
 
-const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => void; onOpenMore?: () => void } = {}) => {
+const HabitsPage = ({
+  onOpenSettings,
+  onOpenMore,
+  onSubPageBack,
+}: { onOpenSettings?: () => void; onOpenMore?: () => void; onSubPageBack?: () => void } = {}) => {
   const {
     habits, filteredHabits, filteredPartnerHabits,
     toggleHabit, addHabit, removeHabit, addSharedHabit,
@@ -74,6 +84,7 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
   const { user, partner, profile, activeGroup, groups, setActiveGroup } = useAuth();
   const [newHabitLabel, setNewHabitLabel] = useState("");
   const [addingToSection, setAddingToSection] = useState<string | null>(null);
+  const addRoutineInputRef = useRef<HTMLInputElement>(null);
   const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [viewingPartnerHabit, setViewingPartnerHabit] = useState<{ habit: Habit; ownerName: string } | null>(null);
@@ -90,6 +101,8 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
 
   const [editingWaterGoal, setEditingWaterGoal] = useState(false);
   const [customGoalInput, setCustomGoalInput] = useState("");
+  const [progressViewDate, setProgressViewDate] = useState(() => todayStr());
+  const [historicalProgressWater, setHistoricalProgressWater] = useState<{ intake: number; goal: number } | null>(null);
 
   const isPersonalActive = (activeGroup as any)?._personal === true;
   const isAllActive = activeGroup === null && !isPersonalActive;
@@ -265,6 +278,15 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
     checkNudges();
   }, [user, partner]);
 
+  const toggleAddRoutineSheet = (sectionKey: string) => {
+    setAddingToSection((prev) => (prev === sectionKey ? null : sectionKey));
+  };
+
+  useEffect(() => {
+    setNewHabitLabel("");
+    setSelectedContexts([]);
+  }, [addingToSection]);
+
   const normalizeName = (name: string) => name.toLowerCase().replace(/[\s\-_.,:;!?'"]/g, "").trim();
 
   const handleAdd = async () => {
@@ -381,20 +403,155 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
 
   const isMineOnly = selectedUsers.length === 1 && selectedUsers[0].id === user?.id;
 
+  const shiftProgressDate = useCallback((deltaDays: number) => {
+    const [y, m, d] = progressViewDate.split("-").map(Number);
+    const next = new Date(y, m - 1, d);
+    next.setDate(next.getDate() + deltaDays);
+    const nextStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+    const cap = todayStr();
+    if (nextStr > cap) return;
+    setProgressViewDate(nextStr);
+  }, [progressViewDate]);
+
+  const habitsDoneForProgressDate = useMemo(() => {
+    return allDisplayHabits.map((h) => ({
+      ...h,
+      done: h.completionDates.includes(progressViewDate),
+    }));
+  }, [allDisplayHabits, progressViewDate]);
+
+  const sectionProgressForDate = useMemo(() => {
+    return DEFAULT_SECTIONS.map((section) => {
+      const sHabits = getSectionHabits(section.key, habitsDoneForProgressDate);
+      const done = sHabits.filter((h) => h.done).length;
+      const total = sHabits.length;
+      return { ...section, done, total };
+    }).filter((s) => s.total > 0);
+  }, [habitsDoneForProgressDate]);
+
+  const progressTodayKey = todayStr();
+  const isProgressToday = progressViewDate === progressTodayKey;
+
+  /** Multi-user progress for the date shown in the progress card (habits only when not today; water included only for today). */
+  const progressPerUserForViewDate = useMemo(() => {
+    return selectedUsers.map((u) => {
+      const userHabits = habitsPerUser.get(u.id) || [];
+      const habitDone = userHabits.filter((h) => h.completionDates.includes(progressViewDate)).length;
+      const habitTotal = userHabits.length;
+      const isMe = u.id === user?.id;
+      if (isProgressToday) {
+        const userWaterIntake = isMe ? waterIntake : (partnerWaterMap.get(u.id)?.intake ?? 0);
+        const userWaterGoal = isMe ? waterGoal : (partnerWaterMap.get(u.id)?.goal ?? 3);
+        const waterDone = showWater && userWaterIntake >= userWaterGoal;
+        const totalWithWater = habitTotal + (showWater ? 1 : 0);
+        const doneWithWater = habitDone + (showWater && waterDone ? 1 : 0);
+        return {
+          ...u,
+          done: doneWithWater,
+          total: totalWithWater,
+          percent: totalWithWater > 0 ? Math.round((doneWithWater / totalWithWater) * 100) : 0,
+        };
+      }
+      return {
+        ...u,
+        done: habitDone,
+        total: habitTotal,
+        percent: habitTotal > 0 ? Math.round((habitDone / habitTotal) * 100) : 0,
+      };
+    });
+  }, [selectedUsers, habitsPerUser, progressViewDate, isProgressToday, user, showWater, waterIntake, waterGoal, partnerWaterMap]);
+
+  const mergedSingleUserProgress = useMemo(() => {
+    if (isMultiUser) return null;
+    if (isProgressToday) {
+      const p = progressPerUser[0];
+      return {
+        done: p?.done ?? 0,
+        total: p?.total ?? 0,
+        percent: p?.percent ?? 0,
+        sections: sectionProgress,
+      };
+    }
+    const habitDone = habitsDoneForProgressDate.filter((h) => h.done).length;
+    const habitTotal = habitsDoneForProgressDate.length;
+    let waterExtra = 0;
+    let waterDone = 0;
+    if (showWater && isMineOnly) {
+      waterExtra = 1;
+      if (historicalProgressWater) {
+        waterDone = historicalProgressWater.intake >= historicalProgressWater.goal ? 1 : 0;
+      }
+    }
+    const done = habitDone + waterDone;
+    const total = habitTotal + waterExtra;
+    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+    return {
+      done,
+      total,
+      percent,
+      sections: sectionProgressForDate,
+    };
+  }, [
+    isMultiUser,
+    isProgressToday,
+    progressPerUser,
+    sectionProgress,
+    habitsDoneForProgressDate,
+    sectionProgressForDate,
+    showWater,
+    isMineOnly,
+    historicalProgressWater,
+  ]);
+
+  useEffect(() => {
+    if (isMultiUser || !isMineOnly || !showWater || isProgressToday || !user) {
+      setHistoricalProgressWater(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("water_tracking")
+        .select("intake, goal")
+        .eq("user_id", user.id)
+        .eq("date", progressViewDate)
+        .maybeSingle();
+      if (cancelled) return;
+      setHistoricalProgressWater(
+        data ? { intake: Number(data.intake), goal: Number(data.goal) } : { intake: 0, goal: 3 },
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isMultiUser, isMineOnly, showWater, isProgressToday, user, progressViewDate]);
+
   // ── MAIN VIEW ──
   return (
     <div className="px-5">
 
       {/* ── Header ── */}
-      <header className="safe-area-top pt-3 pb-4 flex items-start justify-between">
-        <div>
-          <h1 className="text-[1.75rem] font-bold tracking-display">Routines</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Build a better routine</p>
+      <header className="safe-area-top pt-3 pb-4 flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2 min-w-0 flex-1">
+          {onSubPageBack && (
+            <div className="pt-1.5 shrink-0">
+              <SubPageBackButton onBack={onSubPageBack} />
+            </div>
+          )}
+          <div className="min-w-0">
+            <h1 className="text-[1.75rem] font-bold tracking-display">Routines</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Build a better routine</p>
+          </div>
         </div>
         <div className="flex items-center gap-1.5 mt-1">
           <button
-            onClick={() => setAddingToSection(addingToSection ? null : "morning")}
-            className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-md active:scale-95 transition-transform"
+            type="button"
+            onClick={() => toggleAddRoutineSheet("morning")}
+            className={`w-9 h-9 rounded-full flex items-center justify-center shadow-md active:scale-95 transition-transform ${
+              addingToSection === "morning"
+                ? "bg-primary text-primary-foreground ring-2 ring-primary/30 ring-offset-2 ring-offset-background"
+                : "bg-primary text-primary-foreground"
+            }`}
             aria-label="Add routine"
           >
             <Plus size={18} strokeWidth={2.5} />
@@ -439,56 +596,123 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
       {/* ── Progress Card ── */}
       <div className="bg-card rounded-xl p-4 border border-border shadow-card mb-5">
         {isMultiUser ? (
-          <>
-            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-3">Today's Progress</p>
-            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1" style={{ WebkitOverflowScrolling: "touch" }}>
-              {progressPerUser.map((pu) => {
-                const colorIdx = userColorMap.get(pu.id) ?? 0;
-                const color = getUserColor(colorIdx);
-                return (
-                  <div key={pu.id} className="flex flex-col items-center text-center flex-shrink-0" style={{ minWidth: 56 }}>
-                    {pu.avatarUrl ? (
-                      <img src={pu.avatarUrl} alt="" className="w-[22px] h-[22px] rounded-full object-cover mb-1" />
-                    ) : (
-                      <span className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-[9px] font-bold mb-1"
-                        style={{ backgroundColor: color.bg, color: color.pillText }}>{pu.initial}</span>
-                    )}
-                    <span className="text-[9px] text-muted-foreground truncate w-full">{pu.label}</span>
-                    <span className="text-sm font-bold tracking-display mt-0.5">{pu.done}/{pu.total}</span>
-                    <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden mt-1">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${pu.percent}%`, backgroundColor: color.ring }} />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground mt-0.5">
-                      {pu.percent >= 100 ? `🎉 ${pu.percent}%` : `${pu.percent}%`}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground font-medium">Today's Progress</span>
-              <span className="text-sm font-semibold">{progressPerUser[0]?.done || 0} / {progressPerUser[0]?.total || 0} done</span>
-            </div>
-            <div className="h-2 bg-secondary rounded-full overflow-hidden mb-3">
-              <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progressPerUser[0]?.percent || 0}%` }} />
-            </div>
-            {sectionProgress.length > 0 && (
-              <div className="flex flex-wrap gap-x-3 gap-y-1">
-                {sectionProgress.map((sp) => {
-                  const dotColor = sp.done === sp.total ? "hsl(var(--habit-green, 142 71% 45%))" : sp.done > 0 ? "hsl(var(--primary))" : "hsl(var(--muted))";
+          <div className="flex gap-2 items-stretch">
+            <button
+              type="button"
+              onClick={() => shiftProgressDate(-1)}
+              className="flex-shrink-0 self-center p-2 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 transition-colors"
+              aria-label="Previous day"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="flex-1 min-w-0 flex flex-col items-center text-center">
+              <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-3 px-1">
+                {isProgressToday ? "Today's Progress" : formatProgressViewDate(progressViewDate)}
+              </p>
+              <div
+                className="flex w-full gap-3 justify-center flex-wrap pb-1 overflow-x-auto scrollbar-hide"
+                style={{ WebkitOverflowScrolling: "touch" }}
+              >
+                {progressPerUserForViewDate.map((pu) => {
+                  const colorIdx = userColorMap.get(pu.id) ?? 0;
+                  const color = getUserColor(colorIdx);
                   return (
-                    <span key={sp.key} className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
-                      {sp.label} {sp.done}/{sp.total}
-                    </span>
+                    <div key={pu.id} className="flex flex-col items-center text-center flex-shrink-0" style={{ minWidth: 56 }}>
+                      {pu.avatarUrl ? (
+                        <img src={pu.avatarUrl} alt="" className="w-[22px] h-[22px] rounded-full object-cover mb-1" />
+                      ) : (
+                        <span className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-[9px] font-bold mb-1"
+                          style={{ backgroundColor: color.bg, color: color.pillText }}>{pu.initial}</span>
+                      )}
+                      <span className="text-[9px] text-muted-foreground truncate w-full max-w-[72px]">{pu.label}</span>
+                      <span className="text-sm font-bold tracking-display mt-0.5">{pu.done}/{pu.total}</span>
+                      <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden mt-1 max-w-[56px] mx-auto">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${pu.percent}%`, backgroundColor: color.ring }} />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground mt-0.5">
+                        {pu.percent >= 100 ? `🎉 ${pu.percent}%` : `${pu.percent}%`}
+                      </span>
+                    </div>
                   );
                 })}
               </div>
-            )}
-          </>
+            </div>
+            <button
+              type="button"
+              onClick={() => shiftProgressDate(1)}
+              disabled={isProgressToday}
+              className="flex-shrink-0 self-center p-2 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+              aria-label="Next day"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2 items-stretch">
+            <button
+              type="button"
+              onClick={() => shiftProgressDate(-1)}
+              className="flex-shrink-0 self-center p-2 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 transition-colors"
+              aria-label="Previous day"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="flex-1 min-w-0 flex flex-col items-center text-center">
+              <div className="flex flex-col items-center gap-1 mb-2 w-full">
+                <span className="text-xs text-muted-foreground font-medium">
+                  {isProgressToday ? "Today's Progress" : formatProgressViewDate(progressViewDate)}
+                </span>
+                <span className="text-sm font-semibold">
+                  {mergedSingleUserProgress.done} / {mergedSingleUserProgress.total} done
+                </span>
+              </div>
+              <div className="h-2 w-full max-w-xs mx-auto bg-secondary rounded-full overflow-hidden mb-3">
+                <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${mergedSingleUserProgress.percent}%` }} />
+              </div>
+              {mergedSingleUserProgress.sections.length > 0 && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center">
+                  {mergedSingleUserProgress.sections.map((sp) => {
+                    const dotColor = sp.done === sp.total ? "hsl(var(--habit-green, 142 71% 45%))" : sp.done > 0 ? "hsl(var(--primary))" : "hsl(var(--muted))";
+                    return (
+                      <span key={sp.key} className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
+                        {sp.label} {sp.done}/{sp.total}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              {!isProgressToday && showWater && isMineOnly && historicalProgressWater && (
+                <div className="mt-3 pt-3 border-t border-border w-full max-w-xs mx-auto">
+                  <div className="flex items-center gap-2 mb-1 justify-center">
+                    <Droplets size={14} className="text-primary" />
+                    <span className="text-sm font-medium">Water Intake</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-2 text-sm">
+                    <span className="font-bold">{historicalProgressWater.intake.toFixed(1)}L</span>
+                    <span className="text-muted-foreground">/ {historicalProgressWater.goal}L</span>
+                  </div>
+                  <div className="mt-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full transition-all"
+                      style={{
+                        width: `${historicalProgressWater.goal > 0 ? Math.min((historicalProgressWater.intake / historicalProgressWater.goal) * 100, 100) : 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => shiftProgressDate(1)}
+              disabled={isProgressToday}
+              className="flex-shrink-0 self-center p-2 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+              aria-label="Next day"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
         )}
       </div>
 
@@ -586,9 +810,6 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
         ><Eye size={14} /><span>Show Water Intake</span></button>
       )}
 
-      {/* Past Date Viewer */}
-      <HabitDateViewer />
-
       {/* ── Habits List ── */}
       {isMultiUser ? (
         /* Multi-user: column layout per period */
@@ -651,58 +872,23 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
                             const streak = own ? getHabitStreak(habit.id) : getPartnerHabitStreak(habit.id);
                             const ownerName = getHabitOwnerName(habit);
                             return (
-                              <div
+                              <MultiUserGroupRoutineCell
                                 key={habit.id}
-                                onClick={() => {
-                                  if (own) setEditingHabit(habit);
-                                  else setViewingPartnerHabit({ habit, ownerName });
-                                }}
-                                className={`rounded-lg p-2.5 border cursor-pointer active:scale-[0.98] transition-all ${habit.done ? "opacity-45" : ""}`}
-                                style={{
-                                  backgroundColor: color.bg,
-                                  borderColor: color.border,
-                                  boxSizing: "border-box",
-                                }}
-                              >
-                                <div className="flex items-start gap-1.5">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (own) handleToggle(habit.id);
-                                    }}
-                                    disabled={!own}
-                                    className="flex-shrink-0 mt-0.5"
-                                  >
-                                    {habit.done ? (
-                                      <span className="w-4 h-4 rounded-full bg-habit-green flex items-center justify-center">
-                                        <Check size={10} className="text-primary-foreground" />
-                                      </span>
-                                    ) : (
-                                      <span className="w-4 h-4 rounded-full border-2 border-muted" />
-                                    )}
-                                  </button>
-                                  <div className="flex-1 min-w-0">
-                                    <span className={`text-[11px] font-medium block truncate ${habit.done ? "line-through" : ""}`}>{habit.label}</span>
-                                    {streak >= 1 && (
-                                      <span className="text-[9px] text-accent flex items-center gap-0.5 mt-0.5">
-                                        🔥 {streak}d
-                                      </span>
-                                    )}
-                                    {/* Nudge button for other users' incomplete habits */}
-                                    {!own && !habit.done && habit.ownerUserId && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          sendNudge(habit.label, habit.id, habit.ownerUserId!, ownerName);
-                                        }}
-                                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-primary/30 text-primary text-[9px] font-semibold mt-1 hover:bg-primary/10 transition-colors"
-                                      >
-                                        <Bell size={8} /> Nudge
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
+                                habit={habit}
+                                own={own}
+                                color={color}
+                                isGroupActive={isGroupActive}
+                                onToggle={handleToggle}
+                                onEditOwn={(h) => setEditingHabit(h)}
+                                onViewPartner={(h, name) => setViewingPartnerHabit({ habit: h, ownerName: name })}
+                                ownerName={ownerName}
+                                streak={streak}
+                                onNudge={
+                                  !own && !habit.done && habit.ownerUserId
+                                    ? () => sendNudge(habit.label, habit.id, habit.ownerUserId!, ownerName)
+                                    : undefined
+                                }
+                              />
                             );
                           })
                         )}
@@ -719,7 +905,6 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
         DEFAULT_SECTIONS.map((section) => {
           const sectionHabits = getSectionHabits(section.key, allDisplayHabits);
           const sectionCompleted = sectionHabits.filter((h) => h.done).length;
-          const isAdding = addingToSection === section.key;
           const showEmptySection = isMineOnly || isPersonalActive;
 
           if (sectionHabits.length === 0 && !showEmptySection) return null;
@@ -735,22 +920,20 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
                 )}
                 <div className="flex-1 h-px bg-border" />
                 {(isMineOnly || isPersonalActive) && (
-                  <button onClick={() => setAddingToSection(isAdding ? null : section.key)}
-                    className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary hover:bg-primary/20 transition-colors"
-                  ><Plus size={12} /></button>
+                  <button
+                    type="button"
+                    onClick={() => toggleAddRoutineSheet(section.key)}
+                    className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                      addingToSection === section.key
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-primary/10 text-primary hover:bg-primary/20"
+                    }`}
+                    aria-label={`Add ${section.label} routine`}
+                  >
+                    <Plus size={12} />
+                  </button>
                 )}
               </div>
-
-              {isAdding && (
-                <AddHabitForm
-                  value={newHabitLabel}
-                  onChange={setNewHabitLabel}
-                  onSubmit={handleAdd}
-                  selectedContexts={selectedContexts}
-                  onChangeContexts={setSelectedContexts}
-                  placeholder={`Add ${section.label.toLowerCase()} routine...`}
-                />
-              )}
 
               {sectionHabits.length > 0 ? (
                 <div className="space-y-1.5">
@@ -770,6 +953,7 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
                         onNudge={!own && habit.ownerUserId ? () => sendNudge(habit.label, habit.id, habit.ownerUserId!, ownerName) : undefined}
                         nudgeLabel={!own && habit.ownerUserId ? `Nudge ${ownerName}` : undefined}
                         showNotShared={own ? shouldShowNotShared(habit) : false}
+                        groupTabCard={isGroupActive}
                       />
                     );
                   })}
@@ -792,6 +976,46 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
         open={!!viewingPartnerHabit}
         onClose={() => setViewingPartnerHabit(null)}
       />
+
+      <Sheet
+        open={addingToSection !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAddingToSection(null);
+            setDuplicateConfirm(null);
+          }
+        }}
+      >
+        <SheetContent
+          side="bottom"
+          className="rounded-t-2xl max-h-[min(90dvh,640px)] overflow-y-auto px-5 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] max-w-md mx-auto left-0 right-0"
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            queueMicrotask(() => addRoutineInputRef.current?.focus());
+          }}
+        >
+          {addingToSection ? (
+            <>
+              <SheetHeader className="space-y-1 pb-4 text-left">
+                <SheetTitle>Add routine</SheetTitle>
+                <SheetDescription>
+                  {DEFAULT_SECTIONS.find((s) => s.key === addingToSection)?.label ?? "Routine"} — add a new item to this section.
+                </SheetDescription>
+              </SheetHeader>
+              <AddHabitForm
+                value={newHabitLabel}
+                onChange={setNewHabitLabel}
+                onSubmit={handleAdd}
+                selectedContexts={selectedContexts}
+                onChangeContexts={setSelectedContexts}
+                placeholder={`Add ${(DEFAULT_SECTIONS.find((s) => s.key === addingToSection)?.label ?? "routine").toLowerCase()} routine...`}
+                inputRef={addRoutineInputRef}
+                className="mb-0"
+              />
+            </>
+          ) : null}
+        </SheetContent>
+      </Sheet>
 
       {routinePhotoPrompt && (
         <RoutinePhotoPrompt
@@ -831,7 +1055,14 @@ const HabitsPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => voi
 
 // ── Add Habit Form with Context Selector ──
 const AddHabitForm = ({
-  value, onChange, onSubmit, selectedContexts, onChangeContexts, placeholder,
+  value,
+  onChange,
+  onSubmit,
+  selectedContexts,
+  onChangeContexts,
+  placeholder,
+  inputRef,
+  className,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -839,25 +1070,276 @@ const AddHabitForm = ({
   selectedContexts: string[];
   onChangeContexts: (contexts: string[]) => void;
   placeholder: string;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  className?: string;
 }) => (
-  <div className="space-y-2 mb-3">
+  <div className={`space-y-2 mb-3 ${className ?? ""}`}>
     <input
+      ref={inputRef}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => e.key === "Enter" && onSubmit()}
       placeholder={placeholder}
-      className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
-      autoFocus
+      className="w-full bg-card border border-border rounded-lg px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+      autoFocus={!inputRef}
     />
     <HabitContextSelector
       selectedContexts={selectedContexts}
       onChangeContexts={onChangeContexts}
     />
-    <button onClick={onSubmit} className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">
+    <button
+      type="button"
+      onClick={onSubmit}
+      className="w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium"
+    >
       Add
     </button>
   </div>
 );
+
+const GROUP_ROUTINE_LONG_PRESS_MS = 300;
+const GROUP_ROUTINE_MOVE_CANCEL_PX = 12;
+
+/** Short tap vs long press (300ms) for group-tab own routines; ignores small movement. */
+function useGroupRoutineGestures(enabled: boolean, onShortTap: () => void, onLongPress: () => void) {
+  const shortRef = useRef(onShortTap);
+  const longRef = useRef(onLongPress);
+  shortRef.current = onShortTap;
+  longRef.current = onLongPress;
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longFiredRef = useRef(false);
+  const startRef = useRef<{ x: number; y: number } | null>(null);
+  const movedRef = useRef(false);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearTimer(), [clearTimer]);
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (!enabled || e.button !== 0) return;
+      longFiredRef.current = false;
+      movedRef.current = false;
+      startRef.current = { x: e.clientX, y: e.clientY };
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        if (movedRef.current) return;
+        longFiredRef.current = true;
+        longRef.current();
+        navigator.vibrate?.(12);
+      }, GROUP_ROUTINE_LONG_PRESS_MS);
+    },
+    [enabled]
+  );
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!enabled || !startRef.current) return;
+      const dx = e.clientX - startRef.current.x;
+      const dy = e.clientY - startRef.current.y;
+      if (dx * dx + dy * dy > GROUP_ROUTINE_MOVE_CANCEL_PX * GROUP_ROUTINE_MOVE_CANCEL_PX) {
+        movedRef.current = true;
+        clearTimer();
+      }
+    },
+    [enabled, clearTimer]
+  );
+
+  const finishPointer = useCallback(
+    (e: React.PointerEvent, asCancel: boolean) => {
+      if (!enabled || e.button !== 0) return;
+      clearTimer();
+      const moved = movedRef.current;
+      const longed = longFiredRef.current;
+      longFiredRef.current = false;
+      movedRef.current = false;
+      startRef.current = null;
+      if (asCancel || moved) return;
+      if (longed) return;
+      shortRef.current();
+    },
+    [enabled, clearTimer]
+  );
+
+  const onPointerUp = useCallback((e: React.PointerEvent) => finishPointer(e, false), [finishPointer]);
+  const onPointerCancel = useCallback((e: React.PointerEvent) => finishPointer(e, true), [finishPointer]);
+
+  if (!enabled) {
+    return { pointerHandlers: {} };
+  }
+
+  return {
+    pointerHandlers: {
+      onPointerDown,
+      onPointerMove,
+      onPointerUp,
+      onPointerCancel,
+      onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+    },
+  };
+}
+
+type UserColorSwatch = (typeof USER_COLORS)[number];
+
+const MultiUserGroupRoutineCell = ({
+  habit,
+  own,
+  color,
+  isGroupActive,
+  onToggle,
+  onEditOwn,
+  onViewPartner,
+  ownerName,
+  streak,
+  onNudge,
+}: {
+  habit: Habit;
+  own: boolean;
+  color: UserColorSwatch;
+  isGroupActive: boolean;
+  onToggle: (id: string) => void;
+  onEditOwn: (h: Habit) => void;
+  onViewPartner: (h: Habit, ownerName: string) => void;
+  ownerName: string;
+  streak: number;
+  onNudge?: () => void;
+}) => {
+  const { pointerHandlers } = useGroupRoutineGestures(
+    isGroupActive && own,
+    () => onToggle(habit.id),
+    () => onEditOwn(habit)
+  );
+
+  const shellStyle = {
+    backgroundColor: color.bg,
+    borderColor: color.border,
+    boxSizing: "border-box" as const,
+  };
+
+  if (isGroupActive && own) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        {...pointerHandlers}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle(habit.id);
+          }
+        }}
+        className={`rounded-lg p-2.5 border cursor-pointer active:scale-[0.98] transition-all touch-pan-y select-none ${habit.done ? "opacity-45" : ""}`}
+        style={shellStyle}
+        aria-label={`${habit.label}. Tap to toggle done. Hold to edit.`}
+      >
+        <div className="flex-1 min-w-0">
+          <span className={`text-[11px] font-medium block truncate ${habit.done ? "line-through" : ""}`}>{habit.label}</span>
+          {streak >= 1 && (
+            <span className="text-[9px] text-accent flex items-center gap-0.5 mt-0.5">
+              🔥 {streak}d
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (isGroupActive && !own) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onViewPartner(habit, ownerName)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onViewPartner(habit, ownerName);
+          }
+        }}
+        className={`rounded-lg p-2.5 border cursor-pointer active:scale-[0.98] transition-all ${habit.done ? "opacity-45" : ""}`}
+        style={shellStyle}
+      >
+        <div className="flex-1 min-w-0">
+          <span className={`text-[11px] font-medium block truncate ${habit.done ? "line-through" : ""}`}>{habit.label}</span>
+          {streak >= 1 && (
+            <span className="text-[9px] text-accent flex items-center gap-0.5 mt-0.5">
+              🔥 {streak}d
+            </span>
+          )}
+          {onNudge && !habit.done && habit.ownerUserId && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onNudge();
+              }}
+              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-primary/30 text-primary text-[9px] font-semibold mt-1 hover:bg-primary/10 transition-colors"
+            >
+              <Bell size={8} /> Nudge
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => {
+        if (own) onEditOwn(habit);
+        else onViewPartner(habit, ownerName);
+      }}
+      className={`rounded-lg p-2.5 border cursor-pointer active:scale-[0.98] transition-all ${habit.done ? "opacity-45" : ""}`}
+      style={shellStyle}
+    >
+      <div className="flex items-start gap-1.5">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (own) onToggle(habit.id);
+          }}
+          disabled={!own}
+          className="flex-shrink-0 mt-0.5"
+        >
+          {habit.done ? (
+            <span className="w-4 h-4 rounded-full bg-habit-green flex items-center justify-center">
+              <Check size={10} className="text-primary-foreground" />
+            </span>
+          ) : (
+            <span className="w-4 h-4 rounded-full border-2 border-muted" />
+          )}
+        </button>
+        <div className="flex-1 min-w-0">
+          <span className={`text-[11px] font-medium block truncate ${habit.done ? "line-through" : ""}`}>{habit.label}</span>
+          {streak >= 1 && (
+            <span className="text-[9px] text-accent flex items-center gap-0.5 mt-0.5">
+              🔥 {streak}d
+            </span>
+          )}
+          {!own && !habit.done && habit.ownerUserId && onNudge && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onNudge();
+              }}
+              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-primary/30 text-primary text-[9px] font-semibold mt-1 hover:bg-primary/10 transition-colors"
+            >
+              <Bell size={8} /> Nudge
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface HabitRowProps {
   habit: { id: string; label: string; done: boolean; groupId?: string | null; category: string; sharedGroupIds?: string[] };
@@ -869,15 +1351,36 @@ interface HabitRowProps {
   onNudge?: () => void;
   nudgeLabel?: string;
   showNotShared?: boolean;
+  /** Group tab (specific group): tap toggles completion; long-press opens edit; completion circle hidden for own rows. */
+  groupTabCard?: boolean;
 }
 
-const HabitRow = ({ habit, onToggle, onEdit, onViewDetail, streak, isViewingPartner, onNudge, nudgeLabel, showNotShared }: HabitRowProps) => {
+const HabitRow = ({
+  habit,
+  onToggle,
+  onEdit,
+  onViewDetail,
+  streak,
+  isViewingPartner,
+  onNudge,
+  nudgeLabel,
+  showNotShared,
+  groupTabCard = false,
+}: HabitRowProps) => {
+  const ownGroupTapHold = groupTabCard && !isViewingPartner && !!onEdit;
+  const { pointerHandlers } = useGroupRoutineGestures(
+    ownGroupTapHold,
+    () => onToggle(habit.id),
+    () => onEdit?.(habit)
+  );
+
   const handleCircleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isViewingPartner) onToggle(habit.id);
   };
 
   const handleCardClick = () => {
+    if (groupTabCard) return;
     if (isViewingPartner) {
       onViewDetail?.(habit);
       return;
@@ -885,46 +1388,106 @@ const HabitRow = ({ habit, onToggle, onEdit, onViewDetail, streak, isViewingPart
     onEdit?.(habit);
   };
 
+  const cardClass = `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
+    habit.done ? "border-habit-green bg-habit-green/5 opacity-50" : "border-border bg-card"
+  } ${isViewingPartner ? "cursor-pointer active:scale-[0.98]" : "active:scale-[0.98] cursor-pointer"}`;
+
   return (
     <div className="w-full">
-      <div
-        onClick={handleCardClick}
-        className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
-          habit.done ? "border-habit-green bg-habit-green/5 opacity-50" : "border-border bg-card"
-        } ${isViewingPartner ? "cursor-pointer active:scale-[0.98]" : "active:scale-[0.98] cursor-pointer"}`}
-      >
-        <button
-          onClick={handleCircleClick}
-          disabled={isViewingPartner}
-          className="w-11 h-11 -m-2.5 flex items-center justify-center flex-shrink-0 rounded-full"
-          aria-label={habit.done ? "Mark incomplete" : "Mark complete"}
+      {groupTabCard && isViewingPartner ? (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onViewDetail?.(habit)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onViewDetail?.(habit);
+            }
+          }}
+          className={cardClass}
         >
-          {habit.done ? (
-            <span className="w-[22px] h-[22px] rounded-full bg-habit-green flex items-center justify-center">
-              <Check size={12} className="text-primary-foreground" />
+          <span className={`flex-1 text-left text-[13px] font-medium ${habit.done ? "line-through" : ""}`}>{habit.label}</span>
+          {showNotShared && (
+            <span className="flex items-center gap-1 text-muted-foreground/60 flex-shrink-0" title="Only visible to you in this group. Tap to view.">
+              <EyeOff size={13} />
+              <span className="text-[10px] font-medium hidden sm:inline">Only you</span>
             </span>
-          ) : (
-            <span className="w-[22px] h-[22px] rounded-full border-2 border-muted" />
           )}
-        </button>
-        <span className={`flex-1 text-left text-[13px] font-medium ${habit.done ? "line-through" : ""}`}>{habit.label}</span>
-        {showNotShared && (
-          <span className="flex items-center gap-1 text-muted-foreground/60 flex-shrink-0" title="Only visible to you in this group. Tap Edit to share.">
-            <EyeOff size={13} />
-            <span className="text-[10px] font-medium hidden sm:inline">Only you</span>
-          </span>
-        )}
-        <GroupBadge groupId={habit.groupId} />
-        {streak >= 1 && (
-          <div className="flex items-center gap-0.5 text-accent flex-shrink-0">
-            <span className="text-xs">🔥</span>
-            <span className="text-xs font-bold">{streak}d</span>
-          </div>
-        )}
-      </div>
-      {onNudge && !habit.done && (
-        <div className="flex items-center justify-end ml-10 mt-1 mb-1">
+          <GroupBadge groupId={habit.groupId} />
+          {streak >= 1 && (
+            <div className="flex items-center gap-0.5 text-accent flex-shrink-0">
+              <span className="text-xs">🔥</span>
+              <span className="text-xs font-bold">{streak}d</span>
+            </div>
+          )}
+        </div>
+      ) : ownGroupTapHold ? (
+        <div
+          role="button"
+          tabIndex={0}
+          {...pointerHandlers}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onToggle(habit.id);
+            }
+          }}
+          className={`${cardClass} touch-pan-y select-none`}
+          aria-label={`${habit.label}. Tap to toggle done. Hold to edit.`}
+        >
+          <span className={`flex-1 text-left text-[13px] font-medium ${habit.done ? "line-through" : ""}`}>{habit.label}</span>
+          {showNotShared && (
+            <span className="flex items-center gap-1 text-muted-foreground/60 flex-shrink-0" title="Only visible to you in this group. Hold to edit to share.">
+              <EyeOff size={13} />
+              <span className="text-[10px] font-medium hidden sm:inline">Only you</span>
+            </span>
+          )}
+          <GroupBadge groupId={habit.groupId} />
+          {streak >= 1 && (
+            <div className="flex items-center gap-0.5 text-accent flex-shrink-0">
+              <span className="text-xs">🔥</span>
+              <span className="text-xs font-bold">{streak}d</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div onClick={handleCardClick} className={cardClass}>
           <button
+            type="button"
+            onClick={handleCircleClick}
+            disabled={isViewingPartner}
+            className="w-11 h-11 -m-2.5 flex items-center justify-center flex-shrink-0 rounded-full"
+            aria-label={habit.done ? "Mark incomplete" : "Mark complete"}
+          >
+            {habit.done ? (
+              <span className="w-[22px] h-[22px] rounded-full bg-habit-green flex items-center justify-center">
+                <Check size={12} className="text-primary-foreground" />
+              </span>
+            ) : (
+              <span className="w-[22px] h-[22px] rounded-full border-2 border-muted" />
+            )}
+          </button>
+          <span className={`flex-1 text-left text-[13px] font-medium ${habit.done ? "line-through" : ""}`}>{habit.label}</span>
+          {showNotShared && (
+            <span className="flex items-center gap-1 text-muted-foreground/60 flex-shrink-0" title="Only visible to you in this group. Tap Edit to share.">
+              <EyeOff size={13} />
+              <span className="text-[10px] font-medium hidden sm:inline">Only you</span>
+            </span>
+          )}
+          <GroupBadge groupId={habit.groupId} />
+          {streak >= 1 && (
+            <div className="flex items-center gap-0.5 text-accent flex-shrink-0">
+              <span className="text-xs">🔥</span>
+              <span className="text-xs font-bold">{streak}d</span>
+            </div>
+          )}
+        </div>
+      )}
+      {onNudge && !habit.done && (
+        <div className={`flex items-center justify-end mt-1 mb-1 ${groupTabCard ? "ml-0" : "ml-10"}`}>
+          <button
+            type="button"
             onClick={onNudge}
             className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-semibold hover:bg-primary/20 transition-colors"
           >

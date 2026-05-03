@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Capacitor } from "@capacitor/core";
-import { listDeviceCalendars, normalizeAppleCalendarColor } from "@/integrations/appleCalendar";
+import { normalizeAppleCalendarColor } from "@/lib/normalizeAppleCalendarColor";
 import type { Calendar } from "@ebarooni/capacitor-calendar";
 import { APPLE_CALENDAR_VISIBILITY_CHANGED } from "@/lib/appleCalendarVisibility";
 import {
@@ -192,7 +192,8 @@ const CalendarsManager = ({ open, onClose }: Props) => {
     }
     let cancelled = false;
     setAppleCalendarsLoading(true);
-    listDeviceCalendars()
+    import("@/integrations/appleCalendar")
+      .then((m) => m.listDeviceCalendars())
       .then((list) => {
         if (cancelled) return;
         const sorted = [...list].sort((a, b) => a.title.localeCompare(b.title));

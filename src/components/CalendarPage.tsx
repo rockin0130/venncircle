@@ -26,6 +26,7 @@ import CalendarsManager from "@/components/CalendarsManager";
 import CalendarUserFilter from "@/components/CalendarUserFilter";
 import { APPLE_CALENDAR_VISIBILITY_CHANGED } from "@/lib/appleCalendarVisibility";
 import { isAppleDeviceCalendarVisible, getAppleCalendarDisplayColor } from "@/lib/appleCalendarPrefs";
+import { SubPageBackButton } from "@/components/SubPageBackButton";
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -227,7 +228,11 @@ interface CalendarRecord {
 
 // ── Main Component ──────────────────────────────────────────
 
-const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => void; onOpenMore?: () => void } = {}) => {
+const CalendarPage = ({
+  onOpenSettings,
+  onOpenMore,
+  onSubPageBack,
+}: { onOpenSettings?: () => void; onOpenMore?: () => void; onSubPageBack?: () => void } = {}) => {
   const {
     events, filteredEvents, removeEvent, rescheduleEvent,
     tasks, filteredTasks, toggleTask, removeTask,
@@ -1021,6 +1026,11 @@ const CalendarPage = ({ onOpenSettings, onOpenMore }: { onOpenSettings?: () => v
     <div className="px-4 pb-24">
       {/* ── Header ──────────────────────────────────────── */}
       <header className="safe-area-top pt-3 pb-2">
+        {onSubPageBack && (
+          <div className="flex items-center pb-2">
+            <SubPageBackButton onBack={onSubPageBack} />
+          </div>
+        )}
         <div className="flex items-center justify-between">
           {/* Left: Month Year */}
           {viewMode === "week" ? (

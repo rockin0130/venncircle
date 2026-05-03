@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { takePhoto } from "@/integrations/camera";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Workout } from "@/context/AppContext";
+import type { Workout } from "@/types/workoutModels";
 
 const SUPPRESS_KEY = "suppress_workout_photo_prompt_date";
 

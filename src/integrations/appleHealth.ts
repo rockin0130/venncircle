@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { Health } from "@capgo/capacitor-health";
 import type { HealthDataType, Workout as HKWorkout, WorkoutType } from "@capgo/capacitor-health";
-import type { Workout } from "@/context/AppContext";
+import type { Workout } from "@/types/workoutModels";
 import { formatHealthKitWorkoutLabel } from "@/lib/healthKitWorkoutTypes";
 import { getWorkoutTypeEmoji, normalizeWorkoutType, parseWorkoutDurationToMinutes } from "@/lib/workoutSync";
 

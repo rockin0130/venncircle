@@ -35,7 +35,6 @@ const GroupInviteRequestCard = ({ invite, variant = "card", onResolved }: Props)
       setBusy(null);
       return;
     }
-    toast.success(`Joined ${invite.group_name} 🎉`);
     onResolved?.();
   };
 

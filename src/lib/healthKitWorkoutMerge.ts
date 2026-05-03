@@ -1,4 +1,4 @@
-import type { Workout } from "@/context/AppContext";
+import type { Workout } from "@/types/workoutModels";
 
 /**
  * Merges HealthKit-only workouts with app (Supabase) workouts for the current user.

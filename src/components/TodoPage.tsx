@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Plus, ChevronDown, ChevronRight, MoreHorizontal, AlertTriangle, Sparkles, Calendar as CalendarIcon, Pencil, Trash2, ListTodo, Loader2, X } from "lucide-react";
+import { Check, Plus, ChevronDown, ChevronRight, MoreHorizontal, AlertTriangle, Sparkles, Calendar as CalendarIcon, Pencil, Trash2, Loader2 } from "lucide-react";
 import { useAppContext, Task } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
-import PageGroupSelector from "@/components/PageGroupSelector";
 import { Calendar } from "@/components/ui/calendar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { SubPageBackButton } from "@/components/SubPageBackButton";
 
 type Priority = "high" | "medium" | "low" | "none";
 
@@ -39,9 +39,9 @@ const PRIORITY_CONFIG: Record<string, { label: string; border: string; bg: strin
   },
 };
 
-const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
+const TodoPage = ({ onOpenMore, onSubPageBack }: { onOpenMore?: () => void; onSubPageBack?: () => void }) => {
   const { tasks, toggleTask, addTask, removeTask, updateTask } = useAppContext();
-  const { user, groups } = useAuth();
+  const { user } = useAuth();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showSchedule, setShowSchedule] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
@@ -51,9 +51,9 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
   const [breakdownSteps, setBreakdownSteps] = useState<{ title: string; description: string }[]>([]);
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [prioritizeLoading, setPrioritizeLoading] = useState(false);
-  const [todoExpanded, setTodoExpanded] = useState(true);
-  const [addingPriority, setAddingPriority] = useState<Priority | null>(null);
-  const [addingTodo, setAddingTodo] = useState(false);
+  /** Top-of-page add flow: expanded shows input + H/M/L + confirm. */
+  const [addTaskExpanded, setAddTaskExpanded] = useState(false);
+  const [selectedNewPriority, setSelectedNewPriority] = useState<"high" | "medium" | "low" | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -92,19 +92,17 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
   const highTasks = todoItems.filter(t => t.priority === "high");
   const mediumTasks = todoItems.filter(t => t.priority === "medium");
   const lowTasks = todoItems.filter(t => t.priority === "low");
-  const unsortedTasks = todoItems.filter(t => !t.priority || t.priority === "none");
-  const unsortedPending = unsortedTasks.filter(t => !t.done);
-
-  const hasPriorityItems = highTasks.length > 0 || mediumTasks.length > 0 || lowTasks.length > 0;
+  const unsortedPending = todoItems.filter((t) => (!t.priority || t.priority === "none") && !t.done);
 
   useEffect(() => {
-    if (hasPriorityItems && unsortedTasks.length > 0) setTodoExpanded(false);
-    else if (!hasPriorityItems) setTodoExpanded(true);
-  }, [hasPriorityItems]);
+    if (addTaskExpanded && inputRef.current) inputRef.current.focus();
+  }, [addTaskExpanded]);
 
-  useEffect(() => {
-    if ((addingPriority || addingTodo) && inputRef.current) inputRef.current.focus();
-  }, [addingPriority, addingTodo]);
+  const resetAddTaskFlow = () => {
+    setAddTaskExpanded(false);
+    setSelectedNewPriority(null);
+    setNewTitle("");
+  };
 
   const handleAddTask = (priority: Priority) => {
     if (!newTitle.trim()) return;
@@ -115,9 +113,12 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
       assignee: "me",
       priority,
     });
-    setNewTitle("");
-    setAddingPriority(null);
-    setAddingTodo(false);
+    resetAddTaskFlow();
+  };
+
+  const confirmAddTaskWithPriority = () => {
+    if (!newTitle.trim() || !selectedNewPriority) return;
+    handleAddTask(selectedNewPriority);
   };
 
   const handleTaskTap = (task: Task) => {
@@ -281,7 +282,7 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
     );
   };
 
-  const renderTaskRow = (task: Task, showIcon?: boolean) => {
+  const renderTaskRow = (task: Task) => {
     const dueDateLabel = task.dueDate
       ? new Date(task.dueDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
       : null;
@@ -315,11 +316,6 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
           >
             {task.done && <Check size={12} className="text-background" />}
           </button>
-          {showIcon && (
-            <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <ListTodo size={12} className="text-primary" />
-            </div>
-          )}
           <button
             onClick={() => handleTaskTap(task)}
             className="flex-1 min-w-0 text-left"
@@ -361,39 +357,17 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
     const config = PRIORITY_CONFIG[priority];
     return (
       <section key={priority} className={`rounded-xl border border-dashed ${config.border} ${config.bg} p-3 mb-4`}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={14} className={config.iconColor} />
-            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${config.badgeBg} ${config.badgeText}`}>
-              {config.label}
-            </span>
-          </div>
-          <button
-            onClick={() => { setAddingPriority(priority); setNewTitle(""); }}
-            className="w-6 h-6 rounded-lg bg-white/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Plus size={13} />
-          </button>
+        <div className="flex items-center gap-2 mb-2">
+          <AlertTriangle size={14} className={config.iconColor} />
+          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${config.badgeBg} ${config.badgeText}`}>
+            {config.label}
+          </span>
         </div>
-        {addingPriority === priority && (
-          <div className="flex items-center gap-2 mb-2">
-            <input
-              ref={inputRef}
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleAddTask(priority); if (e.key === "Escape") { setAddingPriority(null); setNewTitle(""); } }}
-              placeholder="Task name..."
-              className="flex-1 bg-white/80 rounded-lg px-3 py-2 text-sm outline-none border border-border/50"
-            />
-            <button onClick={() => handleAddTask(priority)} disabled={!newTitle.trim()} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-40">Add</button>
-            <button onClick={() => { setAddingPriority(null); setNewTitle(""); }} className="text-muted-foreground"><X size={14} /></button>
-          </div>
-        )}
-        {sectionTasks.length === 0 && addingPriority !== priority && (
+        {sectionTasks.length === 0 && (
           <p className="text-[11px] text-muted-foreground py-1">No tasks</p>
         )}
         <div className="divide-y divide-border/30">
-          {sectionTasks.map(t => renderTaskRow(t, true))}
+          {sectionTasks.map(t => renderTaskRow(t))}
         </div>
       </section>
     );
@@ -403,9 +377,12 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
     <div className="px-5 pb-8">
       {/* Header */}
       <header className="safe-area-top pt-3 pb-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: "'DM Sans', sans-serif" }}>To-Do</h1>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {onSubPageBack && <SubPageBackButton onBack={onSubPageBack} />}
+            <h1 className="text-xl font-bold tracking-tight truncate" style={{ fontFamily: "'DM Sans', sans-serif" }}>To-Do</h1>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             {unsortedPending.length > 0 && (
               <button
                 onClick={handlePrioritize}
@@ -426,60 +403,97 @@ const TodoPage = ({ onOpenMore }: { onOpenMore?: () => void }) => {
         </div>
       </header>
 
-      {/* Priority sections */}
-      {renderPrioritySection("high", highTasks)}
-      {renderPrioritySection("medium", mediumTasks)}
-      {renderPrioritySection("low", lowTasks)}
-
-      {/* Unsorted To-Do section */}
-      <section className="bg-card rounded-xl border shadow-sm p-3 mb-4" style={{ borderColor: "rgba(0,0,0,0.07)", borderWidth: "0.5px" }}>
-        <button
-          onClick={() => setTodoExpanded(!todoExpanded)}
-          className="flex items-center justify-between w-full mb-1"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-foreground">To-Do</span>
-            {todoExpanded ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronRight size={14} className="text-muted-foreground" />}
-          </div>
-          <span className="text-[11px] font-medium text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-md">{unsortedTasks.length}</span>
-        </button>
-
-        <AnimatePresence>
-          {todoExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
+      {/* Add task — top of page, above priority cards */}
+      <section className="mb-4">
+        <AnimatePresence mode="wait">
+          {!addTaskExpanded ? (
+            <motion.button
+              key="collapsed"
+              type="button"
+              initial={{ opacity: 0.9 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+              onClick={() => {
+                setAddTaskExpanded(true);
+                setNewTitle("");
+                setSelectedNewPriority(null);
+              }}
+              className="w-full flex items-center gap-3 rounded-xl border border-dashed border-border/70 bg-secondary/25 px-4 py-3.5 text-left text-muted-foreground hover:text-foreground hover:bg-secondary/40 active:scale-[0.99] transition-all"
             >
-              <div className="divide-y divide-border/30">
-                {unsortedTasks.map(t => renderTaskRow(t))}
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-background/80 border border-border/50">
+                <Plus size={16} className="text-foreground/70" />
+              </span>
+              <span className="text-sm font-medium">Add a task...</span>
+            </motion.button>
+          ) : (
+            <motion.div
+              key="expanded"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+              className="rounded-xl border border-border/80 bg-card p-3 shadow-sm"
+              style={{ borderWidth: "0.5px" }}
+            >
+              <input
+                ref={inputRef}
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") confirmAddTaskWithPriority();
+                  if (e.key === "Escape") resetAddTaskFlow();
+                }}
+                placeholder="Add a task..."
+                className="w-full rounded-xl border border-border/60 bg-secondary/30 px-3.5 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/25 placeholder:text-muted-foreground/70"
+              />
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-3 mb-2">Priority</p>
+              <div className="grid grid-cols-3 gap-2">
+                {(["high", "medium", "low"] as const).map((p) => {
+                  const cfg = PRIORITY_CONFIG[p];
+                  const active = selectedNewPriority === p;
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setSelectedNewPriority(p)}
+                      className={cn(
+                        "rounded-xl border py-2.5 text-xs font-semibold transition-all",
+                        active ? cn(cfg.bg, cfg.border, "ring-2 ring-primary/35 text-foreground") : "border-border/60 bg-background/80 text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
+                      )}
+                    >
+                      {cfg.label}
+                    </button>
+                  );
+                })}
               </div>
-              {addingTodo ? (
-                <div className="flex items-center gap-2 mt-2">
-                  <input
-                    ref={inputRef}
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleAddTask("none"); if (e.key === "Escape") { setAddingTodo(false); setNewTitle(""); } }}
-                    placeholder="Task name..."
-                    className="flex-1 bg-secondary/50 rounded-lg px-3 py-2 text-sm outline-none"
-                  />
-                  <button onClick={() => handleAddTask("none")} disabled={!newTitle.trim()} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-40">Add</button>
-                  <button onClick={() => { setAddingTodo(false); setNewTitle(""); }} className="text-muted-foreground"><X size={14} /></button>
-                </div>
-              ) : (
+              <div className="mt-3 flex gap-2">
                 <button
-                  onClick={() => { setAddingTodo(true); setNewTitle(""); }}
-                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm py-2 mt-1 transition-colors w-full"
+                  type="button"
+                  onClick={resetAddTaskFlow}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-border bg-secondary/50 text-foreground"
                 >
-                  <Plus size={14} /> Add a task...
+                  Cancel
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={confirmAddTaskWithPriority}
+                  disabled={!newTitle.trim() || !selectedNewPriority}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-primary-foreground disabled:opacity-40 transition-opacity"
+                  style={{ backgroundColor: "#6C47FF" }}
+                >
+                  Add task
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
       </section>
+
+      {/* Priority sections */}
+      {renderPrioritySection("high", highTasks)}
+      {renderPrioritySection("medium", mediumTasks)}
+      {renderPrioritySection("low", lowTasks)}
 
       {/* Task Options Sheet */}
       <Drawer open={!!selectedTask && !showSchedule && !showBreakdown && !showEdit && !showDeleteConfirm} onOpenChange={(open) => { if (!open) setSelectedTask(null); }}>

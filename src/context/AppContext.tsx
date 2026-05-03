@@ -10,6 +10,7 @@ import {
   deleteSectionFromDB,
 } from "@/lib/habitSections";
 import { parseWorkoutDurationToMinutes } from "@/lib/workoutSync";
+import type { AppleCalendarEvent, Workout } from "@/types/workoutModels";
 
 export interface Habit {
   id: string;
@@ -68,51 +69,6 @@ export interface Task {
   ownerUserId?: string;
   priority?: "high" | "medium" | "low" | "none";
   parentId?: string | null;
-}
-
-export type WorkoutOriginType = "manual" | "ai" | "imported" | "merged";
-export type WorkoutCompletionSource = "manual" | "auto_import" | "user_confirmed" | null;
-
-export interface Workout {
-  id: string;
-  title: string;
-  duration: string;
-  cal: number;
-  tag: string;
-  emoji: string;
-  done: boolean;
-  scheduledDate?: string;
-  completedDate?: string;
-  exercises?: { name: string; sets: number; reps: string }[];
-  hiddenFromPartner?: boolean;
-  groupId?: string | null;
-  ownerUserId?: string;
-  distance?: number;
-  distanceUnit?: string;
-  // Cardio metrics
-  heartRateAvg?: number | null;
-  paceAvg?: string | null;
-  speedAvg?: number | null;
-  elevationGain?: number | null;
-  cadenceAvg?: number | null;
-  // Device/source info
-  sourceApp?: string | null;
-  sourceDevice?: string | null;
-  routeData?: any | null;
-  // Completion photo
-  completionPhotoUrl?: string | null;
-  // Import/sync fields
-  externalId?: string | null;
-  normalizedType?: string | null;
-  originType?: WorkoutOriginType;
-  completionSource?: WorkoutCompletionSource;
-  matchedPlannedWorkoutId?: string | null;
-  needsReview?: boolean;
-  importedAt?: string | null;
-  startTime?: string | null;
-  endTime?: string | null;
-  // Cross-group linking
-  linkedWorkoutId?: string | null;
 }
 
 const CARDIO_TYPES = ["Running", "Walking", "Cycling", "Swimming"];
@@ -174,18 +130,6 @@ export interface GoogleCalendarEvent {
   calendarId?: string;
   calendarColor?: string | null;
   isApple?: boolean;
-}
-
-export interface AppleCalendarEvent {
-  id: string;
-  title: string;
-  startDate: number;
-  endDate: number;
-  allDay: boolean;
-  location?: string | null;
-  calendarId?: string;
-  calendarTitle?: string;
-  calendarColor?: string;
 }
 
 const mapAppleCalendarToGoogle = (ae: AppleCalendarEvent, ownerUserId: string): GoogleCalendarEvent => ({

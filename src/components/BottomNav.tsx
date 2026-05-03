@@ -4,7 +4,8 @@ import VennIcon from "@/components/VennIcon";
 export type Tab =
   | "home" | "shared-interests" | "ai" | "chat" | "profile" | "friends"
   | "workout" | "habits" | "sobriety"
-  | "calendar" | "study" | "todo" | "more" | "settings";
+  | "calendar" | "study" | "todo" | "more" | "settings"
+  | "group-hub";
 
 // Keep these exports for backward compat with MorePage etc.
 export const ALL_PAGE_META: Record<string, { label: string; icon: typeof Home; desc: string }> = {

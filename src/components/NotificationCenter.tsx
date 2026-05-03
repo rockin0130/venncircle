@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Bell, Check, Calendar, ListTodo, Heart, Dumbbell, UserPlus } from "lucide-react";
+import { X, Bell, Check, Calendar, ListTodo, Heart, Dumbbell, UserPlus, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppContext } from "@/context/AppContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -138,19 +138,27 @@ const NotificationCenter = ({ open, onClose }: Props) => {
           onClick={(e) => e.stopPropagation()}
           className="absolute top-0 left-0 right-0 max-w-md mx-auto bg-card border-b border-border shadow-lg max-h-[80vh] overflow-y-auto scroll-smooth-touch rounded-b-2xl safe-area-top"
         >
-          <div className="sticky top-[env(safe-area-inset-top,0px)] bg-card/95 backdrop-blur-sm border-b border-border/50 px-5 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bell size={18} className="text-foreground" />
-              <h2 className="text-lg font-bold" style={{ fontFamily: "'Georgia', serif", color: "hsl(25, 30%, 30%)" }}>
+          <div className="sticky top-[env(safe-area-inset-top,0px)] bg-card/95 backdrop-blur-sm border-b border-border/50 px-5 py-4 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary transition-colors shrink-0"
+                aria-label="Back"
+              >
+                <ArrowLeft size={18} className="text-muted-foreground" />
+              </button>
+              <Bell size={18} className="text-foreground shrink-0" />
+              <h2 className="text-lg font-bold truncate" style={{ fontFamily: "'Georgia', serif", color: "hsl(25, 30%, 30%)" }}>
                 Notifications
               </h2>
               {unreadCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                <span className="px-1.5 py-0.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold shrink-0">
                   {unreadCount}
                 </span>
               )}
             </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary transition-colors">
+            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary transition-colors shrink-0">
               <X size={18} className="text-muted-foreground" />
             </button>
           </div>

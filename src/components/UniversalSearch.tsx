@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Calendar, ListTodo, MessageCircle, Dumbbell, Heart, Apple, ShoppingCart, Trophy, ArrowRight } from "lucide-react";
+import { Search, X, Calendar, ListTodo, MessageCircle, Dumbbell, Heart, Apple, ShoppingCart, Trophy, ArrowRight, ArrowLeft } from "lucide-react";
 import { useAppContext, Task, ScheduledEvent } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -178,6 +178,17 @@ const UniversalSearch = ({ open, onClose, onNavigate }: Props) => {
         <div className="max-w-md mx-auto h-full flex flex-col">
           {/* Search header */}
           <div className="px-4 safe-area-top pt-3 pb-3">
+            <div className="flex items-center gap-2 mb-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-foreground hover:bg-secondary/80 transition-colors shrink-0"
+                aria-label="Back"
+              >
+                <ArrowLeft size={20} strokeWidth={2.25} />
+              </button>
+              <span className="text-sm font-semibold text-foreground">Search</span>
+            </div>
             <div className="flex items-center gap-3 bg-secondary/60 rounded-2xl px-4 py-3 border border-border/50">
               <Search size={18} className="text-muted-foreground flex-shrink-0" />
               <input

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { X, Plus, Trash2, Search, Dumbbell, ChevronDown, ChevronUp, Timer, Flame, MapPin, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WorkoutType as HealthWorkoutType } from "@capgo/capacitor-health";
-import { Workout } from "@/context/AppContext";
+import type { Workout } from "@/types/workoutModels";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";

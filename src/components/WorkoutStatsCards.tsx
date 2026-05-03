@@ -4,7 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Workout } from "@/context/AppContext";
+import type { Workout } from "@/types/workoutModels";
 import { type WeekStart, getWeekStartDate, loadWeekStart } from "@/hooks/useWeekStart";
 
 type TimeRange = "all" | "today" | "week" | "month" | "30days" | "custom";

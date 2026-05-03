@@ -24,6 +24,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import CreateGroupModal from "@/components/CreateGroupModal";
 import { toast } from "sonner";
+import { SubPageBackButton } from "@/components/SubPageBackButton";
 
 interface SobrietyCategory {
   id: string;
@@ -121,7 +122,7 @@ function getUserTone(index: number): UserTone {
   };
 }
 
-const SobrietyPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
+const SobrietyPage = ({ onOpenMore, onSubPageBack }: { onOpenMore?: () => void; onSubPageBack?: () => void } = {}) => {
   const { user, activeGroup, setActiveGroup, profile, groups } = useAuth();
 
   const [categories, setCategories] = useState<SobrietyCategory[]>([]);
@@ -894,7 +895,10 @@ const SobrietyPage = ({ onOpenMore }: { onOpenMore?: () => void } = {}) => {
     <div className="px-3 pb-8 safe-area-top pt-3">
       <div className="rounded-[30px] border border-[hsl(var(--sobriety-outline))] bg-[hsl(var(--sobriety-shell))] p-4 shadow-card">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-[2rem] font-semibold tracking-[-0.04em] text-foreground">Sobriety</h1>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {onSubPageBack && <SubPageBackButton onBack={onSubPageBack} />}
+            <h1 className="text-[2rem] font-semibold tracking-[-0.04em] text-foreground truncate">Sobriety</h1>
+          </div>
           <div className="flex items-center gap-1.5">
             <button
               type="button"

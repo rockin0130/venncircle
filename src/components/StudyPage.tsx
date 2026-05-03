@@ -16,6 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { SubPageBackButton } from "@/components/SubPageBackButton";
 
 // ═══ Types ═══
 interface StudySession {
@@ -32,6 +33,7 @@ interface StudySession {
 
 interface StudyPageProps {
   onOpenMore?: () => void;
+  onSubPageBack?: () => void;
 }
 
 // ═══ Constants ═══
@@ -187,7 +189,7 @@ const LiveTimer = ({ startedAt }: { startedAt: string }) => {
 };
 
 // ═══ Main Component ═══
-const StudyPage = ({ onOpenMore }: StudyPageProps) => {
+const StudyPage = ({ onOpenMore, onSubPageBack }: StudyPageProps) => {
   const { user, activeGroup, groups, profile } = useAuth();
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [groupSessions, setGroupSessions] = useState<StudySession[]>([]);
@@ -951,12 +953,13 @@ const StudyPage = ({ onOpenMore }: StudyPageProps) => {
   return (
     <div className="flex flex-col min-h-full pb-4" style={{ background: "#F4F3F0" }}>
       {/* ── Header ── */}
-      <div className="px-4 safe-area-top pt-3 pb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#FAF5FF" }}>
+      <div className="px-4 safe-area-top pt-3 pb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {onSubPageBack && <SubPageBackButton onBack={onSubPageBack} />}
+          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: "#FAF5FF" }}>
             <Clock size={18} color="#6C47FF" />
           </div>
-          <h1 className="text-xl font-bold text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>
+          <h1 className="text-xl font-bold text-foreground min-w-0 truncate" style={{ fontFamily: "DM Sans, sans-serif" }}>
             Study
           </h1>
         </div>

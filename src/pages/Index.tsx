@@ -51,6 +51,8 @@ const Index = () => {
   const [createGroupCategory, setCreateGroupCategory] = useState<"home" | "interest" | undefined>(undefined);
   const [hubGroup, setHubGroup] = useState<Group | null>(null);
   const [workoutNavigatedGroupId, setWorkoutNavigatedGroupId] = useState<string | null>(null);
+  /** When opening Workout/Routines/etc. from Home or Group Hub, show back to that screen (not a main tab). */
+  const [featureReturnTarget, setFeatureReturnTarget] = useState<null | "home" | "group-hub">(null);
   const [storyCameraOpen, setStoryCameraOpen] = useState(false);
   const storySwipeTouchRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -148,10 +150,11 @@ const Index = () => {
 
 
   const handleOpenSettings = () => {
-    setActiveTab("settings");
+    handleTabChange("settings");
   };
 
   const handleTabChange = (tab: Tab) => {
+    setFeatureReturnTarget(null);
     if (tab === "chat") {
       setChatGroup(null);
       setChatMode("list");
@@ -192,14 +195,14 @@ const Index = () => {
 
   const handleDrawerNavigate = (tab: Tab | "settings") => {
     if (tab === "settings") {
-      setActiveTab("settings");
+      handleTabChange("settings");
     } else {
       handleTabChange(tab as Tab);
     }
   };
 
   const handleAiSubmit = (text: string) => {
-    setActiveTab("ai");
+    handleTabChange("ai");
   };
 
   // Map tab names to ShareablePage keys for feature gating
@@ -213,6 +216,10 @@ const Index = () => {
   };
 
   const handleNavigateToFeature = (feature: string, groupId?: string) => {
+    if (activeTab === "home") setFeatureReturnTarget("home");
+    else if (activeTab === "group-hub") setFeatureReturnTarget("group-hub");
+    else setFeatureReturnTarget(null);
+
     const tabMap: Record<string, Tab> = {
       workout: "workout",
       habits: "habits",
@@ -246,13 +253,21 @@ const Index = () => {
   };
 
   const handleOpenGroupHub = (group: Group) => {
+    setFeatureReturnTarget(null);
     setHubGroup(group);
-    setActiveTab("group-hub" as Tab);
+    setActiveTab("group-hub");
   };
 
   const handleBackFromHub = () => {
     setHubGroup(null);
-    setActiveTab("shared-interests" as Tab);
+    setActiveTab("shared-interests");
+  };
+
+  const handleFeatureSubBack = () => {
+    const target = featureReturnTarget;
+    setFeatureReturnTarget(null);
+    if (target === "home") setActiveTab("home");
+    else if (target === "group-hub") setActiveTab("group-hub");
   };
 
   const pages: Record<string, React.ReactNode> = {
@@ -279,14 +294,21 @@ const Index = () => {
         onOpenMore={() => setMoreOpen(true)}
       />
     ),
-    friends: <FriendsPage onBack={() => setActiveTab("profile")} />,
-    workout: <WorkoutsPage onOpenMore={() => setMoreOpen(true)} isActive={activeTab === "workout"} navigatedGroupId={workoutNavigatedGroupId} />,
-    habits: <HabitsPage onOpenMore={() => setMoreOpen(true)} />,
-    sobriety: <SobrietyPage onOpenMore={() => setMoreOpen(true)} />,
+    friends: <FriendsPage onBack={() => handleTabChange("profile")} />,
+    workout: (
+      <WorkoutsPage
+        onOpenMore={() => setMoreOpen(true)}
+        isActive={activeTab === "workout"}
+        navigatedGroupId={workoutNavigatedGroupId}
+        onSubPageBack={featureReturnTarget ? handleFeatureSubBack : undefined}
+      />
+    ),
+    habits: <HabitsPage onOpenMore={() => setMoreOpen(true)} onSubPageBack={featureReturnTarget ? handleFeatureSubBack : undefined} />,
+    sobriety: <SobrietyPage onOpenMore={() => setMoreOpen(true)} onSubPageBack={featureReturnTarget ? handleFeatureSubBack : undefined} />,
 
-    calendar: <CalendarPage onOpenMore={() => setMoreOpen(true)} />,
-    study: <StudyPage onOpenMore={() => setMoreOpen(true)} />,
-    todo: <TodoPage onOpenMore={() => setMoreOpen(true)} />,
+    calendar: <CalendarPage onOpenMore={() => setMoreOpen(true)} onSubPageBack={featureReturnTarget ? handleFeatureSubBack : undefined} />,
+    study: <StudyPage onOpenMore={() => setMoreOpen(true)} onSubPageBack={featureReturnTarget ? handleFeatureSubBack : undefined} />,
+    todo: <TodoPage onOpenMore={() => setMoreOpen(true)} onSubPageBack={featureReturnTarget ? handleFeatureSubBack : undefined} />,
     chat: renderChatView(),
     ai: <AiAssistantPage onOpenMore={() => setMoreOpen(true)} />,
     settings: <SettingsPage />,

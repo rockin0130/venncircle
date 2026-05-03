@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, CalendarDays, ListTodo } from "lucide-react";
+import { X, CalendarDays, ListTodo, ArrowLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppContext } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
@@ -156,11 +156,21 @@ const AddItemModal = ({ open, onClose }: AddItemModalProps) => {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Fixed header */}
-          <div className="flex items-center justify-between px-5 safe-area-top pt-3 pb-3 flex-shrink-0">
-            <h2 className="text-lg font-bold tracking-display">
-              {step === "choose" ? "Add New" : step === "calendar" ? (isTodoMode ? "New To Do" : "Schedule Event") : "New Habit"}
-            </h2>
-            <button onClick={handleClose} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+          <div className="flex items-center justify-between gap-2 px-5 safe-area-top pt-3 pb-3 flex-shrink-0">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => (step === "choose" ? handleClose() : setStep("choose"))}
+                className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center shrink-0 text-foreground hover:bg-secondary/80"
+                aria-label={step === "choose" ? "Close" : "Back"}
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <h2 className="text-lg font-bold tracking-display truncate">
+                {step === "choose" ? "Add New" : step === "calendar" ? (isTodoMode ? "New To Do" : "Schedule Event") : "New Habit"}
+              </h2>
+            </div>
+            <button onClick={handleClose} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
               <X size={16} />
             </button>
           </div>
